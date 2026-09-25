@@ -1,0 +1,513 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+    <title>Paw Art Studio — Визуал для твоего проекта</title>
+    <meta name="description" content="Маскоты, стикеры, оверлеи и арт для стримеров, серверов и брендов." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <link rel="stylesheet" href="css/style.css" />
+</head>
+<body>
+
+<header id="header">
+    <div class="container nav">
+        <div class="logo" onclick="scrollToTop()"><span class="logo-paw">🐾</span> PAW <span>ART</span></div>
+        <button class="burger" id="burger" onclick="toggleMenu()"><span></span><span></span><span></span></button>
+        <nav class="nav-links" id="navLinks">
+            <a onclick="scrollToSection('services')">Услуги</a>
+            <a onclick="scrollToSection('projects')">Заказы</a>
+            <a onclick="scrollToSection('portfolio')">Портфолио</a>
+            <a onclick="scrollToSection('pricing')">Цены</a>
+            <a onclick="scrollToSection('about')">О нас</a>
+            <a onclick="scrollToSection('faq')">FAQ</a>
+            <a onclick="scrollToSection('contact')">Контакты</a>
+        </nav>
+        <div class="nav-user">
+            <button class="btn-login" id="loginBtn" onclick="openAuth()"><i class="fas fa-user"></i> Войти</button>
+            <div class="user-box hidden" id="userBox">
+                <button class="chat-chip" onclick="openMessenger()" title="Сообщения">
+                    <i class="fas fa-comments"></i>
+                    <span class="chat-chip-badge hidden" id="chatBadge">0</span>
+                </button>
+                <button class="balance-chip" onclick="openDashboard()" title="Кабинет">
+                    <i class="fas fa-wallet"></i> <span id="balanceChip">0 ₽</span>
+                </button>
+                <button class="admin-btn hidden" id="adminBtn" onclick="openAdminPanel()" title="Админ"><i class="fas fa-shield-alt"></i></button>
+                <button class="avatar" id="userAvatar" onclick="toggleUserMenu()"><span id="userInitial">U</span></button>
+                <div class="user-menu hidden" id="userMenu">
+                    <div class="user-menu-head">
+                        <div class="user-menu-name" id="userName">User</div>
+                        <div class="user-menu-role" id="userRole">Клиент</div>
+                    </div>
+                    <a onclick="openDashboard()"><i class="fas fa-wallet"></i> Кабинет и баланс</a>
+                    <a onclick="openProfileEditor()"><i class="fas fa-user-edit"></i> Редактировать профиль</a>
+                    <a onclick="openMessenger()"><i class="fas fa-comments"></i> Сообщения (панель)</a>
+                    <a href="/messenger.html" target="_blank"><i class="fas fa-external-link-alt"></i> Мессенджер (страница)</a>
+                    <a onclick="openMyPortfolio()"><i class="fas fa-images"></i> Моё портфолио</a>
+                    <a onclick="openAdminPanel()" id="adminMenuLink" class="hidden"><i class="fas fa-shield-alt"></i> Админ-панель</a>
+                    <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</a>
+                </div>
+            </div>
+        </div>
+    </div>
+</header>
+
+<main>
+    <section class="hero" id="hero">
+        <div class="hero-bg"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
+        <div class="container hero-inner">
+            <div class="hero-content">
+                <div class="hero-eyebrow">🐾 Студия визуала Paw Art Studio</div>
+                <h1>Дизайн, который <span class="gradient-text">работает</span> на вас</h1>
+                <p>Маскоты, стикеры, оформление, арты и 3D-модели. Создаём образы, которые запоминаются.</p>
+                <div class="hero-actions">
+                    <a onclick="scrollToSection('contact')" class="btn">Заказать проект</a>
+                    <a onclick="scrollToSection('portfolio')" class="btn btn-ghost">Смотреть работы</a>
+                </div>
+                <div class="hero-badges">
+                    <span>⭐ 4.9 из 5</span><span>⚡ Срок от 3 дней</span><span>🎨 50+ работ</span>
+                </div>
+            </div>
+            <div class="hero-gallery">
+                <div class="placeholder" onclick="scrollToSection('projects')"><i class="fas fa-palette"></i><span>маскот</span></div>
+                <div class="placeholder" onclick="scrollToSection('projects')"><i class="fas fa-smile"></i><span>стикеры</span></div>
+                <div class="placeholder" onclick="scrollToSection('projects')"><i class="fas fa-video"></i><span>оверлей</span></div>
+                <div class="placeholder" onclick="scrollToSection('projects')"><i class="fas fa-dragon"></i><span>арт</span></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section services" id="services">
+        <div class="container">
+            <h2>Услуги</h2>
+            <p class="section-subtitle">Выберите то, что нужно вашему проекту</p>
+            <div class="grid grid-3">
+                <div class="service-card" data-service="Маскот" data-price="от 4 000 ₽">
+                    <span class="badge badge-hot">ХИТ</span>
+                    <div class="service-icon"><i class="fas fa-user-astronaut"></i></div>
+                    <h3>Маскот</h3><p>Персонаж для бренда / канала</p><span class="price">от 4 000 ₽</span>
+                </div>
+                <div class="service-card" data-service="Стикеры" data-price="от 1 800 ₽">
+                    <div class="service-icon"><i class="fas fa-sticky-note"></i></div>
+                    <h3>Стикеры</h3><p>5–15 эмоций для Discord / Telegram</p><span class="price">от 1 800 ₽</span>
+                </div>
+                <div class="service-card" data-service="Оверлей" data-price="от 3 000 ₽">
+                    <div class="service-icon"><i class="fas fa-layer-group"></i></div>
+                    <h3>Оверлей</h3><p>Оформление экрана для стримов</p><span class="price">от 3 000 ₽</span>
+                </div>
+                <div class="service-card" data-service="Арт" data-price="от 3 000 ₽">
+                    <div class="service-icon"><i class="fas fa-paint-brush"></i></div>
+                    <h3>Арт</h3><p>Иллюстрация на заказ</p><span class="price">от 3 000 ₽</span>
+                </div>
+                <div class="service-card" data-service="Брендинг DC" data-price="10 000 ₽">
+                    <span class="badge badge-new">NEW</span>
+                    <div class="service-icon"><i class="fab fa-discord"></i></div>
+                    <h3>Брендинг DC</h3><p>Маскот + стикеры + баннеры + аватарки</p><span class="price">10 000 ₽</span>
+                </div>
+                <div class="service-card" data-service="Анимация" data-price="от 5 000 ₽">
+                    <div class="service-icon"><i class="fas fa-film"></i></div>
+                    <h3>Анимация</h3><p>2D-анимация персонажа или логотипа</p><span class="price">от 5 000 ₽</span>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section projects-section" id="projects">
+        <div class="container">
+            <h2>Заказы</h2>
+            <p class="section-subtitle">Создайте заказ или возьмите в работу</p>
+            <div class="projects-toolbar">
+                <div class="projects-filters" id="projectFilters">
+                    <button class="filter active" data-status="all">Все</button>
+                    <button class="filter" data-status="open">Открытые</button>
+                    <button class="filter" data-status="in_progress">В работе</button>
+                    <button class="filter" data-status="completed">Завершённые</button>
+                </div>
+                <button class="btn" id="createProjectBtn" onclick="openProjectCreator()"><i class="fas fa-plus"></i> Создать заказ</button>
+            </div>
+            <div class="projects-list" id="projectsList">
+                <div class="empty-state"><i class="fas fa-folder-open"></i><p>Войдите, чтобы увидеть заказы</p></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section portfolio-preview" id="portfolio">
+        <div class="container">
+            <h2>Портфолио</h2>
+            <p class="section-subtitle">Готовые работы мастеров студии</p>
+            <div class="port-filters">
+                <button class="filter active" data-filter="all">Все</button>
+                <button class="filter" data-filter="Маскот">Маскоты</button>
+                <button class="filter" data-filter="Стикеры">Стикеры</button>
+                <button class="filter" data-filter="Оверлей">Оверлеи</button>
+                <button class="filter" data-filter="Арт">Арт</button>
+            </div>
+            <div class="portfolio-gallery" id="portfolioGallery">
+                <div class="empty-state"><i class="fas fa-image"></i><p>Работы появятся здесь</p></div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section pricing" id="pricing">
+        <div class="container">
+            <h2>Пакеты и цены</h2>
+            <p class="section-subtitle">Подберите идеальный вариант</p>
+            <div class="grid grid-5 pricing-grid">
+                <div class="pricing-card"><div class="name">Старт</div><div class="price-tag">1 800 ₽</div>
+                    <ul><li><i class="fas fa-check"></i> 5 стикеров</li><li><i class="fas fa-check"></i> Учёт стиля</li><li><i class="fas fa-check"></i> PNG</li><li><i class="fas fa-check"></i> 1 правка</li></ul>
+                    <a onclick="selectPlan('Старт', '1 800 ₽')" class="btn btn-outline">Выбрать</a>
+                </div>
+                <div class="pricing-card"><div class="name">Базовый</div><div class="price-tag">2 500 ₽</div>
+                    <ul><li><i class="fas fa-check"></i> 10 стикеров</li><li><i class="fas fa-check"></i> Учёт стиля</li><li><i class="fas fa-check"></i> PNG + WEBP</li><li><i class="fas fa-check"></i> 2 правки</li></ul>
+                    <a onclick="selectPlan('Базовый', '2 500 ₽')" class="btn btn-outline">Выбрать</a>
+                </div>
+                <div class="pricing-card popular"><div class="name">Маскот</div><div class="price-tag">4 000–6 000 ₽</div>
+                    <ul><li><i class="fas fa-check"></i> 1 персонаж</li><li><i class="fas fa-check"></i> 2–3 позы</li><li><i class="fas fa-check"></i> Concept-арт</li><li><i class="fas fa-check"></i> 3 правки</li></ul>
+                    <a onclick="selectPlan('Маскот', '4 000–6 000 ₽')" class="btn">Выбрать</a>
+                </div>
+                <div class="pricing-card"><div class="name">Бренд</div><div class="price-tag">10 000–12 000 ₽</div>
+                    <ul><li><i class="fas fa-check"></i> Маскот + 10 стикеров</li><li><i class="fas fa-check"></i> Оверлей</li><li><i class="fas fa-check"></i> Аватарки</li><li><i class="fas fa-check"></i> 4 правки</li></ul>
+                    <a onclick="selectPlan('Бренд', '10 000–12 000 ₽')" class="btn btn-outline">Выбрать</a>
+                </div>
+                <div class="pricing-card"><div class="name">Под ключ</div><div class="price-tag">15 000–20 000 ₽</div>
+                    <ul><li><i class="fas fa-check"></i> Маскот + стикеры</li><li><i class="fas fa-check"></i> Оверлей + баннеры</li><li><i class="fas fa-check"></i> Анимация</li><li><i class="fas fa-check"></i> ∞ правки</li></ul>
+                    <a onclick="selectPlan('Под ключ', '15 000–20 000 ₽')" class="btn btn-outline">Выбрать</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section about" id="about">
+        <div class="container">
+            <h2>О нас</h2>
+            <p class="section-subtitle">Команда, которая делает визуал осмысленным</p>
+            <div class="about-layout">
+                <div class="about-text">
+                    <p><strong>Paw Art Studio</strong> — команда художников и менеджеров.</p>
+                    <blockquote>«Мы не просто рисуем. Мы создаём образы, которые работают на ваш проект»</blockquote>
+                </div>
+                <div class="about-grid">
+                    <div class="about-stat"><div class="num" id="stat1">0</div><div class="desc">проектов</div></div>
+                    <div class="about-stat"><div class="num" id="stat2">0</div><div class="desc">довольных клиентов</div></div>
+                    <div class="about-stat"><div class="num" id="stat3">0</div><div class="desc">средний срок</div></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section faq" id="faq">
+        <div class="container">
+            <h2>Частые вопросы</h2>
+            <p class="section-subtitle">Коротко о главном</p>
+            <div class="faq-list">
+                <details class="faq-item"><summary>Как зарегистрироваться?</summary><p>Нажмите «Войти» → «Регистрация». Вы получите роль «Клиент» и бонус 500 ₽.</p></details>
+                <details class="faq-item"><summary>Как стать исполнителем?</summary><p>В личном кабинете на вкладке «Роль» отправьте заявку. Админ рассмотрит.</p></details>
+                <details class="faq-item"><summary>Как взять заказ?</summary><p>Исполнители видят открытые заказы в разделе «Заказы».</p></details>
+                <details class="faq-item"><summary>Как вывести деньги?</summary><p>В кабинете → Кошелёк → Вывести. Заявка уходит админу.</p></details>
+                <details class="faq-item"><summary>Какая комиссия?</summary><p><strong>0%</strong>. Минимум вывода — 0.01 ₽.</p></details>
+            </div>
+        </div>
+    </section>
+
+    <section class="section contact" id="contact">
+        <div class="container">
+            <h2>Контакты</h2>
+            <p class="section-subtitle">Свяжитесь с нами удобным способом</p>
+            <div class="contact-wrapper">
+                <div class="contact-links">
+                    <a href="https://discord.gg/pawartstudio" target="_blank" rel="noopener noreferrer">
+                        <i class="fab fa-discord"></i> discord.gg/pawartstudio
+                    </a>
+                    <a href="https://t.me/pawartstudio" target="_blank" rel="noopener noreferrer">
+                        <i class="fab fa-telegram-plane"></i> @pawartstudio
+                    </a>
+                    <a href="mailto:pawartstudio@gmail.com">
+                        <i class="fas fa-envelope"></i> pawartstudio@gmail.com
+                    </a>
+                </div>
+                <div class="contact-form">
+                    <h3 style="margin-bottom:6px;">Оставить заявку</h3>
+                    <p style="color:var(--text-mute); font-size:0.9rem;">Мы ответим в течение 24 часов</p>
+                    <form id="contactForm" onsubmit="handleSubmit(event)">
+                        <label>Имя</label><input type="text" id="formName" placeholder="Как к вам обращаться?" required />
+                        <label>Проект</label><input type="text" id="formProject" placeholder="Название проекта" />
+                        <label>Что нужно</label>
+                        <select id="formService">
+                            <option value="Маскот">Маскот</option><option value="Стикеры">Стикеры</option>
+                            <option value="Оверлей">Оверлей</option><option value="Арт">Арт</option>
+                            <option value="Брендинг DC">Брендинг DC</option><option value="Анимация">Анимация</option>
+                            <option value="Другое">Другое</option>
+                        </select>
+                        <label>Бюджет</label><input type="text" id="formBudget" placeholder="Ориентировочная сумма" />
+                        <label>Ссылка на референсы</label><textarea id="formMessage" placeholder="Стиль, примеры, идеи..."></textarea>
+                        <div id="selectedPlan">Выбран пакет: <span id="planDisplay"></span></div>
+                        <button type="submit" class="btn">Отправить заявку</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<footer>
+    <div class="container footer-grid">
+        <div class="footer-col">
+            <div class="logo"><span class="logo-paw">🐾</span> PAW <span>ART</span></div>
+            <p>Визуал для стримеров, серверов и брендов.</p>
+        </div>
+        <div class="footer-col">
+            <h4>Навигация</h4>
+            <a onclick="scrollToSection('services')">Услуги</a>
+            <a onclick="scrollToSection('projects')">Заказы</a>
+            <a onclick="scrollToSection('portfolio')">Портфолио</a>
+            <a onclick="scrollToSection('pricing')">Цены</a>
+        </div>
+        <div class="footer-col">
+            <h4>Соцсети</h4>
+            <a href="https://discord.gg/pawartstudio" target="_blank" rel="noopener noreferrer"><i class="fab fa-discord"></i> Discord</a>
+            <a href="https://t.me/pawartstudio" target="_blank" rel="noopener noreferrer"><i class="fab fa-telegram-plane"></i> Telegram</a>
+            <a href="mailto:pawartstudio@gmail.com"><i class="fas fa-envelope"></i> Email</a>
+        </div>
+    </div>
+    <div class="footer-bottom"><div class="container">&copy; 2026 PAW ART STUDIO</div></div>
+</footer>
+
+<div class="toast" id="toast"></div>
+<button class="scroll-top" id="scrollTop" onclick="scrollToTop()"><i class="fas fa-arrow-up"></i></button>
+
+<div class="modal" id="authModal" onclick="if(event.target===this) closeAuth()">
+    <div class="modal-box">
+        <button class="modal-close" onclick="closeAuth()">×</button>
+        <div class="auth-head"><div class="auth-logo">🐾</div><h3>Paw Art Studio</h3><p>Войдите или создайте аккаунт</p></div>
+        <div class="auth-tabs">
+            <button class="auth-tab active" data-tab="login" onclick="switchAuthTab('login')">Вход</button>
+            <button class="auth-tab" data-tab="register" onclick="switchAuthTab('register')">Регистрация</button>
+        </div>
+        <form class="auth-form" id="loginForm" onsubmit="handleLogin(event)">
+            <label>Email</label><input type="email" id="loginEmail" placeholder="your@email.com" required />
+            <label>Пароль</label><input type="password" id="loginPassword" placeholder="••••••••" required />
+            <button type="submit" class="btn">Войти</button>
+        </form>
+        <form class="auth-form hidden" id="registerForm" onsubmit="handleRegister(event)">
+            <label>Имя</label><input type="text" id="regName" placeholder="Как вас зовут?" required />
+            <label>Email</label><input type="email" id="regEmail" placeholder="your@email.com" required />
+            <label>Пароль</label><input type="password" id="regPassword" placeholder="Минимум 6 символов" minlength="6" required />
+            <div class="role-info-box"><i class="fas fa-info-circle"></i><span>При регистрации — роль <strong>Клиент</strong> + бонус <strong>500 ₽</strong>.</span></div>
+            <button type="submit" class="btn">Создать аккаунт</button>
+        </form>
+    </div>
+</div>
+
+<div class="modal" id="dashboardModal" onclick="if(event.target===this) closeDashboard()">
+    <div class="modal-box dashboard-box">
+        <button class="modal-close" onclick="closeDashboard()">×</button>
+        <div class="dash-head">
+            <div class="dash-avatar" id="dashAvatar">U</div>
+            <div><h3 id="dashName">Пользователь</h3><div class="dash-role" id="dashRole">Клиент</div></div>
+            <button class="dash-edit-btn" onclick="openProfileEditor()" title="Профиль"><i class="fas fa-pen"></i></button>
+        </div>
+        <div class="dash-tabs">
+            <button class="dash-tab active" data-dtab="wallet" onclick="switchDashTab('wallet')"><i class="fas fa-wallet"></i> Кошелёк</button>
+            <button class="dash-tab" data-dtab="withdrawals" onclick="switchDashTab('withdrawals')"><i class="fas fa-money-check-alt"></i> Выплаты</button>
+            <button class="dash-tab" data-dtab="history" onclick="switchDashTab('history')"><i class="fas fa-history"></i> История</button>
+            <button class="dash-tab" data-dtab="role" onclick="switchDashTab('role')"><i class="fas fa-user-tag"></i> Роль</button>
+        </div>
+        <div class="dash-panel" id="dashWallet">
+            <div class="balance-card">
+                <div class="balance-label">Ваш баланс</div>
+                <div class="balance-value" id="dashBalance">0 ₽</div>
+                <div class="balance-actions">
+                    <button class="btn" onclick="openDeposit()"><i class="fas fa-plus"></i> Пополнить</button>
+                    <button class="btn btn-outline" onclick="openWithdraw()"><i class="fas fa-arrow-up"></i> Вывести</button>
+                </div>
+                <div class="commission-note"><i class="fas fa-info-circle"></i> Комиссия <strong>0%</strong>. Вывод подтверждает админ.</div>
+            </div>
+            <div class="wallet-stats">
+                <div class="wallet-stat"><div class="ws-num" id="wsIn">0 ₽</div><div class="ws-desc">пополнено</div></div>
+                <div class="wallet-stat"><div class="ws-num" id="wsOut">0 ₽</div><div class="ws-desc">выведено</div></div>
+                <div class="wallet-stat"><div class="ws-num" id="wsProjects">0</div><div class="ws-desc">проектов</div></div>
+            </div>
+        </div>
+        <div class="dash-panel hidden" id="dashWithdrawals">
+            <div class="withdrawals-list" id="userWithdrawalsList">
+                <div class="tx-empty">Пока нет заявок на вывод</div>
+            </div>
+        </div>
+        <div class="dash-panel hidden" id="dashHistory"><div class="tx-list" id="txList"><div class="tx-empty">Пока нет операций</div></div></div>
+        <div class="dash-panel hidden" id="dashRolePanel">
+            <div class="role-current"><div class="role-current-label">Ваша роль</div><div class="role-current-value" id="roleCurrentValue">Клиент</div></div>
+            <div id="roleRequestBlock">
+                <p class="role-desc">Отправьте заявку — админ рассмотрит.</p>
+                <div class="role-request-actions">
+                    <button class="btn" onclick="requestRole('executor')"><i class="fas fa-paint-brush"></i> Стать исполнителем</button>
+                    <button class="btn btn-outline" onclick="requestRole('manager')"><i class="fas fa-briefcase"></i> Стать менеджером</button>
+                </div>
+            </div>
+            <div class="role-pending hidden" id="rolePending"><i class="fas fa-hourglass-half"></i><span id="rolePendingText">Заявка на рассмотрении</span></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="profileModal" onclick="if(event.target===this) closeProfileEditor()">
+    <div class="modal-box">
+        <button class="modal-close" onclick="closeProfileEditor()">×</button>
+        <div class="auth-head"><div class="auth-logo">👤</div><h3>Редактировать профиль</h3></div>
+        <div class="avatar-editor">
+            <div class="avatar-preview" id="avatarPreview">U</div>
+            <div class="avatar-upload">
+                <input type="file" id="avatarInput" accept="image/*" onchange="uploadAvatar(event)" hidden />
+                <button class="btn btn-outline" onclick="document.getElementById('avatarInput').click()"><i class="fas fa-camera"></i> Загрузить аватар</button>
+                <p class="avatar-hint">PNG, JPG, WEBP до 5 МБ</p>
+            </div>
+        </div>
+        <form class="auth-form" onsubmit="handleProfileUpdate(event)">
+            <label>Имя</label><input type="text" id="profileName" placeholder="Ваше имя" />
+            <label>О себе</label><textarea id="profileBio" placeholder="Коротко о себе..." maxlength="500" style="min-height:80px;"></textarea>
+            <div class="section-divider"><span>Смена пароля</span></div>
+            <label>Текущий пароль</label><input type="password" id="profileCurrentPass" placeholder="Оставьте пустым" />
+            <label>Новый пароль</label><input type="password" id="profileNewPass" placeholder="Минимум 6 символов" minlength="6" />
+            <button type="submit" class="btn">Сохранить</button>
+        </form>
+    </div>
+</div>
+
+<div class="modal" id="projectModal" onclick="if(event.target===this) closeProjectCreator()">
+    <div class="modal-box">
+        <button class="modal-close" onclick="closeProjectCreator()">×</button>
+        <div class="auth-head"><div class="auth-logo">📦</div><h3>Создать заказ</h3><p>Опишите задачу</p></div>
+        <form class="auth-form" onsubmit="handleProjectCreate(event)">
+            <label>Название *</label><input type="text" id="projTitle" placeholder="Например: Маскот для Twitch-канала" required maxlength="120" />
+            <label>Описание *</label><textarea id="projDescription" placeholder="Что нужно нарисовать..." required maxlength="2000" style="min-height:100px;"></textarea>
+            <label>Категория *</label>
+            <select id="projCategory" required>
+                <option value="Маскот">Маскот</option><option value="Стикеры">Стикеры</option>
+                <option value="Оверлей">Оверлей</option><option value="Арт">Арт</option>
+                <option value="Брендинг DC">Брендинг DC</option><option value="Анимация">Анимация</option>
+                <option value="Другое">Другое</option>
+            </select>
+            <label>Бюджет (₽)</label><input type="number" id="projBudget" placeholder="0" min="0" step="0.01" />
+            <button type="submit" class="btn">Создать заказ</button>
+        </form>
+    </div>
+</div>
+
+<div class="modal" id="projectDetailModal" onclick="if(event.target===this) closeProjectDetail()">
+    <div class="modal-box project-detail-box">
+        <button class="modal-close" onclick="closeProjectDetail()">×</button>
+        <div id="projectDetailContent"></div>
+    </div>
+</div>
+
+<div class="modal" id="myPortfolioModal" onclick="if(event.target===this) closeMyPortfolio()">
+    <div class="modal-box portfolio-box">
+        <button class="modal-close" onclick="closeMyPortfolio()">×</button>
+        <div class="auth-head"><div class="auth-logo">🖼️</div><h3>Моё портфолио</h3><p>Загружайте свои работы</p></div>
+        <form class="upload-form" id="portfolioUploadForm" onsubmit="handlePortfolioUpload(event)">
+            <div class="upload-zone" onclick="document.getElementById('portfolioInput').click()">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <p id="uploadZoneText">Нажмите, чтобы выбрать изображение</p>
+                <input type="file" id="portfolioInput" accept="image/*" hidden onchange="previewPortfolioFile(event)" />
+            </div>
+            <label>Название *</label><input type="text" id="portTitle" placeholder="Например: Маскот для кофейни" required maxlength="120" />
+            <label>Описание</label><textarea id="portDescription" placeholder="Коротко о работе" maxlength="500" style="min-height:60px;"></textarea>
+            <label>Категория</label>
+            <select id="portCategory">
+                <option value="Маскот">Маскот</option><option value="Стикеры">Стикеры</option>
+                <option value="Оверлей">Оверлей</option><option value="Арт">Арт</option>
+                <option value="Брендинг DC">Брендинг DC</option><option value="Анимация">Анимация</option>
+            </select>
+            <button type="submit" class="btn">Загрузить</button>
+        </form>
+        <div class="my-portfolio-grid" id="myPortfolioGrid"></div>
+    </div>
+</div>
+
+<aside class="messenger" id="messenger">
+    <div class="msgr-header">
+        <button class="msgr-back hidden" id="msgrBack" onclick="closeChat()"><i class="fas fa-arrow-left"></i></button>
+        <h3 id="msgrTitle"><i class="fas fa-comments"></i> Сообщения</h3>
+        <button class="msgr-close" onclick="closeMessenger()">×</button>
+    </div>
+    <div class="msgr-body">
+        <div class="chat-list" id="chatList"></div>
+        <div class="chat-window hidden" id="chatWindow">
+            <div class="chat-head hidden" id="chatHead">
+                <div class="chat-head-avatar" id="chatHeadAvatar">?</div>
+                <div class="chat-head-info">
+                    <div class="chat-head-name" id="chatHeadName">—</div>
+                    <div class="chat-head-role" id="chatHeadRole">—</div>
+                </div>
+            </div>
+            <div class="chat-messages" id="chatMessages"></div>
+            <form class="chat-input" onsubmit="sendMessage(event)">
+                <input type="text" id="chatInput" placeholder="Написать сообщение..." autocomplete="off" maxlength="2000" />
+                <button type="submit"><i class="fas fa-paper-plane"></i></button>
+            </form>
+        </div>
+    </div>
+</aside>
+
+<button class="msgr-fab hidden" id="msgrFab" onclick="openMessenger()">
+    <i class="fas fa-comments"></i>
+    <span class="msgr-badge hidden" id="msgrBadge">0</span>
+</button>
+
+<div class="modal" id="adminModal" onclick="if(event.target===this) closeAdminPanel()">
+    <div class="modal-box admin-box">
+        <button class="modal-close" onclick="closeAdminPanel()">×</button>
+        <div class="admin-head"><div class="admin-head-icon">🛡️</div><div><h3>Админ-панель</h3><p>Управление и статистика</p></div></div>
+        <div class="admin-tabs">
+            <button class="admin-tab active" data-atab="dashboard" onclick="switchAdminTab('dashboard')"><i class="fas fa-chart-line"></i> Статистика</button>
+            <button class="admin-tab" data-atab="withdrawals" onclick="switchAdminTab('withdrawals')"><i class="fas fa-money-check-alt"></i> Выплаты <span class="admin-badge" id="wdCount">0</span></button>
+            <button class="admin-tab" data-atab="requests" onclick="switchAdminTab('requests')"><i class="fas fa-bell"></i> Заявки <span class="admin-badge" id="reqCount">0</span></button>
+            <button class="admin-tab" data-atab="users" onclick="switchAdminTab('users')"><i class="fas fa-users"></i> Пользователи</button>
+        </div>
+        <div class="admin-panel" id="adminDashboard"><div id="dashboardStats"></div></div>
+        <div class="admin-panel hidden" id="adminWithdrawals"><div id="withdrawalsList"></div></div>
+        <div class="admin-panel hidden" id="adminRequests"><div id="requestsList"></div></div>
+        <div class="admin-panel hidden" id="adminUsers">
+            <div class="admin-search"><i class="fas fa-search"></i><input type="text" id="userSearch" placeholder="Поиск..." oninput="renderAdminUsers()" /></div>
+            <div id="usersList"></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="userFullModal" onclick="if(event.target===this) closeUserFull()">
+    <div class="modal-box user-modal-box">
+        <button class="modal-close" onclick="closeUserFull()">×</button>
+        <div id="userFullContent"></div>
+    </div>
+</div>
+
+<div class="modal" id="moneyModal" onclick="if(event.target===this) closeMoney()">
+    <div class="modal-box money-box">
+        <button class="modal-close" onclick="closeMoney()">×</button>
+        <h3 id="moneyTitle">Пополнение баланса</h3>
+        <p class="money-sub" id="moneySub">Выберите сумму или введите свою</p>
+        <div class="money-presets">
+            <button onclick="setMoney(500)">500 ₽</button><button onclick="setMoney(1000)">1 000 ₽</button>
+            <button onclick="setMoney(2000)">2 000 ₽</button><button onclick="setMoney(5000)">5 000 ₽</button>
+        </div>
+        <label>Сумма (можно копейки)</label>
+        <input type="number" id="moneyAmount" placeholder="0.00" step="0.01" min="0.01" />
+        <div class="money-note" id="moneyNote">Комиссия <strong>0%</strong>. Моментально.</div>
+        <button class="btn" id="moneySubmit" onclick="submitMoney()">Пополнить</button>
+    </div>
+</div>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+    <button class="lb-close" onclick="closeLightbox()">×</button>
+    <div class="lb-content" onclick="event.stopPropagation()">
+        <img id="lbImg" src="" alt="">
+        <div class="lb-meta"><h3 id="lbTitle"></h3><p id="lbDesc"></p></div>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="js/script.js"></script>
+</body>
+</html>

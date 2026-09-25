@@ -1,0 +1,17 @@
+meta:
+  environment: node
+  toolchain:
+    name: npm
+    version: "20"
+
+build:
+  additionalCommands: npm install
+
+run:
+  command: npm start
+  containerPort: 3000
+
+volumes:
+  - name: data
+    path: /data
+    size: 1Gi

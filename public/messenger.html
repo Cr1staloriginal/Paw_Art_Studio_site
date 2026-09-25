@@ -1,0 +1,441 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+    <title>Мессенджер — Paw Art Studio</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <link rel="stylesheet" href="css/style.css" />
+    <style>
+        body { background: var(--bg); height: 100vh; overflow: hidden; }
+        .msgr-page {
+            display: grid; grid-template-columns: 340px 1fr;
+            height: 100vh; max-width: 1400px; margin: 0 auto;
+            border-left: 1px solid var(--border);
+            border-right: 1px solid var(--border);
+            background: var(--bg-card);
+        }
+        .msgr-sidebar {
+            border-right: 1px solid var(--border);
+            display: flex; flex-direction: column;
+            background: var(--bg-2); overflow: hidden;
+        }
+        .msgr-sidebar-head {
+            padding: 16px 20px;
+            border-bottom: 1px solid var(--border);
+            display: flex; align-items: center; gap: 12px;
+            background: var(--bg-card);
+        }
+        .msgr-sidebar-head .logo { font-size: 1.15rem; flex: 1; }
+        .msgr-sidebar-head .back-btn {
+            width: 34px; height: 34px; border-radius: 50%;
+            border: 1px solid var(--border-2); background: var(--bg-2);
+            color: var(--text-soft);
+            display: flex; align-items: center; justify-content: center;
+            cursor: pointer; transition: all 0.2s;
+            -webkit-tap-highlight-color: transparent; text-decoration: none;
+        }
+        .msgr-sidebar-head .back-btn:hover { border-color: var(--accent); color: var(--accent-light); }
+        .msgr-sidebar-search { padding: 12px 16px; border-bottom: 1px solid var(--border); position: relative; }
+        .msgr-sidebar-search i {
+            position: absolute; left: 28px; top: 50%; transform: translateY(-50%);
+            color: var(--text-mute); font-size: 0.85rem; pointer-events: none;
+        }
+        .msgr-sidebar-search input {
+            width: 100%; padding: 10px 14px 10px 38px;
+            background: var(--bg-card); border: 1px solid var(--border-2);
+            border-radius: 40px; color: var(--text);
+            font-family: inherit; font-size: 0.88rem; transition: border-color 0.2s;
+        }
+        .msgr-sidebar-search input:focus {
+            outline: none; border-color: var(--accent);
+            box-shadow: 0 0 0 3px rgba(236, 72, 153, 0.12);
+        }
+        .msgr-page-chat-list { flex: 1; overflow-y: auto; padding: 6px 0; }
+        .msgr-new-chat-btn {
+            display: flex; align-items: center; gap: 8px;
+            margin: 8px 12px 4px; padding: 10px 14px;
+            border-radius: 12px;
+            background: linear-gradient(135deg, var(--accent), var(--accent-2));
+            color: #fff; border: none; font-family: inherit;
+            font-weight: 600; font-size: 0.85rem; cursor: pointer;
+            transition: filter 0.2s, transform 0.15s;
+            -webkit-tap-highlight-color: transparent;
+        }
+        .msgr-new-chat-btn:hover { filter: brightness(1.1); transform: translateY(-1px); }
+        .msgr-main {
+            display: flex; flex-direction: column;
+            background: var(--bg-card); overflow: hidden; position: relative;
+        }
+        .msgr-main-empty {
+            flex: 1; display: flex; flex-direction: column;
+            align-items: center; justify-content: center;
+            color: var(--text-mute); padding: 30px; text-align: center;
+        }
+        .msgr-main-empty i {
+            font-size: 4rem; color: var(--accent);
+            opacity: 0.4; margin-bottom: 16px;
+        }
+        .msgr-main-empty h3 { color: var(--text); margin-bottom: 8px; font-size: 1.2rem; }
+        .msgr-main-empty p { font-size: 0.9rem; }
+        @media (max-width: 800px) {
+            .msgr-page { grid-template-columns: 1fr; }
+            .msgr-sidebar { border-right: none; }
+            .msgr-main { display: none; }
+            .msgr-page.chat-open .msgr-sidebar { display: none; }
+            .msgr-page.chat-open .msgr-main { display: flex; }
+        }
+    </style>
+</head>
+<body>
+
+<div class="msgr-page" id="msgrPage">
+    <aside class="msgr-sidebar">
+        <div class="msgr-sidebar-head">
+            <a href="/" class="back-btn" title="На главную"><i class="fas fa-arrow-left"></i></a>
+            <div class="logo">🐾 Сообщения</div>
+        </div>
+        <div class="msgr-sidebar-search">
+            <i class="fas fa-search"></i>
+            <input type="text" id="chatSearchInput" placeholder="Поиск чата..." oninput="filterChats()" />
+        </div>
+        <div class="msgr-page-chat-list" id="chatList">
+            <div class="empty-state small"><i class="fas fa-comments"></i><p>Загрузка...</p></div>
+        </div>
+    </aside>
+
+    <main class="msgr-main" id="chatWindow">
+        <div class="msgr-main-empty" id="chatEmpty">
+            <i class="fas fa-comments"></i>
+            <h3>Выберите чат</h3>
+            <p>Слева — список ваших диалогов</p>
+        </div>
+        <div class="chat-window hidden" id="chatActive" style="position:static; flex:1; display:flex; flex-direction:column;">
+            <div class="chat-head">
+                <button class="chat-back" onclick="backToList()" style="display:none" id="mobileBackBtn"><i class="fas fa-arrow-left"></i></button>
+                <div class="chat-head-avatar" id="chatHeadAvatar">?</div>
+                <div class="chat-head-info">
+                    <div class="chat-head-name" id="chatHeadName">—</div>
+                    <div class="chat-head-role" id="chatHeadRole">—</div>
+                </div>
+            </div>
+            <div class="chat-messages" id="chatMessages"></div>
+            <form class="chat-input" onsubmit="sendMessage(event)">
+                <input type="text" id="chatInput" placeholder="Написать сообщение..." autocomplete="off" maxlength="2000" />
+                <button type="submit"><i class="fas fa-paper-plane"></i></button>
+            </form>
+        </div>
+    </main>
+</div>
+
+<div class="modal" id="newChatModal" onclick="if(event.target===this) closeNewChat()">
+    <div class="modal-box">
+        <button class="modal-close" onclick="closeNewChat()">×</button>
+        <div class="auth-head"><div class="auth-logo">💬</div><h3>Новый чат</h3><p>Выберите пользователя</p></div>
+        <div class="admin-search">
+            <i class="fas fa-search"></i>
+            <input type="text" id="userSearchInput" placeholder="Поиск по имени..." oninput="filterUsers()" />
+        </div>
+        <div id="usersForChat" style="max-height:400px; overflow-y:auto;"></div>
+    </div>
+</div>
+
+<div class="toast" id="toast"></div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script>
+const API = '';
+const TOKEN_KEY = 'paw_token';
+const ROLE_LABELS = { client: 'Клиент', executor: 'Исполнитель', manager: 'Менеджер', admin: 'Администратор' };
+
+const state = {
+    user: null, chats: [], chatMessages: {}, currentChatId: null, chatPeer: null,
+    socket: null, onlineUsers: new Set(), allUsers: [],
+};
+
+function getToken() { return localStorage.getItem(TOKEN_KEY); }
+function setToken(t) { t ? localStorage.setItem(TOKEN_KEY, t) : localStorage.removeItem(TOKEN_KEY); }
+
+async function api(path, options = {}) {
+    const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+    const token = getToken();
+    if (token) headers.Authorization = `Bearer ${token}`;
+    const res = await fetch(API + path, {
+        ...options, headers,
+        body: options.body ? JSON.stringify(options.body) : undefined,
+    });
+    let data = null;
+    try { data = await res.json(); } catch {}
+    if (!res.ok) {
+        const err = new Error(data?.error || `Ошибка ${res.status}`);
+        err.status = res.status;
+        throw err;
+    }
+    return data;
+}
+function escapeHtml(s) {
+    return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c]));
+}
+function formatTime(ts) {
+    const d = new Date(ts), now = new Date(), diff = (now - d) / 1000;
+    if (diff < 60) return 'сейчас';
+    if (diff < 3600) return Math.floor(diff / 60) + ' мин';
+    if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
+    return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' });
+}
+function userAvatarHtml(u) {
+    if (u?.avatar) return `<img src="${escapeHtml(u.avatar)}" alt="">`;
+    return `<span>${(u?.name || '?').charAt(0).toUpperCase()}</span>`;
+}
+function showToast(text, type) {
+    const t = document.getElementById('toast');
+    if (!t) return;
+    t.textContent = text;
+    t.classList.toggle('error', type === 'error');
+    t.classList.add('show');
+    clearTimeout(t._timeout);
+    t._timeout = setTimeout(() => t.classList.remove('show'), 3500);
+}
+
+async function checkAuth() {
+    if (!getToken()) { location.href = '/'; return false; }
+    try {
+        const { user } = await api('/api/me');
+        state.user = user;
+        return true;
+    } catch {
+        setToken(null);
+        location.href = '/';
+        return false;
+    }
+}
+
+async function loadChats() {
+    try {
+        const { chats } = await api('/api/chats');
+        state.chats = chats;
+        renderChatList();
+    } catch (err) { showToast('❌ ' + err.message, 'error'); }
+}
+
+function filterChats() { renderChatList(); }
+
+function renderChatList() {
+    const list = document.getElementById('chatList');
+    const search = (document.getElementById('chatSearchInput')?.value || '').trim().toLowerCase();
+    let chats = state.chats;
+    if (search) chats = chats.filter(c => c.peer.name.toLowerCase().includes(search));
+
+    let html = `<button class="msgr-new-chat-btn" onclick="openNewChat()"><i class="fas fa-plus"></i> Новый чат</button>`;
+
+    if (!chats.length) {
+        html += `<div class="empty-state small"><i class="fas fa-comments"></i><p>${search ? 'Ничего не найдено' : 'Нет чатов'}</p></div>`;
+    } else {
+        html += chats.map(c => {
+            const peer = c.peer;
+            const preview = c.lastMessage?.text || 'Нет сообщений';
+            const time = c.lastMessage ? formatTime(c.lastMessage.createdAt) : '';
+            const unread = c.unread > 0 ? `<span class="chat-unread">${c.unread}</span>` : '';
+            const online = state.onlineUsers.has(peer.id) ? `<span class="chat-online"></span>` : '';
+            const active = state.currentChatId === c.id ? 'active' : '';
+            return `<div class="chat-row ${active}" onclick="openChatWith(${peer.id})">
+                <div class="chat-avatar">${userAvatarHtml(peer)}${online}</div>
+                <div class="chat-info">
+                    <div class="chat-name">${escapeHtml(peer.name)}</div>
+                    <div class="chat-preview">${escapeHtml(preview)}</div>
+                </div>
+                <div class="chat-meta">
+                    <div class="chat-time">${time}</div>
+                    ${unread}
+                </div>
+            </div>`;
+        }).join('');
+    }
+    list.innerHTML = html;
+}
+
+async function openChatWith(peerId) {
+    try {
+        const { chatId } = await api('/api/chats', { method: 'POST', body: { peerId } });
+        state.currentChatId = chatId;
+
+        let chat = state.chats.find(c => c.id === chatId);
+        if (chat) state.chatPeer = chat.peer;
+        else {
+            const usersRes = await api('/api/users/list');
+            state.chatPeer = usersRes.users.find(u => u.id === peerId);
+        }
+
+        const { messages } = await api(`/api/chats/${chatId}/messages`);
+        state.chatMessages[chatId] = messages;
+
+        document.getElementById('chatEmpty').classList.add('hidden');
+        document.getElementById('chatActive').classList.remove('hidden');
+        document.getElementById('chatHeadAvatar').innerHTML = userAvatarHtml(state.chatPeer);
+        document.getElementById('chatHeadName').textContent = state.chatPeer?.name || '—';
+        document.getElementById('chatHeadRole').textContent = ROLE_LABELS[state.chatPeer?.role] || '';
+
+        renderChatMessages(messages);
+
+        if (window.innerWidth <= 800) {
+            document.getElementById('msgrPage').classList.add('chat-open');
+            document.getElementById('mobileBackBtn').style.display = 'flex';
+        }
+
+        state.socket?.emit('chat:join', { chatId });
+        await loadChats();
+        setTimeout(() => document.getElementById('chatInput').focus(), 300);
+    } catch (err) { showToast('❌ ' + err.message, 'error'); }
+}
+
+function backToList() {
+    document.getElementById('msgrPage').classList.remove('chat-open');
+}
+
+function renderChatMessages(messages) {
+    const wrap = document.getElementById('chatMessages');
+    if (!wrap) return;
+    if (!messages.length) {
+        wrap.innerHTML = `<div class="empty-state small"><i class="fas fa-comment"></i><p>Начните переписку</p></div>`;
+        return;
+    }
+    wrap.innerHTML = messages.map(m => msgHtml(m)).join('');
+    wrap.scrollTop = wrap.scrollHeight;
+}
+
+function msgHtml(m) {
+    const isOut = m.senderId === state.user.id;
+    return `<div class="msg ${isOut ? 'msg-out' : 'msg-in'}">${escapeHtml(m.text)}<span class="msg-time">${formatTime(m.createdAt)}</span></div>`;
+}
+
+function appendMessageToWindow(m) {
+    const wrap = document.getElementById('chatMessages');
+    if (!wrap) return;
+    const empty = wrap.querySelector('.empty-state');
+    if (empty) empty.remove();
+    wrap.insertAdjacentHTML('beforeend', msgHtml(m));
+    wrap.scrollTop = wrap.scrollHeight;
+}
+
+function sendMessage(e) {
+    e.preventDefault();
+    const input = document.getElementById('chatInput');
+    const text = input.value.trim();
+    if (!text || !state.currentChatId) return;
+    if (!state.socket || !state.socket.connected) return showToast('⚠️ Нет соединения', 'error');
+    state.socket.emit('chat:send', { chatId: state.currentChatId, text });
+    input.value = '';
+}
+
+async function openNewChat() {
+    try {
+        const { users } = await api('/api/users/list');
+        state.allUsers = users;
+        renderUsersForChat();
+        document.getElementById('newChatModal').classList.add('open');
+    } catch (err) { showToast('❌ ' + err.message, 'error'); }
+}
+function closeNewChat() { document.getElementById('newChatModal').classList.remove('open'); }
+function filterUsers() { renderUsersForChat(); }
+
+function renderUsersForChat() {
+    const wrap = document.getElementById('usersForChat');
+    const search = (document.getElementById('userSearchInput')?.value || '').trim().toLowerCase();
+    let users = state.allUsers;
+    if (search) users = users.filter(u => u.name.toLowerCase().includes(search));
+
+    if (!users.length) {
+        wrap.innerHTML = '<div class="empty-state small"><i class="fas fa-user-slash"></i><p>Ничего не найдено</p></div>';
+        return;
+    }
+
+    wrap.innerHTML = users.map(u => {
+        const av = u.avatar
+            ? `<img src="${escapeHtml(u.avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+            : escapeHtml(u.name.charAt(0).toUpperCase());
+        const online = state.onlineUsers.has(u.id) ? `<span class="chat-online"></span>` : '';
+        return `<div class="chat-row" onclick="startNewChat(${u.id})">
+            <div class="chat-avatar">${av}${online}</div>
+            <div class="chat-info">
+                <div class="chat-name">${escapeHtml(u.name)}</div>
+                <div class="chat-preview">${ROLE_LABELS[u.role] || u.role}</div>
+            </div>
+        </div>`;
+    }).join('');
+}
+
+async function startNewChat(peerId) {
+    closeNewChat();
+    await openChatWith(peerId);
+}
+
+function connectSocket() {
+    if (!getToken()) return;
+    state.socket = io({ auth: { token: getToken() } });
+
+    state.socket.on('connect', () => {
+        if (state.currentChatId) state.socket.emit('chat:join', { chatId: state.currentChatId });
+    });
+
+    state.socket.on('chat:new', (msg) => {
+        const arr = state.chatMessages[msg.chatId] || [];
+        if (!arr.find(m => m.id === msg.id)) {
+            arr.push(msg);
+            state.chatMessages[msg.chatId] = arr;
+        }
+        if (state.currentChatId === msg.chatId) appendMessageToWindow(msg);
+        loadChats();
+    });
+
+    state.socket.on('chat:notify', ({ chatId, message }) => {
+        if (state.currentChatId !== chatId) {
+            showToast(`💬 ${message.senderName}: ${message.text.slice(0, 40)}`);
+        }
+    });
+
+    state.socket.on('presence', ({ userId, online }) => {
+        if (online) state.onlineUsers.add(userId); else state.onlineUsers.delete(userId);
+        renderChatList();
+        if (document.getElementById('newChatModal')?.classList.contains('open')) renderUsersForChat();
+    });
+
+    state.socket.on('chat:typing', ({ name }) => {
+        const el = document.getElementById('chatHeadRole');
+        if (el) {
+            const orig = el.dataset.orig || el.textContent;
+            el.dataset.orig = orig;
+            el.textContent = `${name} печатает...`;
+            clearTimeout(el._t);
+            el._t = setTimeout(() => { el.textContent = orig; }, 2000);
+        }
+    });
+}
+
+document.addEventListener('input', (e) => {
+    if (e.target.id === 'chatInput' && state.currentChatId && state.socket) {
+        clearTimeout(window._typingTimer);
+        window._typingTimer = setTimeout(() => {
+            state.socket.emit('chat:typing', { chatId: state.currentChatId });
+        }, 300);
+    }
+});
+
+(async () => {
+    const ok = await checkAuth();
+    if (!ok) return;
+    connectSocket();
+    await loadChats();
+
+    const params = new URLSearchParams(location.search);
+    const chatId = params.get('chat');
+    if (chatId) {
+        const chat = state.chats.find(c => c.id === Number(chatId));
+        if (chat) await openChatWith(chat.peer.id);
+    }
+})();
+</script>
+</body>
+</html>
