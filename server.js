@@ -9,6 +9,7 @@ const bcrypt = require('bcryptjs');
 const jwt = require('jsonwebtoken');
 const cors = require('cors');
 const multer = require('multer');
+const { YooKassa } = require('yookassa-api-sdk');
 
 const app = express();
 const server = http.createServer(app);
@@ -33,6 +34,17 @@ const CONTENT_DIR = path.join(UPLOAD_DIR, 'content');
 [UPLOAD_DIR, AVATAR_DIR, PORTFOLIO_DIR, CONTENT_DIR].forEach(d => {
     if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 });
+
+let yookassa = null;
+if (process.env.YOOKASSA_SHOP_ID && process.env.YOOKASSA_SECRET_KEY) {
+    yookassa = YooKassa({
+        shop_id: process.env.YOOKASSA_SHOP_ID,
+        secret_key: process.env.YOOKASSA_SECRET_KEY,
+    });
+    console.log('💳 ЮKassa инициализирована');
+} else {
+    console.log('⚠️ ЮKassa не настроена (нет ключей в .env)');
+}
 
 const io = new SocketServer(server, {
     cors: { origin: '*', methods: ['GET', 'POST'] },
@@ -83,7 +95,6 @@ db.exec(`
         is_root INTEGER NOT NULL DEFAULT 0,
         created_at INTEGER NOT NULL
     );
-
     CREATE TABLE IF NOT EXISTS transactions (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -93,13 +104,11 @@ db.exec(`
         created_at INTEGER NOT NULL,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
-
     CREATE TABLE IF NOT EXISTS withdrawals (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
         amount INTEGER NOT NULL,
-        status TEXT NOT NULL DEFAULT 'pending'
-            CHECK (status IN ('pending','approved','rejected')),
+        status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
         comment TEXT,
         created_at INTEGER NOT NULL,
         reviewed_at INTEGER,
@@ -107,7 +116,6 @@ db.exec(`
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
     );
-
     CREATE TABLE IF NOT EXISTS projects (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         title TEXT NOT NULL,
@@ -122,7 +130,6 @@ db.exec(`
         FOREIGN KEY (client_id) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (executor_id) REFERENCES users(id) ON DELETE SET NULL
     );
-
     CREATE TABLE IF NOT EXISTS chats (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_a INTEGER NOT NULL,
@@ -132,7 +139,6 @@ db.exec(`
         FOREIGN KEY (user_a) REFERENCES users(id) ON DELETE CASCADE,
         FOREIGN KEY (user_b) REFERENCES users(id) ON DELETE CASCADE
     );
-
     CREATE TABLE IF NOT EXISTS messages (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         chat_id INTEGER NOT NULL,
@@ -143,7 +149,6 @@ db.exec(`
         FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE,
         FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
     );
-
     CREATE TABLE IF NOT EXISTS portfolio (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         user_id INTEGER NOT NULL,
@@ -154,36 +159,43 @@ db.exec(`
         created_at INTEGER NOT NULL,
         FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
     );
-
     CREATE TABLE IF NOT EXISTS site_content (
         key TEXT PRIMARY KEY,
         value TEXT,
         updated_at INTEGER NOT NULL
     );
-
+    CREATE TABLE IF NOT EXISTS payments (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        payment_id TEXT UNIQUE,
+        amount INTEGER NOT NULL,
+        status TEXT NOT NULL DEFAULT 'pending',
+        created_at INTEGER NOT NULL,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    );
     CREATE INDEX IF NOT EXISTS idx_tx_user ON transactions(user_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_msg_chat ON messages(chat_id, created_at);
     CREATE INDEX IF NOT EXISTS idx_wd_user ON withdrawals(user_id, created_at DESC);
     CREATE INDEX IF NOT EXISTS idx_wd_status ON withdrawals(status, created_at DESC);
+    CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id, created_at DESC);
 `);
 
 /* Главный админ */
 const adminExists = db.prepare('SELECT * FROM users WHERE email = ?').get(ADMIN_EMAIL);
 if (!adminExists) {
     const hash = bcrypt.hashSync(ADMIN_PASSWORD, 10);
-    db.prepare(`INSERT INTO users (name, email, password, role, balance, is_root, created_at)
-        VALUES (?, ?, ?, 'admin', 0, 1, ?)`)
+    db.prepare(`INSERT INTO users (name, email, password, role, balance, is_root, created_at) VALUES (?, ?, ?, 'admin', 0, 1, ?)`)
         .run('Главный админ', ADMIN_EMAIL, hash, Date.now());
     console.log(`✅ Создан ГЛАВНЫЙ админ: ${ADMIN_EMAIL}`);
 } else {
     if (adminExists.role !== 'admin' || adminExists.is_root !== 1) {
         db.prepare(`UPDATE users SET role = 'admin', is_root = 1 WHERE id = ?`).run(adminExists.id);
-        console.log(`🔒 Главный админ восстановлен: ${ADMIN_EMAIL}`);
+        console.log(`🔒 Главный админ восстановлен`);
     }
     if (!bcrypt.compareSync(ADMIN_PASSWORD, adminExists.password)) {
         db.prepare('UPDATE users SET password = ? WHERE id = ?')
             .run(bcrypt.hashSync(ADMIN_PASSWORD, 10), adminExists.id);
-        console.log(`🔑 Пароль главного админа обновлён из .env`);
+        console.log(`🔑 Пароль главного админа обновлён`);
     }
 }
 
@@ -191,26 +203,37 @@ if (!adminExists) {
 const DEFAULT_CONTENT = {
     hero_eyebrow: '🐾 Студия визуала Paw Art Studio',
     hero_title: 'Визуал, который работает на вас',
-    hero_subtitle: 'Маскоты, стикеры, оформление для стримеров, серверов и брендов. Создаём образы, которые запоминаются.',
+    hero_subtitle: 'Маскоты, стикеры, оформление для стримеров, серверов и брендов.',
     hero_badge_1: '⭐ 4.9 из 5',
     hero_badge_2: '⚡ Срок от 3 дней',
     hero_badge_3: '🎨 50+ работ',
     hero_image: '',
 
-    service_1_name: 'Маскот', service_1_desc: 'Персонаж для бренда / канала', service_1_price: 'от 4 000 ₽',
-    service_2_name: 'Стикеры', service_2_desc: '5–15 эмоций для Discord / Telegram', service_2_price: 'от 1 800 ₽',
-    service_3_name: 'Оверлей', service_3_desc: 'Оформление экрана для стримов', service_3_price: 'от 3 000 ₽',
-    service_4_name: 'Арт', service_4_desc: 'Иллюстрация на заказ', service_4_price: 'от 3 000 ₽',
-    service_5_name: 'Брендинг DC', service_5_desc: 'Маскот + стикеры + баннеры + аватарки', service_5_price: '10 000 ₽',
-    service_6_name: 'Анимация', service_6_desc: '2D-анимация персонажа или логотипа', service_6_price: 'от 5 000 ₽',
+    service_1_name: 'Артики', service_1_desc: 'Мини-иллюстрации на заказ', service_1_price: 'от 1 500 ₽',
+    service_2_name: 'Премиум арт', service_2_desc: 'Детализированные иллюстрации', service_2_price: 'от 5 000 ₽',
+    service_3_name: 'Чибики', service_3_desc: 'Милые чиби-персонажи', service_3_price: 'от 2 000 ₽',
+    service_4_name: 'Стикеры', service_4_desc: '5–15 эмоций для Discord / Telegram', service_4_price: 'от 1 800 ₽',
+    service_5_name: 'Ава', service_5_desc: 'Аватарки для соцсетей и Discord', service_5_price: 'от 1 200 ₽',
+    service_6_name: '3D модель', service_6_desc: '3D-модель персонажа', service_6_price: 'от 8 000 ₽',
+    service_7_name: '3D арт', service_7_desc: '3D-иллюстрация или сцена', service_7_price: 'от 6 000 ₽',
 
-    pricing_1_name: 'Старт', pricing_1_price: '1 800 ₽', pricing_1_features: '5 стикеров|Учёт стиля|PNG|1 правка',
-    pricing_2_name: 'Базовый', pricing_2_price: '2 500 ₽', pricing_2_features: '10 стикеров|Учёт стиля|PNG + WEBP|2 правки',
-    pricing_3_name: 'Маскот', pricing_3_price: '4 000–6 000 ₽', pricing_3_features: '1 персонаж|2–3 позы|Concept-арт|3 правки',
-    pricing_4_name: 'Бренд', pricing_4_price: '10 000–12 000 ₽', pricing_4_features: 'Маскот + 10 стикеров|Оверлей|Аватарки|4 правки',
-    pricing_5_name: 'Под ключ', pricing_5_price: '15 000–20 000 ₽', pricing_5_features: 'Маскот + стикеры|Оверлей + баннеры|Анимация|∞ правки',
+    pricing_1_name: 'Пак DS',
+    pricing_1_price: '18 000 ₽',
+    pricing_1_features: 'Ава|Баннер ×3|Стикерпак ×10|Маскот|Настройка ролей и каналов|Бусты ×18',
+    pricing_2_name: 'Пак стримера',
+    pricing_2_price: '15 000 ₽',
+    pricing_2_features: '2D моделька|Эмодзи ×5|Арты ×3|Оверлеи ×4',
+    pricing_3_name: 'Маскот',
+    pricing_3_price: '4 000–6 000 ₽',
+    pricing_3_features: '1 персонаж|2–3 позы|Concept-арт|3 правки',
+    pricing_4_name: 'Бренд',
+    pricing_4_price: '10 000–12 000 ₽',
+    pricing_4_features: 'Маскот + 10 стикеров|Оверлей|Аватарки|4 правки',
+    pricing_5_name: 'Создание сайта под ключ',
+    pricing_5_price: 'от 30 000 ₽',
+    pricing_5_features: 'Дизайн|Вёрстка|Адаптив|Админка|Подключение оплаты',
 
-    about_text: 'Paw Art Studio — команда художников и менеджеров. Мы делаем визуал для стримеров, серверов, брендов и творческих проектов.',
+    about_text: 'Paw Art Studio — команда художников и менеджеров.',
     about_quote: '«Мы не просто рисуем. Мы создаём образы, которые работают на ваш проект»',
     about_stat_1: '50', about_stat_1_desc: 'проектов',
     about_stat_2: '30', about_stat_2_desc: 'довольных клиентов',
@@ -222,10 +245,10 @@ const DEFAULT_CONTENT = {
 
     footer_text: 'Визуал для стримеров, серверов и брендов.',
 
-    faq_1_q: 'Как зарегистрироваться?', faq_1_a: 'Нажмите «Войти» → «Регистрация». Вы получите роль «Клиент» и бонус 500 ₽.',
-    faq_2_q: 'Как стать исполнителем?', faq_2_a: 'В личном кабинете на вкладке «Роль» отправьте заявку. Админ рассмотрит.',
+    faq_1_q: 'Как зарегистрироваться?', faq_1_a: 'Нажмите «Войти» → «Регистрация». Бонус 500 ₽ на баланс.',
+    faq_2_q: 'Как стать исполнителем?', faq_2_a: 'В кабинете на вкладке «Роль» отправьте заявку.',
     faq_3_q: 'Как взять заказ?', faq_3_a: 'Исполнители видят открытые заказы в разделе «Заказы».',
-    faq_4_q: 'Как вывести деньги?', faq_4_a: 'В кабинете → Кошелёк → Вывести. Заявка уходит админу.',
+    faq_4_q: 'Как пополнить баланс?', faq_4_a: 'Через ЮKassa — карта, СБП, ЮMoney.',
     faq_5_q: 'Какая комиссия?', faq_5_a: '0%. Минимум вывода — 0.01 ₽.',
 };
 
@@ -237,7 +260,7 @@ if (contentCount === 0) {
         for (const [k, v] of Object.entries(items)) stmt.run(k, String(v), now);
     });
     tx(DEFAULT_CONTENT);
-    console.log('📝 Загружен дефолтный контент сайта');
+    console.log('📝 Загружен дефолтный контент');
 }
 
 app.set('trust proxy', 1);
@@ -257,17 +280,12 @@ function auth(req, res, next) {
         next();
     } catch { res.status(401).json({ error: 'Токен недействителен' }); }
 }
-
 function adminOnly(req, res, next) {
     if (req.user.role !== 'admin') return res.status(403).json({ error: 'Нужны права админа' });
     next();
 }
-
-/* ⚠️ rootOnly — только для ГЛАВНОГО админа */
 function rootOnly(req, res, next) {
-    if (req.user.role !== 'admin' || req.user.is_root !== 1) {
-        return res.status(403).json({ error: 'Доступно только главному админу' });
-    }
+    if (req.user.role !== 'admin' || req.user.is_root !== 1) return res.status(403).json({ error: 'Только главный админ' });
     next();
 }
 
@@ -286,18 +304,13 @@ function shortUser(u) {
 }
 function withdrawalRow(w) {
     if (!w) return null;
-    return {
-        id: w.id, userId: w.user_id, amount: w.amount, status: w.status,
-        comment: w.comment, createdAt: w.created_at,
-        reviewedAt: w.reviewed_at, reviewedBy: w.reviewed_by,
-    };
+    return { id: w.id, userId: w.user_id, amount: w.amount, status: w.status, comment: w.comment, createdAt: w.created_at, reviewedAt: w.reviewed_at, reviewedBy: w.reviewed_by };
 }
 function txRow(t) {
     if (!t) return null;
     return { id: t.id, title: t.title, amount: t.amount, type: t.type, date: t.created_at };
 }
 
-/* HEALTH */
 app.get('/health', (req, res) => res.json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() }));
 
 /* AUTH */
@@ -312,8 +325,7 @@ app.post('/api/auth/register', (req, res) => {
     const now = Date.now();
     const info = db.prepare(`INSERT INTO users (name, email, password, role, balance, created_at) VALUES (?, ?, ?, 'client', 50000, ?)`)
         .run(String(name).trim(), cleanEmail, hash, now);
-    db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at) VALUES (?, 'Бонус новичка', 50000, 'in', ?)`)
-        .run(info.lastInsertRowid, now);
+    db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at) VALUES (?, 'Бонус новичка', 50000, 'in', ?)`).run(info.lastInsertRowid, now);
 
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(info.lastInsertRowid);
     const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30d' });
@@ -331,7 +343,7 @@ app.post('/api/auth/login', (req, res) => {
 
 app.get('/api/me', auth, (req, res) => res.json({ user: publicUser(req.user) }));
 
-/* CONTENT (публичный GET, root-only POST) */
+/* CONTENT */
 app.get('/api/content', (req, res) => {
     const rows = db.prepare('SELECT key, value FROM site_content').all();
     const content = {};
@@ -339,13 +351,11 @@ app.get('/api/content', (req, res) => {
     res.json({ content });
 });
 
-/* ⚠️ Изменять контент может только ГЛАВНЫЙ админ */
 app.post('/api/admin/content', auth, rootOnly, (req, res) => {
     const updates = req.body?.updates;
     if (!updates || typeof updates !== 'object') return res.status(400).json({ error: 'Нет данных' });
     const now = Date.now();
-    const stmt = db.prepare(`INSERT INTO site_content (key, value, updated_at) VALUES (?, ?, ?)
-        ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`);
+    const stmt = db.prepare(`INSERT INTO site_content (key, value, updated_at) VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`);
     try {
         const tx = db.transaction(items => {
             for (const [k, v] of Object.entries(items)) stmt.run(k, String(v ?? ''), now);
@@ -358,6 +368,68 @@ app.post('/api/admin/content', auth, rootOnly, (req, res) => {
 app.post('/api/admin/content/upload', auth, rootOnly, contentUpload.single('image'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
     res.json({ url: '/uploads/content/' + req.file.filename });
+});
+
+/* YOOKASSA */
+app.post('/api/payments/create', auth, async (req, res) => {
+    if (!yookassa) return res.status(503).json({ error: 'ЮKassa не настроена. Обратитесь к админу.' });
+    const rub = Number(req.body?.amount);
+    const kopecks = Math.round(rub * 100);
+    if (!kopecks || isNaN(kopecks) || kopecks < 100) return res.status(400).json({ error: 'Минимум 1 ₽' });
+
+    try {
+        const payment = await yookassa.payments.create({
+            amount: { value: rub.toFixed(2), currency: 'RUB' },
+            capture: true,
+            confirmation: {
+                type: 'redirect',
+                return_url: 'https://pawartstudio.store/dashboard',
+            },
+            description: `Пополнение баланса Paw Art Studio (#${req.user.id})`,
+            metadata: { userId: String(req.user.id) },
+        });
+
+        db.prepare(`INSERT INTO payments (user_id, payment_id, amount, status, created_at) VALUES (?, ?, ?, 'pending', ?)`)
+            .run(req.user.id, payment.id, kopecks, Date.now());
+
+        res.json({ paymentId: payment.id, confirmationUrl: payment.confirmation.confirmation_url });
+    } catch (err) {
+        console.error('❌ ЮKassa ошибка:', err);
+        res.status(500).json({ error: 'Не удалось создать платёж: ' + (err.message || 'неизвестно') });
+    }
+});
+
+app.post('/api/payments/webhook', express.json(), (req, res) => {
+    const { event, object } = req.body || {};
+    console.log('🔔 Webhook:', event, object?.id);
+
+    if (event === 'payment.succeeded' && object) {
+        const userId = parseInt(object.metadata?.userId, 10);
+        const amount = Math.round(parseFloat(object.amount?.value || '0') * 100);
+
+        if (userId && amount > 0) {
+            const existing = db.prepare('SELECT id, status FROM payments WHERE payment_id = ?').get(object.id);
+            if (existing && existing.status === 'succeeded') {
+                return res.status(200).send('OK');
+            }
+
+            if (existing) {
+                db.prepare('UPDATE payments SET status = ? WHERE payment_id = ?').run('succeeded', object.id);
+            } else {
+                db.prepare(`INSERT INTO payments (user_id, payment_id, amount, status, created_at) VALUES (?, ?, ?, 'succeeded', ?)`)
+                    .run(userId, object.id, amount, Date.now());
+            }
+
+            const user = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
+            if (user) {
+                db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(amount, userId);
+                db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at) VALUES (?, ?, ?, 'in', ?)`)
+                    .run(userId, `Пополнение через ЮKassa`, amount, Date.now());
+                console.log(`✅ Зачислено ${amount/100} ₽ → #${userId}`);
+            }
+        }
+    }
+    res.status(200).send('OK');
 });
 
 /* PROFILE */
@@ -442,12 +514,8 @@ app.post('/api/role/request', auth, (req, res) => {
 const PROJECT_STATUSES = ['open', 'in_progress', 'review', 'completed', 'cancelled'];
 
 function getProjectById(id) {
-    const p = db.prepare(`SELECT p.*, c.name AS client_name, c.avatar AS client_avatar,
-        e.name AS executor_name, e.avatar AS executor_avatar
-        FROM projects p
-        LEFT JOIN users c ON c.id = p.client_id
-        LEFT JOIN users e ON e.id = p.executor_id
-        WHERE p.id = ?`).get(id);
+    const p = db.prepare(`SELECT p.*, c.name AS client_name, c.avatar AS client_avatar, e.name AS executor_name, e.avatar AS executor_avatar
+        FROM projects p LEFT JOIN users c ON c.id = p.client_id LEFT JOIN users e ON e.id = p.executor_id WHERE p.id = ?`).get(id);
     if (!p) return null;
     return {
         id: p.id, title: p.title, description: p.description, category: p.category,
@@ -463,21 +531,16 @@ app.post('/api/projects', auth, (req, res) => {
     if (!title || !description || !category) return res.status(400).json({ error: 'Заполните поля' });
     if (req.user.role === 'executor') return res.status(403).json({ error: 'Исполнители не создают заказы' });
     const now = Date.now();
-    const info = db.prepare(`INSERT INTO projects (title, description, category, budget, status, client_id, created_at, updated_at)
-        VALUES (?, ?, ?, ?, 'open', ?, ?, ?)`)
+    const info = db.prepare(`INSERT INTO projects (title, description, category, budget, status, client_id, created_at, updated_at) VALUES (?, ?, ?, ?, 'open', ?, ?, ?)`)
         .run(String(title).trim(), String(description).trim(), category, Math.round((Number(budget) || 0) * 100), req.user.id, now, now);
     res.json({ project: getProjectById(info.lastInsertRowid) });
 });
 
 app.get('/api/projects', auth, (req, res) => {
     let rows;
-    if (req.user.role === 'admin' || req.user.role === 'manager') {
-        rows = db.prepare(`SELECT id FROM projects ORDER BY created_at DESC LIMIT 200`).all();
-    } else if (req.user.role === 'executor') {
-        rows = db.prepare(`SELECT id FROM projects WHERE status = 'open' OR executor_id = ? ORDER BY created_at DESC LIMIT 200`).all(req.user.id);
-    } else {
-        rows = db.prepare(`SELECT id FROM projects WHERE client_id = ? ORDER BY created_at DESC LIMIT 200`).all(req.user.id);
-    }
+    if (req.user.role === 'admin' || req.user.role === 'manager') rows = db.prepare(`SELECT id FROM projects ORDER BY created_at DESC LIMIT 200`).all();
+    else if (req.user.role === 'executor') rows = db.prepare(`SELECT id FROM projects WHERE status = 'open' OR executor_id = ? ORDER BY created_at DESC LIMIT 200`).all(req.user.id);
+    else rows = db.prepare(`SELECT id FROM projects WHERE client_id = ? ORDER BY created_at DESC LIMIT 200`).all(req.user.id);
     res.json({ projects: rows.map(r => getProjectById(r.id)) });
 });
 
@@ -492,8 +555,7 @@ app.post('/api/projects/:id/accept', auth, (req, res) => {
     const p = getProjectById(req.params.id);
     if (!p) return res.status(404).json({ error: 'Не найден' });
     if (p.status !== 'open') return res.status(400).json({ error: 'Уже занят' });
-    db.prepare(`UPDATE projects SET executor_id = ?, status = 'in_progress', updated_at = ? WHERE id = ?`)
-        .run(req.user.id, Date.now(), req.params.id);
+    db.prepare(`UPDATE projects SET executor_id = ?, status = 'in_progress', updated_at = ? WHERE id = ?`).run(req.user.id, Date.now(), req.params.id);
     res.json({ project: getProjectById(req.params.id) });
 });
 
@@ -521,8 +583,7 @@ app.post('/api/portfolio', auth, upload.single('image'), (req, res) => {
     const { title, description, category } = req.body || {};
     if (!title) return res.status(400).json({ error: 'Укажите название' });
     const url = '/uploads/portfolio/' + req.file.filename;
-    const info = db.prepare(`INSERT INTO portfolio (user_id, filename, title, description, category, created_at)
-        VALUES (?, ?, ?, ?, ?, ?)`)
+    const info = db.prepare(`INSERT INTO portfolio (user_id, filename, title, description, category, created_at) VALUES (?, ?, ?, ?, ?, ?)`)
         .run(req.user.id, url, String(title).trim(), (description || '').trim().slice(0, 500), category || 'Арт', Date.now());
     res.json({ item: portfolioItem(db.prepare('SELECT * FROM portfolio WHERE id = ?').get(info.lastInsertRowid)) });
 });
@@ -533,9 +594,7 @@ app.get('/api/portfolio/me', auth, (req, res) => {
 });
 
 app.get('/api/portfolio/all', (req, res) => {
-    const items = db.prepare(`SELECT p.*, u.name AS author_name, u.avatar AS author_avatar
-        FROM portfolio p JOIN users u ON u.id = p.user_id
-        ORDER BY p.created_at DESC LIMIT 200`).all();
+    const items = db.prepare(`SELECT p.*, u.name AS author_name, u.avatar AS author_avatar FROM portfolio p JOIN users u ON u.id = p.user_id ORDER BY p.created_at DESC LIMIT 200`).all();
     res.json({ items: items.map(p => ({ ...portfolioItem(p), authorName: p.author_name, authorAvatar: p.author_avatar })) });
 });
 
@@ -567,11 +626,7 @@ app.get('/api/chats', auth, (req, res) => {
         const other = db.prepare('SELECT id, name, avatar, role FROM users WHERE id = ?').get(otherId);
         const last = db.prepare('SELECT text, sender_id, created_at FROM messages WHERE chat_id = ? ORDER BY created_at DESC LIMIT 1').get(c.id);
         const unread = db.prepare('SELECT COUNT(*) AS n FROM messages WHERE chat_id = ? AND sender_id != ? AND read_at IS NULL').get(c.id, req.user.id).n;
-        return {
-            id: c.id, peer: shortUser(other),
-            lastMessage: last ? { text: last.text, senderId: last.sender_id, createdAt: last.created_at } : null,
-            unread,
-        };
+        return { id: c.id, peer: shortUser(other), lastMessage: last ? { text: last.text, senderId: last.sender_id, createdAt: last.created_at } : null, unread };
     });
     list.sort((a, b) => (b.lastMessage?.createdAt || 0) - (a.lastMessage?.createdAt || 0));
     res.json({ chats: list });
@@ -591,25 +646,15 @@ app.get('/api/chats/:id/messages', auth, (req, res) => {
     const chat = db.prepare('SELECT * FROM chats WHERE id = ?').get(req.params.id);
     if (!chat) return res.status(404).json({ error: 'Чат не найден' });
     if (chat.user_a !== req.user.id && chat.user_b !== req.user.id) return res.status(403).json({ error: 'Нет доступа' });
-    const msgs = db.prepare(`SELECT m.*, u.name AS sender_name, u.avatar AS sender_avatar
-        FROM messages m JOIN users u ON u.id = m.sender_id
-        WHERE m.chat_id = ? ORDER BY m.created_at ASC LIMIT 500`).all(chat.id);
-    db.prepare('UPDATE messages SET read_at = ? WHERE chat_id = ? AND sender_id != ? AND read_at IS NULL')
-        .run(Date.now(), chat.id, req.user.id);
-    res.json({ messages: msgs.map(m => ({
-        id: m.id, chatId: m.chat_id, senderId: m.sender_id,
-        senderName: m.sender_name, senderAvatar: m.sender_avatar,
-        text: m.text, createdAt: m.created_at, readAt: m.read_at,
-    })) });
+    const msgs = db.prepare(`SELECT m.*, u.name AS sender_name, u.avatar AS sender_avatar FROM messages m JOIN users u ON u.id = m.sender_id WHERE m.chat_id = ? ORDER BY m.created_at ASC LIMIT 500`).all(chat.id);
+    db.prepare('UPDATE messages SET read_at = ? WHERE chat_id = ? AND sender_id != ? AND read_at IS NULL').run(Date.now(), chat.id, req.user.id);
+    res.json({ messages: msgs.map(m => ({ id: m.id, chatId: m.chat_id, senderId: m.sender_id, senderName: m.sender_name, senderAvatar: m.sender_avatar, text: m.text, createdAt: m.created_at, readAt: m.read_at })) });
 });
 
 app.get('/api/users/list', auth, (req, res) => {
     let users;
-    if (req.user.role === 'admin' || req.user.role === 'manager') {
-        users = db.prepare('SELECT id, name, avatar, role FROM users WHERE id != ? ORDER BY name').all(req.user.id);
-    } else {
-        users = db.prepare(`SELECT id, name, avatar, role FROM users WHERE id != ? AND role IN ('executor','manager','admin') ORDER BY name`).all(req.user.id);
-    }
+    if (req.user.role === 'admin' || req.user.role === 'manager') users = db.prepare('SELECT id, name, avatar, role FROM users WHERE id != ? ORDER BY name').all(req.user.id);
+    else users = db.prepare(`SELECT id, name, avatar, role FROM users WHERE id != ? AND role IN ('executor','manager','admin') ORDER BY name`).all(req.user.id);
     res.json({ users: users.map(shortUser) });
 });
 
@@ -621,16 +666,13 @@ app.get('/api/admin/users', auth, adminOnly, (req, res) => {
 
 app.get('/api/admin/users/:id/full', auth, adminOnly, (req, res) => {
     const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.params.id);
-    if (!u) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (!u) return res.status(404).json({ error: 'Не найден' });
     const txs = db.prepare(`SELECT id, title, amount, type, created_at FROM transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT 500`).all(u.id);
     const withdrawals = db.prepare(`SELECT * FROM withdrawals WHERE user_id = ? ORDER BY created_at DESC LIMIT 100`).all(u.id);
     const projectsCount = db.prepare(`SELECT COUNT(*) AS n FROM projects WHERE client_id = ? OR executor_id = ?`).get(u.id, u.id).n;
     const totalIn = txs.filter(t => t.type === 'in').reduce((s, t) => s + t.amount, 0);
     const totalOut = txs.filter(t => t.type === 'out').reduce((s, t) => s + t.amount, 0);
-    res.json({
-        user: publicUser(u), transactions: txs.map(txRow), withdrawals: withdrawals.map(withdrawalRow),
-        stats: { totalIn, totalOut, txCount: txs.length, projectsCount, withdrawalsCount: withdrawals.length },
-    });
+    res.json({ user: publicUser(u), transactions: txs.map(txRow), withdrawals: withdrawals.map(withdrawalRow), stats: { totalIn, totalOut, txCount: txs.length, projectsCount, withdrawalsCount: withdrawals.length } });
 });
 
 app.get('/api/admin/requests', auth, adminOnly, (req, res) => {
@@ -647,8 +689,8 @@ app.post('/api/admin/role', auth, adminOnly, (req, res) => {
     const targetIsRoot = target.is_root === 1;
     const targetIsAdmin = target.role === 'admin';
     if (targetIsRoot && target.id !== req.user.id) return res.status(403).json({ error: 'Нельзя изменить главного админа' });
-    if (target.id === req.user.id && role !== 'admin') return res.status(400).json({ error: 'Нельзя снять роль админа с себя' });
-    if (!iAmRoot && targetIsAdmin && target.id !== req.user.id) return res.status(403).json({ error: 'Только главный админ может менять других админов' });
+    if (target.id === req.user.id && role !== 'admin') return res.status(400).json({ error: 'Нельзя снять роль с себя' });
+    if (!iAmRoot && targetIsAdmin && target.id !== req.user.id) return res.status(403).json({ error: 'Только главный админ может менять админов' });
     if (!iAmRoot && role === 'admin') return res.status(403).json({ error: 'Только главный админ может назначать админов' });
     db.prepare('UPDATE users SET role = ?, requested_role = NULL WHERE id = ?').run(role, userId);
     res.json({ user: publicUser(db.prepare('SELECT * FROM users WHERE id = ?').get(userId)) });
@@ -677,7 +719,7 @@ app.post('/api/admin/balance', auth, adminOnly, (req, res) => {
     const t = db.prepare('SELECT * FROM users WHERE id = ?').get(userId);
     if (!t) return res.status(404).json({ error: 'Не найден' });
     const iAmRoot = req.user.is_root === 1;
-    if (!iAmRoot && t.role === 'admin' && t.id !== req.user.id) return res.status(403).json({ error: 'Только главный админ может менять баланс других админов' });
+    if (!iAmRoot && t.role === 'admin' && t.id !== req.user.id) return res.status(403).json({ error: 'Только главный админ может менять баланс админов' });
     const nb = t.balance + k;
     if (nb < 0) return res.status(400).json({ error: 'Баланс не может быть отрицательным' });
     db.prepare('UPDATE users SET balance = ? WHERE id = ?').run(nb, userId);
@@ -687,19 +729,14 @@ app.post('/api/admin/balance', auth, adminOnly, (req, res) => {
 });
 
 app.get('/api/admin/withdrawals', auth, adminOnly, (req, res) => {
-    const rows = db.prepare(`SELECT w.*, u.name AS user_name, u.email AS user_email, u.avatar AS user_avatar
-        FROM withdrawals w JOIN users u ON u.id = w.user_id
-        ORDER BY CASE w.status WHEN 'pending' THEN 0 ELSE 1 END, w.created_at DESC LIMIT 200`).all();
-    res.json({ withdrawals: rows.map(w => ({
-        ...withdrawalRow(w),
-        user: { id: w.user_id, name: w.user_name, email: w.user_email, avatar: w.user_avatar },
-    })) });
+    const rows = db.prepare(`SELECT w.*, u.name AS user_name, u.email AS user_email, u.avatar AS user_avatar FROM withdrawals w JOIN users u ON u.id = w.user_id ORDER BY CASE w.status WHEN 'pending' THEN 0 ELSE 1 END, w.created_at DESC LIMIT 200`).all();
+    res.json({ withdrawals: rows.map(w => ({ ...withdrawalRow(w), user: { id: w.user_id, name: w.user_name, email: w.user_email, avatar: w.user_avatar } })) });
 });
 
 app.post('/api/admin/withdrawals/:id/approve', auth, adminOnly, (req, res) => {
     const w = db.prepare('SELECT * FROM withdrawals WHERE id = ?').get(req.params.id);
     if (!w) return res.status(404).json({ error: 'Заявка не найдена' });
-    if (w.status !== 'pending') return res.status(400).json({ error: 'Заявка уже обработана' });
+    if (w.status !== 'pending') return res.status(400).json({ error: 'Уже обработана' });
     const now = Date.now();
     db.prepare(`UPDATE withdrawals SET status = 'approved', reviewed_at = ?, reviewed_by = ? WHERE id = ?`).run(now, req.user.id, w.id);
     db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at) VALUES (?, 'Вывод средств (одобрен)', ?, 'out', ?)`).run(w.user_id, w.amount, now);
@@ -709,7 +746,7 @@ app.post('/api/admin/withdrawals/:id/approve', auth, adminOnly, (req, res) => {
 app.post('/api/admin/withdrawals/:id/reject', auth, adminOnly, (req, res) => {
     const w = db.prepare('SELECT * FROM withdrawals WHERE id = ?').get(req.params.id);
     if (!w) return res.status(404).json({ error: 'Заявка не найдена' });
-    if (w.status !== 'pending') return res.status(400).json({ error: 'Заявка уже обработана' });
+    if (w.status !== 'pending') return res.status(400).json({ error: 'Уже обработана' });
     const comment = (req.body?.comment || '').trim().slice(0, 300);
     const now = Date.now();
     db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(w.amount, w.user_id);
@@ -721,38 +758,17 @@ app.post('/api/admin/withdrawals/:id/reject', auth, adminOnly, (req, res) => {
 app.get('/api/admin/stats', auth, adminOnly, (req, res) => {
     const g = q => db.prepare(q).get().n;
     res.json({
-        users: {
-            total: g('SELECT COUNT(*) AS n FROM users'),
-            clients: g(`SELECT COUNT(*) AS n FROM users WHERE role = 'client'`),
-            executors: g(`SELECT COUNT(*) AS n FROM users WHERE role = 'executor'`),
-            managers: g(`SELECT COUNT(*) AS n FROM users WHERE role = 'manager'`),
-            admins: g(`SELECT COUNT(*) AS n FROM users WHERE role = 'admin'`),
-            new7: db.prepare('SELECT COUNT(*) AS n FROM users WHERE created_at > ?').get(Date.now() - 7 * 86400000).n,
-        },
-        projects: {
-            total: g('SELECT COUNT(*) AS n FROM projects'),
-            open: g(`SELECT COUNT(*) AS n FROM projects WHERE status = 'open'`),
-            inProgress: g(`SELECT COUNT(*) AS n FROM projects WHERE status = 'in_progress'`),
-            completed: g(`SELECT COUNT(*) AS n FROM projects WHERE status = 'completed'`),
-            cancelled: g(`SELECT COUNT(*) AS n FROM projects WHERE status = 'cancelled'`),
-            new7: db.prepare('SELECT COUNT(*) AS n FROM projects WHERE created_at > ?').get(Date.now() - 7 * 86400000).n,
-        },
+        users: { total: g('SELECT COUNT(*) AS n FROM users'), clients: g(`SELECT COUNT(*) AS n FROM users WHERE role='client'`), executors: g(`SELECT COUNT(*) AS n FROM users WHERE role='executor'`), managers: g(`SELECT COUNT(*) AS n FROM users WHERE role='manager'`), admins: g(`SELECT COUNT(*) AS n FROM users WHERE role='admin'`), new7: db.prepare('SELECT COUNT(*) AS n FROM users WHERE created_at > ?').get(Date.now() - 7 * 86400000).n },
+        projects: { total: g('SELECT COUNT(*) AS n FROM projects'), open: g(`SELECT COUNT(*) AS n FROM projects WHERE status='open'`), inProgress: g(`SELECT COUNT(*) AS n FROM projects WHERE status='in_progress'`), completed: g(`SELECT COUNT(*) AS n FROM projects WHERE status='completed'`), cancelled: g(`SELECT COUNT(*) AS n FROM projects WHERE status='cancelled'`), new7: db.prepare('SELECT COUNT(*) AS n FROM projects WHERE created_at > ?').get(Date.now() - 7 * 86400000).n },
         messages: { total: g('SELECT COUNT(*) AS n FROM messages') },
         portfolio: { total: g('SELECT COUNT(*) AS n FROM portfolio') },
-        withdrawals: {
-            pendingCount: g(`SELECT COUNT(*) AS n FROM withdrawals WHERE status = 'pending'`),
-            pendingSum: db.prepare(`SELECT COALESCE(SUM(amount),0) AS s FROM withdrawals WHERE status = 'pending'`).get().s,
-            approvedSum: db.prepare(`SELECT COALESCE(SUM(amount),0) AS s FROM withdrawals WHERE status = 'approved'`).get().s,
-        },
-        money: {
-            totalBalance: db.prepare('SELECT COALESCE(SUM(balance), 0) AS s FROM users').get().s,
-            totalIn: db.prepare(`SELECT COALESCE(SUM(amount), 0) AS s FROM transactions WHERE type = 'in'`).get().s,
-            totalOut: db.prepare(`SELECT COALESCE(SUM(amount), 0) AS s FROM transactions WHERE type = 'out'`).get().s,
-        },
+        withdrawals: { pendingCount: g(`SELECT COUNT(*) AS n FROM withdrawals WHERE status='pending'`), pendingSum: db.prepare(`SELECT COALESCE(SUM(amount),0) AS s FROM withdrawals WHERE status='pending'`).get().s, approvedSum: db.prepare(`SELECT COALESCE(SUM(amount),0) AS s FROM withdrawals WHERE status='approved'`).get().s },
+        money: { totalBalance: db.prepare('SELECT COALESCE(SUM(balance),0) AS s FROM users').get().s, totalIn: db.prepare(`SELECT COALESCE(SUM(amount),0) AS s FROM transactions WHERE type='in'`).get().s, totalOut: db.prepare(`SELECT COALESCE(SUM(amount),0) AS s FROM transactions WHERE type='out'`).get().s },
+        payments: { total: g('SELECT COUNT(*) AS n FROM payments'), succeeded: g(`SELECT COUNT(*) AS n FROM payments WHERE status='succeeded'`), succeededSum: db.prepare(`SELECT COALESCE(SUM(amount),0) AS s FROM payments WHERE status='succeeded'`).get().s },
     });
 });
 
-/* SOCKET */
+/* SOCKET.IO */
 const onlineUsers = new Map();
 
 io.use((socket, next) => {
@@ -789,17 +805,11 @@ io.on('connection', socket => {
         if (chat.user_a !== uid && chat.user_b !== uid) return;
         const now = Date.now();
         const info = db.prepare(`INSERT INTO messages (chat_id, sender_id, text, created_at) VALUES (?, ?, ?, ?)`).run(chatId, uid, clean, now);
-        const msg = {
-            id: info.lastInsertRowid, chatId: Number(chatId), senderId: uid,
-            senderName: socket.user.name, senderAvatar: socket.user.avatar,
-            text: clean, createdAt: now, readAt: null,
-        };
+        const msg = { id: info.lastInsertRowid, chatId: Number(chatId), senderId: uid, senderName: socket.user.name, senderAvatar: socket.user.avatar, text: clean, createdAt: now, readAt: null };
         io.to('chat:' + chatId).emit('chat:new', msg);
         const otherId = chat.user_a === uid ? chat.user_b : chat.user_a;
         if (onlineUsers.has(otherId)) {
-            for (const sid of onlineUsers.get(otherId)) {
-                io.to(sid).emit('chat:notify', { chatId: Number(chatId), message: msg });
-            }
+            for (const sid of onlineUsers.get(otherId)) io.to(sid).emit('chat:notify', { chatId: Number(chatId), message: msg });
         }
         if (typeof ack === 'function') ack({ ok: true, message: msg });
     });
@@ -827,11 +837,12 @@ process.on('uncaughtException', err => console.error('❌ Uncaught exception:', 
 
 server.listen(PORT, HOST, () => {
     console.log('');
-    console.log('🐾 Paw Art Studio v3.6');
+    console.log('🐾 Paw Art Studio v3.7');
     console.log(`🌐 Сервер: http://${HOST}:${PORT}`);
     console.log(`🔑 ГЛАВНЫЙ админ: ${ADMIN_EMAIL}`);
     console.log(`💾 БД: ${DATABASE_PATH}`);
     console.log(`📁 Uploads: ${UPLOAD_DIR}`);
     console.log(`🌍 Режим: ${IS_PROD ? 'PRODUCTION' : 'development'}`);
+    console.log(`💳 ЮKassa: ${yookassa ? 'ВКЛ' : 'ВЫКЛ'}`);
     console.log('');
 });
