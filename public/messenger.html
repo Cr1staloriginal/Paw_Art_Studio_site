@@ -120,7 +120,6 @@ function userAvatarHtml(u) { if (u?.avatar) return `<img src="${escapeHtml(u.ava
 function showToast(text, type) { const t = document.getElementById('toast'); if (!t) return; t.textContent = text; t.classList.toggle('error', type === 'error'); t.classList.add('show'); clearTimeout(t._timeout); t._timeout = setTimeout(() => t.classList.remove('show'), 3500); }
 
 async function checkAuth() { if (!getToken()) { location.href = '/'; return false; } try { const { user } = await api('/api/me'); state.user = user; return true; } catch { setToken(null); location.href = '/'; return false; } }
-
 async function loadChats() { try { const { chats } = await api('/api/chats'); state.chats = chats; renderChatList(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 function filterChats() { renderChatList(); }
 
@@ -171,7 +170,6 @@ async function openChatWith(peerId) {
     } catch (err) { showToast('❌ ' + err.message, 'error'); }
 }
 function backToList() { document.getElementById('msgrPage').classList.remove('chat-open'); }
-
 function renderChatMessages(messages) {
     const wrap = document.getElementById('chatMessages');
     if (!wrap) return;
@@ -186,7 +184,6 @@ function sendMessage(e) { e.preventDefault(); const input = document.getElementB
 async function openNewChat() { try { const { users } = await api('/api/users/list'); state.allUsers = users; renderUsersForChat(); document.getElementById('newChatModal').classList.add('open'); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 function closeNewChat() { document.getElementById('newChatModal').classList.remove('open'); }
 function filterUsers() { renderUsersForChat(); }
-
 function renderUsersForChat() {
     const wrap = document.getElementById('usersForChat');
     const search = (document.getElementById('userSearchInput')?.value || '').trim().toLowerCase();
