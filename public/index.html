@@ -22,7 +22,6 @@
             <a onclick="scrollToSection('services')">Услуги</a>
             <a onclick="scrollToSection('projects')">Заказы</a>
             <a onclick="scrollToSection('portfolio')">Портфолио</a>
-            <a onclick="scrollToSection('pricing')">Цены</a>
             <a onclick="scrollToSection('about')">О нас</a>
             <a onclick="scrollToSection('faq')">FAQ</a>
             <a onclick="scrollToSection('contact')">Контакты</a>
@@ -168,45 +167,6 @@
         </div>
     </section>
 
-    <section class="section pricing" id="pricing">
-        <div class="container">
-            <h2>Пакеты и цены</h2>
-            <p class="section-subtitle">Настройте состав пакета под себя</p>
-            <div class="grid grid-5 pricing-grid">
-                <div class="pricing-card">
-                    <div class="name" data-content="pricing_1_name">Пак DS</div>
-                    <div class="price-tag" data-content="pricing_1_price">18 000 ₽</div>
-                    <ul data-content="pricing_1_features"></ul>
-                    <a onclick="openPackageConfigurator('ds')" class="btn btn-outline">Настроить</a>
-                </div>
-                <div class="pricing-card popular">
-                    <div class="name" data-content="pricing_2_name">Пак стримера</div>
-                    <div class="price-tag" data-content="pricing_2_price">15 000 ₽</div>
-                    <ul data-content="pricing_2_features"></ul>
-                    <a onclick="openPackageConfigurator('streamer')" class="btn">Настроить</a>
-                </div>
-                <div class="pricing-card">
-                    <div class="name" data-content="pricing_3_name">Маскот</div>
-                    <div class="price-tag" data-content="pricing_3_price">4 000–6 000 ₽</div>
-                    <ul data-content="pricing_3_features"></ul>
-                    <a onclick="selectPlan('Маскот', '4 000–6 000 ₽')" class="btn btn-outline">Выбрать</a>
-                </div>
-                <div class="pricing-card">
-                    <div class="name" data-content="pricing_4_name">Бренд</div>
-                    <div class="price-tag" data-content="pricing_4_price">10 000–12 000 ₽</div>
-                    <ul data-content="pricing_4_features"></ul>
-                    <a onclick="selectPlan('Бренд', '10 000–12 000 ₽')" class="btn btn-outline">Выбрать</a>
-                </div>
-                <div class="pricing-card">
-                    <div class="name" data-content="pricing_5_name">Создание сайта под ключ</div>
-                    <div class="price-tag" data-content="pricing_5_price">от 30 000 ₽</div>
-                    <ul data-content="pricing_5_features"></ul>
-                    <a onclick="selectPlan('Сайт под ключ', 'от 30 000 ₽')" class="btn btn-outline">Выбрать</a>
-                </div>
-            </div>
-        </div>
-    </section>
-
     <section class="section about" id="about">
         <div class="container">
             <h2>О нас</h2>
@@ -276,16 +236,10 @@
                             <option value="Ава">Ава</option>
                             <option value="3D модель">3D модель</option>
                             <option value="3D арт">3D арт</option>
-                            <option value="Пак DS">Пак DS</option>
-                            <option value="Пак стримера">Пак стримера</option>
-                            <option value="Маскот">Маскот</option>
-                            <option value="Бренд">Бренд</option>
-                            <option value="Сайт под ключ">Сайт под ключ</option>
                             <option value="Другое">Другое</option>
                         </select>
                         <label>Бюджет</label><input type="text" id="formBudget" placeholder="Ориентировочная сумма" />
                         <label>Ссылка на референсы</label><textarea id="formMessage" placeholder="Стиль, примеры, идеи..."></textarea>
-                        <div id="selectedPlan">Выбран пакет: <span id="planDisplay"></span></div>
                         <button type="submit" class="btn">Отправить заявку</button>
                     </form>
                 </div>
@@ -305,7 +259,7 @@
             <a onclick="scrollToSection('services')">Услуги</a>
             <a onclick="scrollToSection('projects')">Заказы</a>
             <a onclick="scrollToSection('portfolio')">Портфолио</a>
-            <a onclick="scrollToSection('pricing')">Цены</a>
+            <a onclick="scrollToSection('about')">О нас</a>
         </div>
         <div class="footer-col">
             <h4>Соцсети</h4>
@@ -544,25 +498,6 @@
         <div id="contentEditorWrap" class="content-editor-wrap"></div>
         <div class="content-editor-actions">
             <button class="btn" id="contentSaveBtn" onclick="saveContent()"><i class="fas fa-save"></i> Сохранить всё</button>
-        </div>
-    </div>
-</div>
-
-<div class="modal" id="packageModal" onclick="if(event.target===this) closePackageConfigurator()">
-    <div class="modal-box package-modal-box">
-        <button class="modal-close" onclick="closePackageConfigurator()">×</button>
-        <div class="auth-head">
-            <div class="auth-logo">🎨</div>
-            <h3 id="packageTitle">Настройка пакета</h3>
-            <p id="packageSubtitle">Настройте состав — цена пересчитается автоматически</p>
-        </div>
-        <div id="packageConfigurator"></div>
-        <div class="package-total">
-            <div>
-                <span class="package-total-label">Итоговая стоимость:</span>
-                <span class="package-total-price" id="packageTotalPrice">0 ₽</span>
-            </div>
-            <button class="btn" onclick="orderCustomPackage()"><i class="fas fa-paper-plane"></i> Заказать</button>
         </div>
     </div>
 </div>
