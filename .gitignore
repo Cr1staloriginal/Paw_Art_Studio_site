@@ -1,13 +1,42 @@
+# Зависимости
 node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Переменные окружения и секреты
 .env
+.env.local
+.env.*.local
+
+# База данных
 *.db
 *.db-shm
 *.db-wal
+paw.db*
+
+# Загруженные файлы (кроме маскота и ассетов сайта)
 uploads/*
 !uploads/mascot.png
+!uploads/logo.png
+!uploads/favicon.ico
+
+# Логи
+logs/
 *.log
-npm-debug.log*
+
+# Бэкапы
+*.bak
+*.backup
+*.backup.*
+
+# Системные
 .DS_Store
 Thumbs.db
 .vscode/
 .idea/
+
+# Кэш
+.cache/
+dist/
+build/
