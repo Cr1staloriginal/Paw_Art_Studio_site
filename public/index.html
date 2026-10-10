@@ -8,7 +8,7 @@
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" />
     <link rel="stylesheet" href="css/style.css" />
     <link rel="stylesheet" href="css/paw-upgrade.css" />
 </head>
@@ -71,11 +71,12 @@
                     <span data-content="hero_badge_3">🎨 50+ работ</span>
                 </div>
             </div>
-            <div class="hero-gallery">
-                <div class="placeholder" onclick="scrollToSection('projects')"><i class="fas fa-palette"></i><span>маскот</span></div>
-                <div class="placeholder" onclick="scrollToSection('projects')"><i class="fas fa-smile"></i><span>стикеры</span></div>
-                <div class="placeholder" onclick="scrollToSection('projects')"><i class="fas fa-video"></i><span>оверлей</span></div>
-                <div class="placeholder" onclick="scrollToSection('projects')"><i class="fas fa-dragon"></i><span>арт</span></div>
+            <div class="hero-gallery paw-mascot-card">
+                <img class="paw-mascot-image" src="/uploads/mascot.png" alt="Маскот Paw Art Studio — Paw">
+                <div class="paw-mascot-copy">
+                    <strong>Твой творческий напарник — Paw!</strong>
+                    <span>Маскоты, стикеры и визуал с характером ✨</span>
+                </div>
             </div>
         </div>
     </section>
@@ -319,31 +320,26 @@
 <div class="toast" id="toast"></div>
 <button class="scroll-top" id="scrollTop" onclick="scrollToTop()"><i class="fas fa-arrow-up"></i></button>
 
-<!-- AUTH MODAL: login / register / verify -->
 <div class="modal" id="authModal" onclick="if(event.target===this) closeAuth()">
     <div class="modal-box">
         <button class="modal-close" onclick="closeAuth()">×</button>
         <div class="auth-head"><div class="auth-logo">🐾</div><h3>Paw Art Studio</h3><p id="authSubtitle">Войдите или создайте аккаунт</p></div>
-
         <div class="auth-tabs" id="authTabs">
             <button class="auth-tab active" data-tab="login" onclick="switchAuthTab('login')">Вход</button>
             <button class="auth-tab" data-tab="register" onclick="switchAuthTab('register')">Регистрация</button>
         </div>
-
         <form class="auth-form" id="loginForm" onsubmit="handleLogin(event)">
             <label>Email</label><input type="email" id="loginEmail" placeholder="your@email.com" required />
             <label>Пароль</label><input type="password" id="loginPassword" placeholder="••••••••" required />
             <button type="submit" class="btn">Войти</button>
         </form>
-
         <form class="auth-form hidden" id="registerForm" onsubmit="handleRegister(event)">
             <label>Имя</label><input type="text" id="regName" placeholder="Как вас зовут?" required />
             <label>Email</label><input type="email" id="regEmail" placeholder="your@email.com" required />
             <label>Пароль</label><input type="password" id="regPassword" placeholder="Минимум 6 символов" minlength="6" required />
-            <div class="role-info-box"><i class="fas fa-info-circle"></i><span>На указанный email придёт код подтверждения. После регистрации — бонус <strong>500 ₽</strong>.</span></div>
+            <div class="role-info-box"><i class="fas fa-info-circle"></i><span>На указанный email придёт код подтверждения. Бонус <strong>500 ₽</strong> после регистрации.</span></div>
             <button type="submit" class="btn">Получить код на email</button>
         </form>
-
         <form class="auth-form hidden" id="verifyForm" onsubmit="handleVerify(event)">
             <div style="text-align:center;margin-bottom:14px;">
                 <p style="color:var(--text-soft);font-size:0.92rem;">Мы отправили код на <strong id="verifyEmailTarget">—</strong></p>
@@ -358,7 +354,6 @@
     </div>
 </div>
 
-<!-- DASHBOARD -->
 <div class="modal" id="dashboardModal" onclick="if(event.target===this) closeDashboard()">
     <div class="modal-box dashboard-box">
         <button class="modal-close" onclick="closeDashboard()">×</button>
@@ -407,7 +402,6 @@
     </div>
 </div>
 
-<!-- PROFILE -->
 <div class="modal" id="profileModal" onclick="if(event.target===this) closeProfileEditor()">
     <div class="modal-box">
         <button class="modal-close" onclick="closeProfileEditor()">×</button>
@@ -431,7 +425,6 @@
     </div>
 </div>
 
-<!-- PROJECT CREATE -->
 <div class="modal" id="projectModal" onclick="if(event.target===this) closeProjectCreator()">
     <div class="modal-box">
         <button class="modal-close" onclick="closeProjectCreator()">×</button>
@@ -574,7 +567,6 @@
     </div>
 </div>
 
-<!-- MONEY MODAL: пополнение и вывод. Поле карты скрыто по умолчанию -->
 <div class="modal" id="moneyModal" onclick="if(event.target===this) closeMoney()">
     <div class="modal-box money-box">
         <button class="modal-close" onclick="closeMoney()">×</button>
@@ -586,7 +578,6 @@
         </div>
         <label>Сумма (можно копейки)</label>
         <input type="number" id="moneyAmount" placeholder="0.00" step="0.01" min="1" />
-
         <div id="moneyCardBlock" class="hidden">
             <label>Номер карты для вывода</label>
             <input type="text" id="moneyCard" inputmode="numeric" placeholder="0000 0000 0000 0000" maxlength="23" />
@@ -594,7 +585,6 @@
                 Заявку рассмотрит администратор. Перевод выполняется вручную.
             </p>
         </div>
-
         <div class="money-note" id="moneyNote">Комиссия <strong>0%</strong>. Оплата через ЮKassa.</div>
         <button class="btn" id="moneySubmit" onclick="submitMoney()">Перейти к оплате</button>
     </div>
