@@ -1,322 +1,615 @@
 <!DOCTYPE html>
 <html lang="ru">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <meta name="description" content="Paw Art Studio — маскоты, стикеры и визуал с характером">
-  <title>Paw Art Studio</title>
-
-  <!-- Основные стили -->
-  <link rel="stylesheet" href="/css/styles.css">
-  <!-- Стили пакета обновления (промокоды, рефералы, маскот) -->
-  <link rel="stylesheet" href="/css/paw-upgrade.css">
-
-  <!-- Минимальные базовые стили, чтобы страница работала даже без styles.css -->
-  <style>
-    *{box-sizing:border-box;margin:0;padding:0}
-    :root{
-      --bg:#120d16;--bg-2:#211723;--bg-card:#1b141e;--border:#3b2b42;
-      --text:#ffffff;--text-soft:#d4c7d8;--text-mute:#a99bac;
-      --accent:#ec4899;--accent-2:#8b5cf6;--accent-3:#67e8f9;
-    }
-    body{background:var(--bg);color:var(--text);font-family:system-ui,-apple-system,'Segoe UI',Roboto,sans-serif;line-height:1.5;min-height:100vh}
-    a{color:inherit;text-decoration:none}
-    button{font:inherit;cursor:pointer}
-    .container{max-width:1200px;margin:0 auto;padding:0 20px}
-
-    /* Header */
-    header.site-header{position:sticky;top:0;z-index:50;background:rgba(18,13,22,.85);backdrop-filter:blur(12px);border-bottom:1px solid var(--border)}
-    .site-header .container{display:flex;align-items:center;justify-content:space-between;padding:14px 20px}
-    .logo{font-weight:800;font-size:1.15rem;letter-spacing:.5px;background:linear-gradient(135deg,#ec4899,#8b5cf6);-webkit-background-clip:text;background-clip:text;color:transparent}
-    .nav-links{display:flex;gap:20px;align-items:center}
-    .nav-links a{color:var(--text-soft);font-size:.9rem}
-    .nav-links a:hover{color:var(--text)}
-
-    /* Buttons */
-    .btn{display:inline-flex;align-items:center;justify-content:center;gap:8px;background:linear-gradient(135deg,#ec4899,#8b5cf6);color:#fff;border:none;padding:11px 18px;border-radius:12px;font-size:.9rem;font-weight:600;transition:opacity .15s}
-    .btn:hover{opacity:.9}
-    .btn:disabled{opacity:.5;cursor:not-allowed}
-    .btn.ghost{background:transparent;border:1px solid var(--border);color:var(--text-soft)}
-    .btn.ghost:hover{background:var(--bg-2);color:var(--text)}
-
-    /* Hero */
-    .hero{padding:60px 0 80px}
-    .hero-grid{display:grid;grid-template-columns:1.1fr 1fr;gap:40px;align-items:center}
-    @media(max-width:820px){.hero-grid{grid-template-columns:1fr;gap:24px}}
-    .hero h1{font-size:clamp(2rem,5vw,3.2rem);line-height:1.1;margin-bottom:16px}
-    .hero p.lead{color:var(--text-soft);font-size:1.05rem;max-width:540px;margin-bottom:24px}
-    .hero-actions{display:flex;gap:12px;flex-wrap:wrap}
-    .hero-gallery{min-height:360px;border-radius:28px;background:linear-gradient(145deg,#24172e,#15111d);border:1px solid var(--border)}
-
-    /* Sections */
-    section{padding:60px 0}
-    section h2{font-size:clamp(1.6rem,3vw,2.2rem);margin-bottom:16px}
-    section p.section-lead{color:var(--text-soft);max-width:640px;margin-bottom:32px}
-    .features{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:20px}
-    .feature{background:var(--bg-card);border:1px solid var(--border);border-radius:18px;padding:22px}
-    .feature .icon{font-size:1.8rem;margin-bottom:10px}
-    .feature h3{font-size:1.05rem;margin-bottom:6px}
-    .feature p{color:var(--text-mute);font-size:.9rem}
-
-    /* Modals */
-    .modal{position:fixed;inset:0;z-index:100;display:none;align-items:center;justify-content:center;background:rgba(0,0,0,.7);padding:20px}
-    .modal.open{display:flex}
-    .modal-card{background:var(--bg-card);border:1px solid var(--border);border-radius:20px;width:100%;max-width:440px;padding:26px;max-height:90vh;overflow-y:auto}
-    .modal-card.wide{max-width:720px}
-    .modal-card h3{font-size:1.25rem;margin-bottom:16px}
-    .modal-close{position:absolute;top:14px;right:16px;background:transparent;border:none;color:var(--text-mute);font-size:1.4rem;line-height:1}
-    .modal-card form{display:flex;flex-direction:column;gap:12px}
-    .modal-card input,.modal-card select,.modal-card textarea{width:100%;background:var(--bg-2);color:var(--text);border:1px solid var(--border);border-radius:12px;padding:12px;font:inherit}
-    .modal-card label{font-size:.85rem;color:var(--text-mute);margin-bottom:-4px}
-    .modal-tabs{display:flex;gap:8px;margin-bottom:18px}
-    .modal-tabs button{flex:1;background:transparent;color:var(--text-mute);border:1px solid var(--border);padding:9px;border-radius:10px;font-size:.88rem}
-    .modal-tabs button.active{background:linear-gradient(135deg,#ec4899,#8b5cf6);color:#fff;border-color:transparent}
-    .form-error{color:#f87171;font-size:.85rem;min-height:1.1em}
-    .form-success{color:#4ade80;font-size:.85rem;min-height:1.1em}
-
-    /* Dashboard */
-    .dash-header{display:flex;align-items:center;gap:14px;margin-bottom:20px}
-    .dash-avatar{width:52px;height:52px;border-radius:50%;background:linear-gradient(135deg,#ec4899,#8b5cf6);display:flex;align-items:center;justify-content:center;font-weight:800;font-size:1.2rem;overflow:hidden}
-    .dash-avatar img{width:100%;height:100%;object-fit:cover}
-    .dash-wallet{background:linear-gradient(135deg,rgba(236,72,153,.15),rgba(139,92,246,.15));border:1px solid var(--border);border-radius:18px;padding:20px;margin-bottom:16px}
-    .dash-wallet .label{font-size:.85rem;color:var(--text-mute)}
-    .dash-wallet .amount{font-size:2rem;font-weight:800;margin-top:4px}
-    .dash-actions{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
-    .dash-section{margin-top:22px}
-    .dash-section h4{font-size:1rem;margin-bottom:10px}
-    .dash-list{list-style:none;display:flex;flex-direction:column;gap:8px}
-    .dash-list li{display:flex;justify-content:space-between;background:var(--bg-2);border:1px solid var(--border);border-radius:12px;padding:10px 14px;font-size:.88rem}
-    .dash-list .amount.in{color:#4ade80}
-    .dash-list .amount.out{color:#f87171}
-
-    /* Toast */
-    .toast-wrap{position:fixed;top:80px;right:20px;z-index:200;display:flex;flex-direction:column;gap:8px}
-    .toast{background:var(--bg-card);border:1px solid var(--border);border-left:3px solid var(--accent);border-radius:12px;padding:12px 16px;font-size:.88rem;box-shadow:0 10px 30px rgba(0,0,0,.35);max-width:320px;animation:toast-in .2s ease-out}
-    .toast.error{border-left-color:#f87171}
-    .toast.success{border-left-color:#4ade80}
-    @keyframes toast-in{from{opacity:0;transform:translateX(20px)}to{opacity:1;transform:none}}
-
-    /* Footer */
-    footer{border-top:1px solid var(--border);padding:30px 0;color:var(--text-mute);font-size:.85rem;text-align:center}
-
-    @media(max-width:600px){
-      .nav-links a:not(.btn){display:none}
-      .hero{padding:40px 0 60px}
-    }
-  </style>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
+    <title>Paw Art Studio — Визуал для твоего проекта</title>
+    <meta name="description" content="Маскоты, стикеры, оверлеи и арт для стримеров, серверов и брендов." />
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet" />
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
+    <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/paw-upgrade.css" />
 </head>
 <body>
 
-  <!-- ===================== HEADER ===================== -->
-  <header class="site-header">
-    <div class="container">
-      <a href="/" class="logo">🐾 Paw Art Studio</a>
-      <nav class="nav-links">
-        <a href="#features">Возможности</a>
-        <a href="#about">О студии</a>
-        <button class="btn ghost" id="btnLogin">Войти</button>
-        <button class="btn" id="btnRegister">Регистрация</button>
-        <button class="btn" id="btnDashboard" style="display:none">Кабинет</button>
-      </nav>
-    </div>
-  </header>
-
-  <!-- ===================== HERO ===================== -->
-  <section class="hero">
-    <div class="container">
-      <div class="hero-grid">
-        <div>
-          <h1>Визуал, который <span style="background:linear-gradient(135deg,#ec4899,#8b5cf6);-webkit-background-clip:text;background-clip:text;color:transparent">работает</span> на твой бренд</h1>
-          <p class="lead">
-            Маскоты, стикеры, иллюстрации и айдентика — от идеи до готовых файлов.
-            Заказывай у проверенных исполнителей, пополняй баланс, активируй промокоды.
-          </p>
-          <div class="hero-actions">
-            <button class="btn" id="heroRegister">Начать бесплатно</button>
-            <a href="#features" class="btn ghost">Узнать больше</a>
-          </div>
+<header id="header">
+    <div class="container nav">
+        <div class="logo" onclick="scrollToTop()"><span class="logo-paw">🐾</span> PAW <span>ART</span></div>
+        <button class="burger" id="burger" onclick="toggleMenu()"><span></span><span></span><span></span></button>
+        <nav class="nav-links" id="navLinks">
+            <a onclick="scrollToSection('services')">Услуги</a>
+            <a onclick="scrollToSection('projects')">Заказы</a>
+            <a onclick="scrollToSection('portfolio')">Портфолио</a>
+            <a onclick="scrollToSection('pricing')">Цены</a>
+            <a onclick="scrollToSection('about')">О нас</a>
+            <a onclick="scrollToSection('faq')">FAQ</a>
+            <a onclick="scrollToSection('contact')">Контакты</a>
+        </nav>
+        <div class="nav-user">
+            <button class="btn-login" id="loginBtn" onclick="openAuth()"><i class="fas fa-user"></i> Войти</button>
+            <div class="user-box hidden" id="userBox">
+                <button class="chat-chip" onclick="openMessenger()" title="Сообщения"><i class="fas fa-comments"></i><span class="chat-chip-badge hidden" id="chatBadge">0</span></button>
+                <button class="balance-chip" onclick="openDashboard()" title="Кабинет"><i class="fas fa-wallet"></i> <span id="balanceChip">0 ₽</span></button>
+                <button class="admin-btn hidden" id="adminBtn" onclick="openAdminPanel()" title="Админ"><i class="fas fa-shield-alt"></i></button>
+                <button class="avatar" id="userAvatar" onclick="toggleUserMenu()"><span id="userInitial">U</span></button>
+                <div class="user-menu hidden" id="userMenu">
+                    <div class="user-menu-head">
+                        <div class="user-menu-name" id="userName">User</div>
+                        <div class="user-menu-role" id="userRole">Клиент</div>
+                    </div>
+                    <a onclick="openDashboard()"><i class="fas fa-wallet"></i> Кабинет и баланс</a>
+                    <a onclick="openProfileEditor()"><i class="fas fa-user-edit"></i> Редактировать профиль</a>
+                    <a onclick="openMessenger()"><i class="fas fa-comments"></i> Сообщения (панель)</a>
+                    <a href="/messenger.html" target="_blank"><i class="fas fa-external-link-alt"></i> Мессенджер (страница)</a>
+                    <a onclick="openMyPortfolio()"><i class="fas fa-images"></i> Моё портфолио</a>
+                    <a onclick="openAdminPanel()" id="adminMenuLink" class="hidden"><i class="fas fa-shield-alt"></i> Админ-панель</a>
+                    <a onclick="openContentEditor()" id="contentMenuLink" class="hidden"><i class="fas fa-edit"></i> Редактор сайта 👑</a>
+                    <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</a>
+                </div>
+            </div>
         </div>
-        <!-- paw-upgrade.js заменит этот блок на карточку с маскотом-альпакой -->
-        <div class="hero-gallery" aria-hidden="true"></div>
-      </div>
     </div>
-  </section>
+</header>
 
-  <!-- ===================== FEATURES ===================== -->
-  <section id="features">
-    <div class="container">
-      <h2>Что умеет студия</h2>
-      <p class="section-lead">Полный цикл работы с визуалом — от брифа до финальных файлов в нужных форматах.</p>
-      <div class="features">
-        <div class="feature"><div class="icon">🎨</div><h3>Маскоты и персонажи</h3><p>Уникальные герои для бренда, соцсетей и мерча.</p></div>
-        <div class="feature"><div class="icon">🖼️</div><h3>Иллюстрации</h3><p>Стикеры, обложки, баннеры, оформление каналов.</p></div>
-        <div class="feature"><div class="icon">✨</div><h3>Айдентика</h3><p>Логотипы, палитры, фирменный стиль под задачу.</p></div>
-        <div class="feature"><div class="icon">🚀</div><h3>Быстрый старт</h3><p>500 ₽ бонусом на баланс после регистрации.</p></div>
-      </div>
-    </div>
-  </section>
-
-  <!-- ===================== ABOUT ===================== -->
-  <section id="about">
-    <div class="container">
-      <h2>О студии</h2>
-      <p class="section-lead">
-        Paw Art Studio — команда художников и дизайнеров, которая создаёт визуал с характером.
-        Мы верим, что бренд — это не только логотип, но и эмоция, которую он вызывает.
-      </p>
-    </div>
-  </section>
-
-  <!-- ===================== FOOTER ===================== -->
-  <footer>
-    <div class="container">
-      © <span id="year"></span> Paw Art Studio · <a href="mailto:support@pawartstudio.store">support@pawartstudio.store</a>
-    </div>
-  </footer>
-
-  <!-- ===================== AUTH MODAL ===================== -->
-  <div class="modal" id="authModal" role="dialog" aria-modal="true">
-    <div class="modal-card" style="position:relative">
-      <button class="modal-close" data-close="authModal" aria-label="Закрыть">×</button>
-
-      <div class="modal-tabs">
-        <button class="active" data-auth-tab="login">Вход</button>
-        <button data-auth-tab="register">Регистрация</button>
-      </div>
-
-      <!-- ВХОД -->
-      <form id="loginForm" data-auth-panel="login">
-        <label for="loginEmail">Email</label>
-        <input type="email" id="loginEmail" autocomplete="email" required>
-
-        <label for="loginPassword">Пароль</label>
-        <input type="password" id="loginPassword" autocomplete="current-password" required>
-
-        <p class="form-error" id="loginError"></p>
-        <button type="submit" class="btn">Войти</button>
-      </form>
-
-      <!-- РЕГИСТРАЦИЯ (шаг 1: данные) -->
-      <form id="registerForm" data-auth-panel="register" hidden>
-        <label for="regName">Имя</label>
-        <input type="text" id="regName" autocomplete="name" maxlength="60" required>
-
-        <label for="regEmail">Email</label>
-        <input type="email" id="regEmail" autocomplete="email" required>
-
-        <label for="regPassword">Пароль (минимум 6 символов)</label>
-        <input type="password" id="regPassword" autocomplete="new-password" minlength="6" required>
-
-        <p class="form-error" id="registerError"></p>
-        <button type="submit" class="btn">Получить код на email</button>
-        <p style="font-size:.8rem;color:var(--text-mute);text-align:center;margin-top:4px">
-          На указанный email придёт 6-значный код подтверждения.
-        </p>
-      </form>
-
-      <!-- РЕГИСТРАЦИЯ (шаг 2: ввод кода) -->
-      <form id="verifyForm" data-auth-panel="verify" hidden>
-        <h3 style="margin-bottom:6px">Подтверждение email</h3>
-        <p style="color:var(--text-soft);font-size:.9rem;margin-bottom:6px">
-          Мы отправили код на <strong id="verifyEmailTarget">—</strong>
-        </p>
-
-        <label for="verifyCode">Код из письма</label>
-        <input type="text" id="verifyCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required>
-
-        <p class="form-error" id="verifyError"></p>
-        <p class="form-success" id="verifySuccess"></p>
-
-        <button type="submit" class="btn">Подтвердить</button>
-        <button type="button" class="btn ghost" id="resendCodeBtn">Отправить код повторно</button>
-        <button type="button" class="btn ghost" id="backToRegisterBtn">← Назад</button>
-      </form>
-    </div>
-  </div>
-
-  <!-- ===================== DASHBOARD MODAL ===================== -->
-  <div class="modal" id="dashboardModal" role="dialog" aria-modal="true">
-    <div class="modal-card wide" style="position:relative">
-      <button class="modal-close" data-close="dashboardModal" aria-label="Закрыть">×</button>
-
-      <div class="dash-header">
-        <div class="dash-avatar" id="dashAvatar">P</div>
-        <div>
-          <div style="font-weight:700" id="dashName">Пользователь</div>
-          <div style="color:var(--text-mute);font-size:.85rem" id="dashRole">клиент</div>
+<main>
+    <section class="hero" id="hero">
+        <div class="hero-bg"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
+        <div class="container hero-inner">
+            <div class="hero-content">
+                <div class="hero-eyebrow" data-content="hero_eyebrow">🐾 Студия визуала Paw Art Studio</div>
+                <h1 data-content="hero_title">Визуал, который работает на вас</h1>
+                <p data-content="hero_subtitle">Маскоты, стикеры, оформление для стримеров, серверов и брендов.</p>
+                <div class="hero-actions">
+                    <a onclick="scrollToSection('contact')" class="btn">Заказать проект</a>
+                    <a onclick="scrollToSection('portfolio')" class="btn btn-ghost">Смотреть работы</a>
+                </div>
+                <div class="hero-badges">
+                    <span data-content="hero_badge_1">⭐ 4.9 из 5</span>
+                    <span data-content="hero_badge_2">⚡ Срок от 3 дней</span>
+                    <span data-content="hero_badge_3">🎨 50+ работ</span>
+                </div>
+            </div>
+            <div class="hero-gallery">
+                <div class="placeholder" onclick="scrollToSection('projects')"><i class="fas fa-palette"></i><span>маскот</span></div>
+                <div class="placeholder" onclick="scrollToSection('projects')"><i class="fas fa-smile"></i><span>стикеры</span></div>
+                <div class="placeholder" onclick="scrollToSection('projects')"><i class="fas fa-video"></i><span>оверлей</span></div>
+                <div class="placeholder" onclick="scrollToSection('projects')"><i class="fas fa-dragon"></i><span>арт</span></div>
+            </div>
         </div>
-      </div>
+    </section>
 
-      <!-- Кошелёк. ВАЖНО: id="dashWallet" нужен для paw-upgrade.js -->
-      <div class="dash-wallet" id="dashWallet">
-        <div class="label">Баланс</div>
-        <div class="amount" id="dashBalance">0 ₽</div>
-        <div class="dash-actions">
-          <button class="btn" id="btnTopUp">Пополнить</button>
-          <button class="btn ghost" id="btnWithdraw">Вывести</button>
-          <button class="btn ghost" id="btnLogout">Выйти</button>
+    <section class="section services" id="services">
+        <div class="container">
+            <h2>Услуги</h2>
+            <p class="section-subtitle">Выберите то, что нужно вашему проекту</p>
+            <div class="grid grid-3">
+                <div class="service-card" data-service="Артики" data-price="от 1 500 ₽">
+                    <div class="service-icon"><i class="fas fa-paint-brush"></i></div>
+                    <h3 data-content="service_1_name">Артики</h3>
+                    <p data-content="service_1_desc">Мини-иллюстрации на заказ</p>
+                    <span class="price" data-content="service_1_price">от 1 500 ₽</span>
+                </div>
+                <div class="service-card" data-service="Премиум арт" data-price="от 5 000 ₽">
+                    <div class="service-icon"><i class="fas fa-crown"></i></div>
+                    <h3 data-content="service_2_name">Премиум арт</h3>
+                    <p data-content="service_2_desc">Детализированные иллюстрации</p>
+                    <span class="price" data-content="service_2_price">от 5 000 ₽</span>
+                </div>
+                <div class="service-card" data-service="Чибики" data-price="от 2 000 ₽">
+                    <div class="service-icon"><i class="fas fa-child"></i></div>
+                    <h3 data-content="service_3_name">Чибики</h3>
+                    <p data-content="service_3_desc">Милые чиби-персонажи</p>
+                    <span class="price" data-content="service_3_price">от 2 000 ₽</span>
+                </div>
+                <div class="service-card" data-service="Стикеры" data-price="от 1 800 ₽">
+                    <div class="service-icon"><i class="fas fa-sticky-note"></i></div>
+                    <h3 data-content="service_4_name">Стикеры</h3>
+                    <p data-content="service_4_desc">5–15 эмоций для Discord / Telegram</p>
+                    <span class="price" data-content="service_4_price">от 1 800 ₽</span>
+                </div>
+                <div class="service-card" data-service="Ава" data-price="от 1 200 ₽">
+                    <div class="service-icon"><i class="fas fa-user-circle"></i></div>
+                    <h3 data-content="service_5_name">Ава</h3>
+                    <p data-content="service_5_desc">Аватарки для соцсетей и Discord</p>
+                    <span class="price" data-content="service_5_price">от 1 200 ₽</span>
+                </div>
+                <div class="service-card" data-service="3D модель" data-price="от 8 000 ₽">
+                    <div class="service-icon"><i class="fas fa-cube"></i></div>
+                    <h3 data-content="service_6_name">3D модель</h3>
+                    <p data-content="service_6_desc">3D-модель персонажа</p>
+                    <span class="price" data-content="service_6_price">от 8 000 ₽</span>
+                </div>
+                <div class="service-card" data-service="3D арт" data-price="от 6 000 ₽">
+                    <div class="service-icon"><i class="fas fa-cubes"></i></div>
+                    <h3 data-content="service_7_name">3D арт</h3>
+                    <p data-content="service_7_desc">3D-иллюстрация или сцена</p>
+                    <span class="price" data-content="service_7_price">от 6 000 ₽</span>
+                </div>
+            </div>
         </div>
-      </div>
+    </section>
 
-      <div class="dash-section">
-        <h4>Последние операции</h4>
-        <ul class="dash-list" id="dashTxList">
-          <li><span>Пока нет операций</span></li>
-        </ul>
-      </div>
+    <section class="section projects-section" id="projects">
+        <div class="container">
+            <h2>Заказы</h2>
+            <p class="section-subtitle">Создайте заказ или возьмите в работу</p>
+            <div class="projects-toolbar">
+                <div class="projects-filters" id="projectFilters">
+                    <button class="filter active" data-status="all">Все</button>
+                    <button class="filter" data-status="open">Открытые</button>
+                    <button class="filter" data-status="in_progress">В работе</button>
+                    <button class="filter" data-status="completed">Завершённые</button>
+                    <button class="filter" data-status="cancelled">Отменённые</button>
+                </div>
+                <button class="btn" id="createProjectBtn" onclick="openProjectCreator()"><i class="fas fa-plus"></i> Создать заказ</button>
+            </div>
+            <div class="projects-list" id="projectsList"></div>
+        </div>
+    </section>
+
+    <section class="section portfolio-preview" id="portfolio">
+        <div class="container">
+            <h2>Портфолио</h2>
+            <p class="section-subtitle">Готовые работы мастеров студии</p>
+            <div class="port-filters">
+                <button class="filter active" data-filter="all">Все</button>
+                <button class="filter" data-filter="Артики">Артики</button>
+                <button class="filter" data-filter="Премиум арт">Премиум арт</button>
+                <button class="filter" data-filter="Чибики">Чибики</button>
+                <button class="filter" data-filter="Стикеры">Стикеры</button>
+                <button class="filter" data-filter="Ава">Ава</button>
+                <button class="filter" data-filter="3D модель">3D модель</button>
+                <button class="filter" data-filter="3D арт">3D арт</button>
+            </div>
+            <div class="portfolio-gallery" id="portfolioGallery"></div>
+        </div>
+    </section>
+
+    <section class="section pricing" id="pricing">
+        <div class="container">
+            <h2>Пакеты и цены</h2>
+            <p class="section-subtitle">Настройте состав пакета под себя</p>
+            <div class="grid grid-5 pricing-grid">
+                <div class="pricing-card">
+                    <div class="name" data-content="pricing_1_name">Пак DS</div>
+                    <div class="price-tag" data-content="pricing_1_price">18 000 ₽</div>
+                    <ul data-content="pricing_1_features"></ul>
+                    <a onclick="openPackageConfigurator('ds')" class="btn btn-outline">Настроить</a>
+                </div>
+                <div class="pricing-card popular">
+                    <div class="name" data-content="pricing_2_name">Пак стримера</div>
+                    <div class="price-tag" data-content="pricing_2_price">15 000 ₽</div>
+                    <ul data-content="pricing_2_features"></ul>
+                    <a onclick="openPackageConfigurator('streamer')" class="btn">Настроить</a>
+                </div>
+                <div class="pricing-card">
+                    <div class="name" data-content="pricing_3_name">Маскот</div>
+                    <div class="price-tag" data-content="pricing_3_price">4 000–6 000 ₽</div>
+                    <ul data-content="pricing_3_features"></ul>
+                    <a onclick="selectPlan('Маскот', '4 000–6 000 ₽')" class="btn btn-outline">Выбрать</a>
+                </div>
+                <div class="pricing-card">
+                    <div class="name" data-content="pricing_4_name">Бренд</div>
+                    <div class="price-tag" data-content="pricing_4_price">10 000–12 000 ₽</div>
+                    <ul data-content="pricing_4_features"></ul>
+                    <a onclick="selectPlan('Бренд', '10 000–12 000 ₽')" class="btn btn-outline">Выбрать</a>
+                </div>
+                <div class="pricing-card">
+                    <div class="name" data-content="pricing_5_name">Создание сайта под ключ</div>
+                    <div class="price-tag" data-content="pricing_5_price">от 30 000 ₽</div>
+                    <ul data-content="pricing_5_features"></ul>
+                    <a onclick="selectPlan('Сайт под ключ', 'от 30 000 ₽')" class="btn btn-outline">Выбрать</a>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section about" id="about">
+        <div class="container">
+            <h2>О нас</h2>
+            <p class="section-subtitle">Команда, которая делает визуал осмысленным</p>
+            <div class="about-layout">
+                <div class="about-text">
+                    <p data-content="about_text"><strong>Paw Art Studio</strong> — команда художников и менеджеров.</p>
+                    <blockquote data-content="about_quote">«Мы не просто рисуем»</blockquote>
+                </div>
+                <div class="about-grid">
+                    <div class="about-stat"><div class="num" data-content="about_stat_1">0</div><div class="desc" data-content="about_stat_1_desc">проектов</div></div>
+                    <div class="about-stat"><div class="num" data-content="about_stat_2">0</div><div class="desc" data-content="about_stat_2_desc">клиентов</div></div>
+                    <div class="about-stat"><div class="num" data-content="about_stat_3">0</div><div class="desc" data-content="about_stat_3_desc">срок</div></div>
+                </div>
+            </div>
+        </div>
+    </section>
+
+    <section class="section faq" id="faq">
+        <div class="container">
+            <h2>Частые вопросы</h2>
+            <p class="section-subtitle">Коротко о главном</p>
+            <div class="faq-list">
+                <details class="faq-item"><summary data-content="faq_1_q">Вопрос 1</summary><p data-content="faq_1_a">Ответ</p></details>
+                <details class="faq-item"><summary data-content="faq_2_q">Вопрос 2</summary><p data-content="faq_2_a">Ответ</p></details>
+                <details class="faq-item"><summary data-content="faq_3_q">Вопрос 3</summary><p data-content="faq_3_a">Ответ</p></details>
+                <details class="faq-item"><summary data-content="faq_4_q">Вопрос 4</summary><p data-content="faq_4_a">Ответ</p></details>
+                <details class="faq-item"><summary data-content="faq_5_q">Вопрос 5</summary><p data-content="faq_5_a">Ответ</p></details>
+            </div>
+        </div>
+    </section>
+
+    <section class="section contact" id="contact">
+        <div class="container">
+            <h2>Контакты</h2>
+            <p class="section-subtitle">Свяжитесь с нами удобным способом</p>
+            <div class="contact-wrapper">
+                <div class="contact-links">
+                    <a href="javascript:void(0)" onclick="openSocial('discord', state.content?.contact_discord || 'discord.gg/pawartstudio')">
+                        <i class="fab fa-discord"></i>
+                        <span data-content="contact_discord">discord.gg/pawartstudio</span>
+                    </a>
+                    <a href="javascript:void(0)" onclick="openSocial('telegram', state.content?.contact_telegram || '@pawartstudio')">
+                        <i class="fab fa-telegram-plane"></i>
+                        <span data-content="contact_telegram">@pawartstudio</span>
+                    </a>
+                    <a href="javascript:void(0)" onclick="openEmail()" class="contact-email-link">
+                        <i class="fas fa-envelope"></i>
+                        <span data-content="contact_email">pawartstudioofficial@gmail.com</span>
+                        <button class="copy-btn" onclick="event.stopPropagation(); copyEmail()" title="Скопировать email">
+                            <i class="fas fa-copy"></i>
+                        </button>
+                    </a>
+                </div>
+                <div class="contact-form">
+                    <h3 style="margin-bottom:6px;">Оставить заявку</h3>
+                    <p style="color:var(--text-mute); font-size:0.9rem;">Мы ответим в течение 24 часов</p>
+                    <form id="contactForm" onsubmit="handleSubmit(event)">
+                        <label>Имя</label><input type="text" id="formName" placeholder="Как к вам обращаться?" required />
+                        <label>Проект</label><input type="text" id="formProject" placeholder="Название проекта" />
+                        <label>Что нужно</label>
+                        <select id="formService">
+                            <option value="Артики">Артики</option>
+                            <option value="Премиум арт">Премиум арт</option>
+                            <option value="Чибики">Чибики</option>
+                            <option value="Стикеры">Стикеры</option>
+                            <option value="Ава">Ава</option>
+                            <option value="3D модель">3D модель</option>
+                            <option value="3D арт">3D арт</option>
+                            <option value="Пак DS">Пак DS</option>
+                            <option value="Пак стримера">Пак стримера</option>
+                            <option value="Маскот">Маскот</option>
+                            <option value="Бренд">Бренд</option>
+                            <option value="Сайт под ключ">Сайт под ключ</option>
+                            <option value="Другое">Другое</option>
+                        </select>
+                        <label>Бюджет</label><input type="text" id="formBudget" placeholder="Ориентировочная сумма" />
+                        <label>Ссылка на референсы</label><textarea id="formMessage" placeholder="Стиль, примеры, идеи..."></textarea>
+                        <div id="selectedPlan">Выбран пакет: <span id="planDisplay"></span></div>
+                        <button type="submit" class="btn">Отправить заявку</button>
+                    </form>
+                </div>
+            </div>
+        </div>
+    </section>
+</main>
+
+<footer>
+    <div class="container footer-grid">
+        <div class="footer-col">
+            <div class="logo"><span class="logo-paw">🐾</span> PAW <span>ART</span></div>
+            <p data-content="footer_text">Визуал для стримеров, серверов и брендов.</p>
+        </div>
+        <div class="footer-col">
+            <h4>Навигация</h4>
+            <a onclick="scrollToSection('services')">Услуги</a>
+            <a onclick="scrollToSection('projects')">Заказы</a>
+            <a onclick="scrollToSection('portfolio')">Портфолио</a>
+            <a onclick="scrollToSection('pricing')">Цены</a>
+        </div>
+        <div class="footer-col">
+            <h4>Соцсети</h4>
+            <a href="javascript:void(0)" onclick="openSocial('discord', state.content?.contact_discord || 'discord.gg/pawartstudio')"><i class="fab fa-discord"></i> Discord</a>
+            <a href="javascript:void(0)" onclick="openSocial('telegram', state.content?.contact_telegram || '@pawartstudio')"><i class="fab fa-telegram-plane"></i> Telegram</a>
+            <a href="javascript:void(0)" onclick="openEmail()"><i class="fas fa-envelope"></i> Email</a>
+        </div>
     </div>
-  </div>
+    <div class="footer-bottom"><div class="container">&copy; 2026 PAW ART STUDIO</div></div>
+</footer>
 
-  <!-- ===================== TOP-UP MODAL (ЮKassa) ===================== -->
-  <div class="modal" id="topUpModal" role="dialog" aria-modal="true">
-    <div class="modal-card" style="position:relative">
-      <button class="modal-close" data-close="topUpModal" aria-label="Закрыть">×</button>
-      <h3>Пополнение баланса</h3>
-      <form id="topUpForm">
-        <label for="topUpAmount">Сумма (₽)</label>
-        <input type="number" id="topUpAmount" min="1" step="1" placeholder="500" required>
-        <p class="form-error" id="topUpError"></p>
-        <button type="submit" class="btn">Перейти к оплате</button>
-        <p style="font-size:.8rem;color:var(--text-mute);text-align:center">
-          Откроется защищённая страница ЮKassa.
-        </p>
-      </form>
+<div class="toast" id="toast"></div>
+<button class="scroll-top" id="scrollTop" onclick="scrollToTop()"><i class="fas fa-arrow-up"></i></button>
+
+<!-- AUTH MODAL: login / register / verify -->
+<div class="modal" id="authModal" onclick="if(event.target===this) closeAuth()">
+    <div class="modal-box">
+        <button class="modal-close" onclick="closeAuth()">×</button>
+        <div class="auth-head"><div class="auth-logo">🐾</div><h3>Paw Art Studio</h3><p id="authSubtitle">Войдите или создайте аккаунт</p></div>
+
+        <div class="auth-tabs" id="authTabs">
+            <button class="auth-tab active" data-tab="login" onclick="switchAuthTab('login')">Вход</button>
+            <button class="auth-tab" data-tab="register" onclick="switchAuthTab('register')">Регистрация</button>
+        </div>
+
+        <form class="auth-form" id="loginForm" onsubmit="handleLogin(event)">
+            <label>Email</label><input type="email" id="loginEmail" placeholder="your@email.com" required />
+            <label>Пароль</label><input type="password" id="loginPassword" placeholder="••••••••" required />
+            <button type="submit" class="btn">Войти</button>
+        </form>
+
+        <form class="auth-form hidden" id="registerForm" onsubmit="handleRegister(event)">
+            <label>Имя</label><input type="text" id="regName" placeholder="Как вас зовут?" required />
+            <label>Email</label><input type="email" id="regEmail" placeholder="your@email.com" required />
+            <label>Пароль</label><input type="password" id="regPassword" placeholder="Минимум 6 символов" minlength="6" required />
+            <div class="role-info-box"><i class="fas fa-info-circle"></i><span>На указанный email придёт код подтверждения. После регистрации — бонус <strong>500 ₽</strong>.</span></div>
+            <button type="submit" class="btn">Получить код на email</button>
+        </form>
+
+        <form class="auth-form hidden" id="verifyForm" onsubmit="handleVerify(event)">
+            <div style="text-align:center;margin-bottom:14px;">
+                <p style="color:var(--text-soft);font-size:0.92rem;">Мы отправили код на <strong id="verifyEmailTarget">—</strong></p>
+            </div>
+            <label>Код из письма</label>
+            <input type="text" id="verifyCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6 цифр" required />
+            <p id="verifyError" style="color:#f87171;font-size:0.85rem;min-height:1.1em;margin:0;"></p>
+            <button type="submit" class="btn">Подтвердить</button>
+            <button type="button" class="btn btn-outline" id="resendCodeBtn">Отправить код повторно</button>
+            <button type="button" class="btn btn-ghost" id="backToRegisterBtn">← Назад</button>
+        </form>
     </div>
-  </div>
+</div>
 
-  <!-- ===================== WITHDRAW MODAL ===================== -->
-  <div class="modal" id="withdrawModal" role="dialog" aria-modal="true">
-    <div class="modal-card" style="position:relative">
-      <button class="modal-close" data-close="withdrawModal" aria-label="Закрыть">×</button>
-      <h3>Заявка на вывод</h3>
-      <form id="withdrawForm">
-        <label for="withdrawAmount">Сумма (₽)</label>
-        <input type="number" id="withdrawAmount" min="1" step="1" required>
-
-        <label for="withdrawCard">Номер карты</label>
-        <input type="text" id="withdrawCard" inputmode="numeric" placeholder="0000 0000 0000 0000" maxlength="23" required>
-
-        <p class="form-error" id="withdrawError"></p>
-        <button type="submit" class="btn">Отправить заявку</button>
-        <p style="font-size:.8rem;color:var(--text-mute);text-align:center">
-          Заявку рассмотрит администратор. При одобрении перевод выполняется вручную.
-        </p>
-      </form>
+<!-- DASHBOARD -->
+<div class="modal" id="dashboardModal" onclick="if(event.target===this) closeDashboard()">
+    <div class="modal-box dashboard-box">
+        <button class="modal-close" onclick="closeDashboard()">×</button>
+        <div class="dash-head">
+            <div class="dash-avatar" id="dashAvatar">U</div>
+            <div><h3 id="dashName">Пользователь</h3><div class="dash-role" id="dashRole">Клиент</div></div>
+            <button class="dash-edit-btn" onclick="openProfileEditor()" title="Профиль"><i class="fas fa-pen"></i></button>
+        </div>
+        <div class="dash-tabs">
+            <button class="dash-tab active" data-dtab="wallet" onclick="switchDashTab('wallet')"><i class="fas fa-wallet"></i> Кошелёк</button>
+            <button class="dash-tab" data-dtab="withdrawals" onclick="switchDashTab('withdrawals')"><i class="fas fa-money-check-alt"></i> Выплаты</button>
+            <button class="dash-tab" data-dtab="history" onclick="switchDashTab('history')"><i class="fas fa-history"></i> История</button>
+            <button class="dash-tab" data-dtab="role" onclick="switchDashTab('role')"><i class="fas fa-user-tag"></i> Роль</button>
+        </div>
+        <div class="dash-panel" id="dashWallet">
+            <div class="balance-card">
+                <div class="balance-label">Ваш баланс</div>
+                <div class="balance-value" id="dashBalance">0 ₽</div>
+                <div class="balance-actions">
+                    <button class="btn" onclick="openDeposit()"><i class="fas fa-plus"></i> Пополнить</button>
+                    <button class="btn btn-outline" onclick="openWithdraw()"><i class="fas fa-arrow-up"></i> Вывести</button>
+                </div>
+                <div class="commission-note"><i class="fas fa-info-circle"></i> Комиссия <strong>0%</strong>. Пополнение через ЮKassa.</div>
+            </div>
+            <div class="wallet-stats">
+                <div class="wallet-stat"><div class="ws-num" id="wsIn">0 ₽</div><div class="ws-desc">пополнено</div></div>
+                <div class="wallet-stat"><div class="ws-num" id="wsOut">0 ₽</div><div class="ws-desc">выведено</div></div>
+                <div class="wallet-stat"><div class="ws-num" id="wsProjects">0</div><div class="ws-desc">проектов</div></div>
+            </div>
+        </div>
+        <div class="dash-panel hidden" id="dashWithdrawals">
+            <div class="withdrawals-list" id="userWithdrawalsList"><div class="tx-empty">Пока нет заявок на вывод</div></div>
+        </div>
+        <div class="dash-panel hidden" id="dashHistory"><div class="tx-list" id="txList"><div class="tx-empty">Пока нет операций</div></div></div>
+        <div class="dash-panel hidden" id="dashRolePanel">
+            <div class="role-current"><div class="role-current-label">Ваша роль</div><div class="role-current-value" id="roleCurrentValue">Клиент</div></div>
+            <div id="roleRequestBlock">
+                <p class="role-desc">Отправьте заявку — админ рассмотрит.</p>
+                <div class="role-request-actions">
+                    <button class="btn" onclick="requestRole('executor')"><i class="fas fa-paint-brush"></i> Стать исполнителем</button>
+                    <button class="btn btn-outline" onclick="requestRole('manager')"><i class="fas fa-briefcase"></i> Стать менеджером</button>
+                </div>
+            </div>
+            <div class="role-pending hidden" id="rolePending"><i class="fas fa-hourglass-half"></i><span id="rolePendingText">Заявка на рассмотрении</span></div>
+        </div>
     </div>
-  </div>
+</div>
 
-  <!-- ===================== TOASTS ===================== -->
-  <div class="toast-wrap" id="toastWrap" aria-live="polite"></div>
+<!-- PROFILE -->
+<div class="modal" id="profileModal" onclick="if(event.target===this) closeProfileEditor()">
+    <div class="modal-box">
+        <button class="modal-close" onclick="closeProfileEditor()">×</button>
+        <div class="auth-head"><div class="auth-logo">👤</div><h3>Редактировать профиль</h3></div>
+        <div class="avatar-editor">
+            <div class="avatar-preview" id="avatarPreview">U</div>
+            <div class="avatar-upload">
+                <input type="file" id="avatarInput" accept="image/*" onchange="uploadAvatar(event)" hidden />
+                <button class="btn btn-outline" onclick="document.getElementById('avatarInput').click()"><i class="fas fa-camera"></i> Загрузить аватар</button>
+                <p class="avatar-hint">PNG, JPG, WEBP до 5 МБ</p>
+            </div>
+        </div>
+        <form class="auth-form" onsubmit="handleProfileUpdate(event)">
+            <label>Имя</label><input type="text" id="profileName" placeholder="Ваше имя" />
+            <label>О себе</label><textarea id="profileBio" placeholder="Коротко о себе..." maxlength="500" style="min-height:80px;"></textarea>
+            <div class="section-divider"><span>Смена пароля</span></div>
+            <label>Текущий пароль</label><input type="password" id="profileCurrentPass" placeholder="Оставьте пустым" />
+            <label>Новый пароль</label><input type="password" id="profileNewPass" placeholder="Минимум 6 символов" minlength="6" />
+            <button type="submit" class="btn">Сохранить</button>
+        </form>
+    </div>
+</div>
 
-  <!-- ===================== SCRIPTS ===================== -->
-  <!-- script.js — основной клиент (api, state, updateUI, openAuth и т.д.) -->
-  <script src="/js/script.js" defer></script>
-  <!-- paw-upgrade.js — вкладки промокода/рефералов/поддержки + маскот. ОБЯЗАТЕЛЬНО после script.js -->
-  <script src="/js/paw-upgrade.js" defer></script>
+<!-- PROJECT CREATE -->
+<div class="modal" id="projectModal" onclick="if(event.target===this) closeProjectCreator()">
+    <div class="modal-box">
+        <button class="modal-close" onclick="closeProjectCreator()">×</button>
+        <div class="auth-head"><div class="auth-logo">📦</div><h3>Создать заказ</h3><p>Опишите задачу</p></div>
+        <form class="auth-form" onsubmit="handleProjectCreate(event)">
+            <label>Название *</label><input type="text" id="projTitle" placeholder="Например: Маскот для Twitch-канала" required maxlength="120" />
+            <label>Описание *</label><textarea id="projDescription" placeholder="Что нужно нарисовать..." required maxlength="2000" style="min-height:100px;"></textarea>
+            <label>Категория *</label>
+            <select id="projCategory" required>
+                <option value="Артики">Артики</option><option value="Премиум арт">Премиум арт</option>
+                <option value="Чибики">Чибики</option><option value="Стикеры">Стикеры</option>
+                <option value="Ава">Ава</option><option value="3D модель">3D модель</option>
+                <option value="3D арт">3D арт</option><option value="Другое">Другое</option>
+            </select>
+            <label>Бюджет (₽)</label><input type="number" id="projBudget" placeholder="0" min="0" step="0.01" />
+            <button type="submit" class="btn">Создать заказ</button>
+        </form>
+    </div>
+</div>
 
-  <!-- Год в футере -->
-  <script>
-    document.getElementById('year').textContent = new Date().getFullYear();
-  </script>
+<div class="modal" id="projectDetailModal" onclick="if(event.target===this) closeProjectDetail()">
+    <div class="modal-box project-detail-box">
+        <button class="modal-close" onclick="closeProjectDetail()">×</button>
+        <div id="projectDetailContent"></div>
+    </div>
+</div>
+
+<div class="modal" id="myPortfolioModal" onclick="if(event.target===this) closeMyPortfolio()">
+    <div class="modal-box portfolio-box">
+        <button class="modal-close" onclick="closeMyPortfolio()">×</button>
+        <div class="auth-head"><div class="auth-logo">🖼️</div><h3>Моё портфолио</h3><p>Загружайте свои работы</p></div>
+        <form class="upload-form" id="portfolioUploadForm" onsubmit="handlePortfolioUpload(event)">
+            <div class="upload-zone" onclick="document.getElementById('portfolioInput').click()">
+                <i class="fas fa-cloud-upload-alt"></i>
+                <p id="uploadZoneText">Нажмите, чтобы выбрать изображение</p>
+                <input type="file" id="portfolioInput" accept="image/*" hidden onchange="previewPortfolioFile(event)" />
+            </div>
+            <label>Название *</label><input type="text" id="portTitle" placeholder="Например: Маскот для кофейни" required maxlength="120" />
+            <label>Описание</label><textarea id="portDescription" placeholder="Коротко о работе" maxlength="500" style="min-height:60px;"></textarea>
+            <label>Категория</label>
+            <select id="portCategory">
+                <option value="Артики">Артики</option><option value="Премиум арт">Премиум арт</option>
+                <option value="Чибики">Чибики</option><option value="Стикеры">Стикеры</option>
+                <option value="Ава">Ава</option><option value="3D модель">3D модель</option>
+                <option value="3D арт">3D арт</option>
+            </select>
+            <button type="submit" class="btn">Загрузить</button>
+        </form>
+        <div class="my-portfolio-grid" id="myPortfolioGrid"></div>
+    </div>
+</div>
+
+<aside class="messenger" id="messenger">
+    <div class="msgr-header">
+        <button class="msgr-back hidden" id="msgrBack" onclick="closeChat()"><i class="fas fa-arrow-left"></i></button>
+        <h3 id="msgrTitle"><i class="fas fa-comments"></i> Сообщения</h3>
+        <button class="msgr-close" onclick="closeMessenger()">×</button>
+    </div>
+    <div class="msgr-body">
+        <div class="chat-list" id="chatList"></div>
+        <div class="chat-window hidden" id="chatWindow">
+            <div class="chat-head hidden" id="chatHead">
+                <div class="chat-head-avatar" id="chatHeadAvatar">?</div>
+                <div class="chat-head-info">
+                    <div class="chat-head-name" id="chatHeadName">—</div>
+                    <div class="chat-head-role" id="chatHeadRole">—</div>
+                </div>
+            </div>
+            <div class="chat-messages" id="chatMessages"></div>
+            <form class="chat-input" onsubmit="sendMessage(event)">
+                <input type="text" id="chatInput" placeholder="Написать сообщение..." autocomplete="off" maxlength="2000" />
+                <button type="submit"><i class="fas fa-paper-plane"></i></button>
+            </form>
+        </div>
+    </div>
+</aside>
+
+<button class="msgr-fab hidden" id="msgrFab" onclick="openMessenger()">
+    <i class="fas fa-comments"></i>
+    <span class="msgr-badge hidden" id="msgrBadge">0</span>
+</button>
+
+<div class="modal" id="adminModal" onclick="if(event.target===this) closeAdminPanel()">
+    <div class="modal-box admin-box">
+        <button class="modal-close" onclick="closeAdminPanel()">×</button>
+        <div class="admin-head"><div class="admin-head-icon">🛡️</div><div><h3>Админ-панель</h3><p>Управление и статистика</p></div></div>
+        <div class="admin-tabs">
+            <button class="admin-tab active" data-atab="dashboard" onclick="switchAdminTab('dashboard')"><i class="fas fa-chart-line"></i> Статистика</button>
+            <button class="admin-tab" data-atab="withdrawals" onclick="switchAdminTab('withdrawals')"><i class="fas fa-money-check-alt"></i> Выплаты <span class="admin-badge" id="wdCount">0</span></button>
+            <button class="admin-tab" data-atab="requests" onclick="switchAdminTab('requests')"><i class="fas fa-bell"></i> Заявки <span class="admin-badge" id="reqCount">0</span></button>
+            <button class="admin-tab" data-atab="users" onclick="switchAdminTab('users')"><i class="fas fa-users"></i> Пользователи</button>
+        </div>
+        <div class="admin-panel" id="adminDashboard"><div id="dashboardStats"></div></div>
+        <div class="admin-panel hidden" id="adminWithdrawals"><div id="withdrawalsList"></div></div>
+        <div class="admin-panel hidden" id="adminRequests"><div id="requestsList"></div></div>
+        <div class="admin-panel hidden" id="adminUsers">
+            <div class="admin-search"><i class="fas fa-search"></i><input type="text" id="userSearch" placeholder="Поиск..." oninput="renderAdminUsers()" /></div>
+            <div id="usersList"></div>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="userFullModal" onclick="if(event.target===this) closeUserFull()">
+    <div class="modal-box user-modal-box">
+        <button class="modal-close" onclick="closeUserFull()">×</button>
+        <div id="userFullContent"></div>
+    </div>
+</div>
+
+<div class="modal" id="contentModal" onclick="if(event.target===this) closeContentEditor()">
+    <div class="modal-box content-modal-box">
+        <button class="modal-close" onclick="closeContentEditor()">×</button>
+        <div class="admin-head">
+            <div class="admin-head-icon">👑</div>
+            <div><h3>Редактор сайта</h3><p>Доступно только главному админу</p></div>
+        </div>
+        <div id="contentEditorWrap" class="content-editor-wrap"></div>
+        <div class="content-editor-actions">
+            <button class="btn" id="contentSaveBtn" onclick="saveContent()"><i class="fas fa-save"></i> Сохранить всё</button>
+        </div>
+    </div>
+</div>
+
+<div class="modal" id="packageModal" onclick="if(event.target===this) closePackageConfigurator()">
+    <div class="modal-box package-modal-box">
+        <button class="modal-close" onclick="closePackageConfigurator()">×</button>
+        <div class="auth-head">
+            <div class="auth-logo">🎨</div>
+            <h3 id="packageTitle">Настройка пакета</h3>
+            <p id="packageSubtitle">Настройте состав — цена пересчитается автоматически</p>
+        </div>
+        <div id="packageConfigurator"></div>
+        <div class="package-total">
+            <div>
+                <span class="package-total-label">Итоговая стоимость:</span>
+                <span class="package-total-price" id="packageTotalPrice">0 ₽</span>
+            </div>
+            <button class="btn" onclick="orderCustomPackage()"><i class="fas fa-paper-plane"></i> Заказать</button>
+        </div>
+    </div>
+</div>
+
+<!-- MONEY MODAL: пополнение и вывод. Поле карты скрыто по умолчанию -->
+<div class="modal" id="moneyModal" onclick="if(event.target===this) closeMoney()">
+    <div class="modal-box money-box">
+        <button class="modal-close" onclick="closeMoney()">×</button>
+        <h3 id="moneyTitle">Пополнение баланса</h3>
+        <p class="money-sub" id="moneySub">Выберите сумму или введите свою</p>
+        <div class="money-presets">
+            <button onclick="setMoney(500)">500 ₽</button><button onclick="setMoney(1000)">1 000 ₽</button>
+            <button onclick="setMoney(2000)">2 000 ₽</button><button onclick="setMoney(5000)">5 000 ₽</button>
+        </div>
+        <label>Сумма (можно копейки)</label>
+        <input type="number" id="moneyAmount" placeholder="0.00" step="0.01" min="1" />
+
+        <div id="moneyCardBlock" class="hidden">
+            <label>Номер карты для вывода</label>
+            <input type="text" id="moneyCard" inputmode="numeric" placeholder="0000 0000 0000 0000" maxlength="23" />
+            <p style="font-size:0.8rem;color:var(--text-mute);margin-top:6px;">
+                Заявку рассмотрит администратор. Перевод выполняется вручную.
+            </p>
+        </div>
+
+        <div class="money-note" id="moneyNote">Комиссия <strong>0%</strong>. Оплата через ЮKassa.</div>
+        <button class="btn" id="moneySubmit" onclick="submitMoney()">Перейти к оплате</button>
+    </div>
+</div>
+
+<div class="lightbox" id="lightbox" onclick="closeLightbox()">
+    <button class="lb-close" onclick="closeLightbox()">×</button>
+    <div class="lb-content" onclick="event.stopPropagation()">
+        <img id="lbImg" src="" alt="">
+        <div class="lb-meta"><h3 id="lbTitle"></h3><p id="lbDesc"></p></div>
+    </div>
+</div>
+
+<script src="/socket.io/socket.io.js"></script>
+<script src="js/script.js"></script>
+<script src="js/paw-upgrade.js"></script>
 </body>
 </html>
