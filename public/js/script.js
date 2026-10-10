@@ -1,4 +1,4 @@
-/* Paw Art Studio v3.7 */
+/* Paw Art Studio v3.8 */
 
 const API = '';
 const TOKEN_KEY = 'paw_token';
@@ -16,6 +16,7 @@ const state = {
     moneyMode: 'deposit',
     allPortfolio: [], myPortfolio: [], portfolioFilter: 'all',
     content: null,
+    pendingEmail: null,
 };
 
 function getToken() { return localStorage.getItem(TOKEN_KEY); }
@@ -42,8 +43,8 @@ function userAvatarHtml(u) { if (u?.avatar) return `<img src="${escapeHtml(u.ava
 
 function scrollToSection(id) { const el = document.getElementById(id); if (!el) return; const top = el.getBoundingClientRect().top + window.pageYOffset - 70; window.scrollTo({ top, behavior: 'smooth' }); closeMenu(); }
 function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); closeMenu(); }
-function toggleMenu() { document.getElementById('navLinks').classList.toggle('open'); document.getElementById('burger').classList.toggle('active'); }
-function closeMenu() { document.getElementById('navLinks').classList.remove('open'); document.getElementById('burger').classList.remove('active'); }
+function toggleMenu() { document.getElementById('navLinks')?.classList.toggle('open'); document.getElementById('burger')?.classList.toggle('active'); }
+function closeMenu() { document.getElementById('navLinks')?.classList.remove('open'); document.getElementById('burger')?.classList.remove('active'); }
 
 document.addEventListener('click', (e) => {
     const nav = document.getElementById('navLinks'), burger = document.getElementById('burger');
@@ -53,7 +54,25 @@ document.addEventListener('click', (e) => {
 });
 window.addEventListener('resize', () => { if (window.innerWidth > 900) closeMenu(); });
 
-function showToast(text, type) { const t = document.getElementById('toast'); if (!t) return; t.textContent = text; t.classList.toggle('error', type === 'error'); t.classList.add('show'); clearTimeout(t._timeout); t._timeout = setTimeout(() => t.classList.remove('show'), 3500); }
+/* Toast */
+function showToast(text, type) {
+    const wrap = document.getElementById('toastWrap');
+    if (wrap) {
+        const el = document.createElement('div');
+        el.className = 'toast' + (type === 'error' ? ' error' : type === 'success' ? ' success' : '');
+        el.textContent = text;
+        wrap.appendChild(el);
+        setTimeout(() => el.remove(), 4000);
+        return;
+    }
+    const t = document.getElementById('toast');
+    if (!t) { console.log('[toast]', text); return; }
+    t.textContent = text;
+    t.classList.toggle('error', type === 'error');
+    t.classList.add('show');
+    clearTimeout(t._timeout);
+    t._timeout = setTimeout(() => t.classList.remove('show'), 3500);
+}
 
 /* EMAIL */
 const CONTACT_EMAIL = 'pawartstudioofficial@gmail.com';
@@ -81,37 +100,63 @@ function openSocial(type, value) {
 }
 
 /* AUTH */
-function openAuth() { document.getElementById('authModal').classList.add('open'); document.body.style.overflow = 'hidden'; switchAuthTab('login'); }
-function closeAuth() { document.getElementById('authModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; document.getElementById('loginForm').reset(); document.getElementById('registerForm').reset(); }
-function switchAuthTab(tab) { document.querySelectorAll('.auth-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === tab)); document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login'); document.getElementById('registerForm').classList.toggle('hidden', tab !== 'register'); }
+function openAuth() {
+    const modal = document.getElementById('authModal');
+    if (!modal) return;
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    switchAuthTab('login');
+}
+function closeAuth() {
+    const modal = document.getElementById('authModal');
+    if (!modal) return;
+    modal.classList.remove('open');
+    if (!isAnyModalOpen()) document.body.style.overflow = '';
+    document.getElementById('loginForm')?.reset();
+    document.getElementById('registerForm')?.reset();
+    document.getElementById('verifyForm')?.reset();
+    document.querySelectorAll('[data-auth-panel]').forEach(p => {
+        p.hidden = p.dataset.authPanel !== 'login';
+    });
+    const err1 = document.getElementById('loginError'); if (err1) err1.textContent = '';
+    const err2 = document.getElementById('registerError'); if (err2) err2.textContent = '';
+    const err3 = document.getElementById('verifyError'); if (err3) err3.textContent = '';
+}
+
+function switchAuthTab(tab) {
+    document.querySelectorAll('.modal-tabs button, .auth-tab').forEach(t => {
+        const tTab = t.dataset.authTab || t.dataset.tab;
+        t.classList.toggle('active', tTab === tab);
+    });
+    const loginForm = document.getElementById('loginForm');
+    const registerForm = document.getElementById('registerForm');
+    const verifyForm = document.getElementById('verifyForm');
+    if (loginForm) loginForm.classList.toggle('hidden', tab !== 'login');
+    if (registerForm) registerForm.classList.toggle('hidden', tab !== 'register');
+    if (verifyForm) verifyForm.classList.toggle('hidden', tab !== 'verify');
+    document.querySelectorAll('[data-auth-panel]').forEach(p => {
+        p.hidden = p.dataset.authPanel !== tab;
+    });
+}
 
 async function handleLogin(e) {
     e.preventDefault();
     const email = document.getElementById('loginEmail').value.trim();
     const password = document.getElementById('loginPassword').value;
-    const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
+    const btn = e.target.querySelector('button[type="submit"]'); if (btn) btn.disabled = true;
     try {
         const { token, user } = await api('/api/auth/login', { method: 'POST', body: { email, password } });
         setToken(token); state.user = user; closeAuth();
         await afterLogin();
         showToast(`👋 Добро пожаловать, ${user.name}!`);
-    } catch (err) { showToast('❌ ' + err.message, 'error'); }
-    finally { btn.disabled = false; }
+    } catch (err) {
+        const errEl = document.getElementById('loginError');
+        if (errEl) errEl.textContent = err.message;
+        showToast('❌ ' + err.message, 'error');
+    }
+    finally { if (btn) btn.disabled = false; }
 }
-async function handleRegister(e) {
-    e.preventDefault();
-    const name = document.getElementById('regName').value.trim();
-    const email = document.getElementById('regEmail').value.trim();
-    const password = document.getElementById('regPassword').value;
-    const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
-    try {
-        const { token, user } = await api('/api/auth/register', { method: 'POST', body: { name, email, password } });
-        setToken(token); state.user = user; closeAuth();
-        await afterLogin();
-        showToast('🎉 Аккаунт создан! Бонус 500 ₽ зачислен.');
-    } catch (err) { showToast('❌ ' + err.message, 'error'); }
-    finally { btn.disabled = false; }
-}
+
 async function logout() {
     setToken(null); state.user = null; state.chats = []; state.chatMessages = {}; state.currentChatId = null;
     if (state.socket) { state.socket.disconnect(); state.socket = null; }
@@ -129,48 +174,80 @@ function updateUI() {
     const msgrFab = document.getElementById('msgrFab'), createProjectBtn = document.getElementById('createProjectBtn');
     const contentLink = document.getElementById('contentMenuLink');
 
+    // Кнопки хедера из нового HTML
+    const btnLogin = document.getElementById('btnLogin');
+    const btnRegister = document.getElementById('btnRegister');
+    const btnDashboard = document.getElementById('btnDashboard');
+
     if (u) {
-        loginBtn.classList.add('hidden'); userBox.classList.remove('hidden'); msgrFab.classList.remove('hidden');
-        document.getElementById('userName').textContent = u.name;
-        document.getElementById('userRole').textContent = ROLE_LABELS[u.role] || u.role;
-        document.getElementById('balanceChip').textContent = formatMoney(u.balance);
-        document.getElementById('dashName').textContent = u.name;
-        document.getElementById('dashRole').textContent = ROLE_LABELS[u.role] || u.role;
-        document.getElementById('dashBalance').textContent = formatMoney(u.balance);
-        document.getElementById('roleCurrentValue').textContent = ROLE_LABELS[u.role] || u.role;
+        if (loginBtn) loginBtn.classList.add('hidden');
+        if (userBox) userBox.classList.remove('hidden');
+        if (msgrFab) msgrFab.classList.remove('hidden');
+        if (btnLogin) btnLogin.style.display = 'none';
+        if (btnRegister) btnRegister.style.display = 'none';
+        if (btnDashboard) btnDashboard.style.display = 'inline-flex';
+
+        setText('userName', u.name);
+        setText('userRole', ROLE_LABELS[u.role] || u.role);
+        setText('balanceChip', formatMoney(u.balance));
+        setText('dashName', u.name);
+        setText('dashRole', ROLE_LABELS[u.role] || u.role);
+        setText('dashBalance', formatMoney(u.balance));
+        setText('roleCurrentValue', ROLE_LABELS[u.role] || u.role);
 
         const avatarEl = document.getElementById('dashAvatar'), userAvatarEl = document.getElementById('userAvatar');
-        if (u.avatar) {
-            avatarEl.innerHTML = `<img src="${escapeHtml(u.avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
-            userAvatarEl.innerHTML = `<img src="${escapeHtml(u.avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
-        } else {
-            avatarEl.textContent = u.name.charAt(0).toUpperCase();
-            userAvatarEl.innerHTML = `<span id="userInitial">${u.name.charAt(0).toUpperCase()}</span>`;
+        if (avatarEl) {
+            if (u.avatar) avatarEl.innerHTML = `<img src="${escapeHtml(u.avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+            else avatarEl.textContent = u.name.charAt(0).toUpperCase();
+        }
+        if (userAvatarEl) {
+            if (u.avatar) userAvatarEl.innerHTML = `<img src="${escapeHtml(u.avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`;
+            else userAvatarEl.innerHTML = `<span id="userInitial">${u.name.charAt(0).toUpperCase()}</span>`;
         }
 
         const pendingBlock = document.getElementById('rolePending'), requestBlock = document.getElementById('roleRequestBlock');
-        if (u.requestedRole) { pendingBlock.classList.remove('hidden'); requestBlock.classList.add('hidden'); document.getElementById('rolePendingText').textContent = `Заявка на роль «${ROLE_LABELS[u.requestedRole]}» на рассмотрении`; }
-        else if (u.role === 'admin') { pendingBlock.classList.add('hidden'); requestBlock.classList.add('hidden'); }
-        else { pendingBlock.classList.add('hidden'); requestBlock.classList.remove('hidden'); }
+        if (pendingBlock && requestBlock) {
+            if (u.requestedRole) { pendingBlock.classList.remove('hidden'); requestBlock.classList.add('hidden'); setText('rolePendingText', `Заявка на роль «${ROLE_LABELS[u.requestedRole]}» на рассмотрении`); }
+            else if (u.role === 'admin') { pendingBlock.classList.add('hidden'); requestBlock.classList.add('hidden'); }
+            else { pendingBlock.classList.add('hidden'); requestBlock.classList.remove('hidden'); }
+        }
 
         if (u.role === 'admin') {
-            adminBtn.classList.remove('hidden'); adminMenuLink.classList.remove('hidden');
-            if (u.isRoot) { adminBtn.style.background = 'linear-gradient(135deg, #fbbf24, #f59e0b)'; adminBtn.title = '👑 Главный админ'; if (contentLink) contentLink.classList.remove('hidden'); }
-            else { adminBtn.style.background = ''; adminBtn.title = 'Админ'; if (contentLink) contentLink.classList.add('hidden'); }
+            if (adminBtn) adminBtn.classList.remove('hidden');
+            if (adminMenuLink) adminMenuLink.classList.remove('hidden');
+            if (u.isRoot) {
+                if (adminBtn) { adminBtn.style.background = 'linear-gradient(135deg, #fbbf24, #f59e0b)'; adminBtn.title = '👑 Главный админ'; }
+                if (contentLink) contentLink.classList.remove('hidden');
+            } else {
+                if (adminBtn) { adminBtn.style.background = ''; adminBtn.title = 'Админ'; }
+                if (contentLink) contentLink.classList.add('hidden');
+            }
         } else {
-            adminBtn.classList.add('hidden'); adminMenuLink.classList.add('hidden');
+            if (adminBtn) adminBtn.classList.add('hidden');
+            if (adminMenuLink) adminMenuLink.classList.add('hidden');
             if (contentLink) contentLink.classList.add('hidden');
         }
-        if (u.role === 'executor') createProjectBtn.classList.add('hidden'); else createProjectBtn.classList.remove('hidden');
+        if (createProjectBtn) {
+            if (u.role === 'executor') createProjectBtn.classList.add('hidden');
+            else createProjectBtn.classList.remove('hidden');
+        }
     } else {
-        loginBtn.classList.remove('hidden'); userBox.classList.add('hidden');
-        adminBtn.classList.add('hidden'); adminMenuLink.classList.add('hidden'); msgrFab.classList.add('hidden');
+        if (loginBtn) loginBtn.classList.remove('hidden');
+        if (userBox) userBox.classList.add('hidden');
+        if (adminBtn) adminBtn.classList.add('hidden');
+        if (adminMenuLink) adminMenuLink.classList.add('hidden');
+        if (msgrFab) msgrFab.classList.add('hidden');
         if (contentLink) contentLink.classList.add('hidden');
+        if (btnLogin) btnLogin.style.display = 'inline-flex';
+        if (btnRegister) btnRegister.style.display = 'inline-flex';
+        if (btnDashboard) btnDashboard.style.display = 'none';
     }
 }
-function toggleUserMenu() { document.getElementById('userMenu').classList.toggle('hidden'); }
+function setText(id, value) { const el = document.getElementById(id); if (el) el.textContent = value; }
+
+function toggleUserMenu() { document.getElementById('userMenu')?.classList.toggle('hidden'); }
 function isAnyModalOpen() {
-    return ['adminModal','authModal','moneyModal','dashboardModal','profileModal','projectModal','projectDetailModal','myPortfolioModal','userFullModal','contentModal','packageModal']
+    return ['adminModal','authModal','moneyModal','dashboardModal','profileModal','projectModal','projectDetailModal','myPortfolioModal','userFullModal','contentModal','packageModal','topUpModal','withdrawModal']
         .some(id => document.getElementById(id)?.classList.contains('open'));
 }
 
@@ -190,7 +267,6 @@ async function loadAndApplyContent() {
     try { const { content } = await api('/api/content'); state.content = content; applyContent(content); }
     catch (err) { console.warn('Контент не загружен:', err.message); }
 }
-
 function applyContent(c) {
     if (!c) return;
     ['hero_eyebrow','hero_title','hero_subtitle','hero_badge_1','hero_badge_2','hero_badge_3'].forEach(k => setText(`[data-content="${k}"]`, c[k]));
@@ -217,7 +293,6 @@ function applyContent(c) {
         setText(`[data-content="faq_${i}_a"]`, c[`faq_${i}_a`]);
     }
 }
-function setText(selector, value) { if (value === undefined || value === null) return; const el = document.querySelector(selector); if (el) el.textContent = value; }
 
 /* CONTENT EDITOR */
 const CONTENT_FIELDS = [
@@ -249,12 +324,11 @@ async function openContentEditor() {
     if (state.user.role !== 'admin' || !state.user.isRoot) return showToast('⛔ Только главный админ', 'error');
     if (!state.content) { try { const { content } = await api('/api/content'); state.content = content; } catch (err) { showToast('❌ ' + err.message, 'error'); return; } }
     renderContentEditor();
-    document.getElementById('contentModal').classList.add('open');
+    document.getElementById('contentModal')?.classList.add('open');
     document.body.style.overflow = 'hidden';
-    document.getElementById('userMenu').classList.add('hidden');
+    document.getElementById('userMenu')?.classList.add('hidden');
 }
-function closeContentEditor() { document.getElementById('contentModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
-
+function closeContentEditor() { document.getElementById('contentModal')?.classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
 function renderContentEditor() {
     const c = state.content || {};
     const wrap = document.getElementById('contentEditorWrap');
@@ -280,34 +354,28 @@ async function uploadContentImage(e, key) {
 async function saveContent() {
     const inputs = document.querySelectorAll('#contentEditorWrap [data-content-key]');
     const updates = {}; inputs.forEach(inp => { updates[inp.dataset.contentKey] = inp.value; });
-    const btn = document.getElementById('contentSaveBtn'); btn.disabled = true;
+    const btn = document.getElementById('contentSaveBtn'); if (btn) btn.disabled = true;
     try { await api('/api/admin/content', { method: 'POST', body: { updates } }); state.content = { ...state.content, ...updates }; applyContent(state.content); showToast('✅ Контент сохранён'); }
     catch (err) { showToast('❌ ' + err.message, 'error'); }
-    finally { btn.disabled = false; }
+    finally { if (btn) btn.disabled = false; }
 }
 
 /* PACKAGE CONFIGURATOR */
 const PACKAGES = {
-    ds: {
-        title: 'Пак DS',
-        items: [
-            { id: 'avatar',  name: 'Ава',                      price: 1200, min: 0, max: 5,  default: 1  },
-            { id: 'banner',  name: 'Баннер (сезонный)',        price: 1500, min: 0, max: 12, default: 3  },
-            { id: 'sticker', name: 'Стикер',                   price: 300,  min: 0, max: 30, default: 10 },
-            { id: 'mascot',  name: 'Маскот',                   price: 4000, min: 0, max: 3,  default: 1  },
-            { id: 'roles',   name: 'Настройка ролей и каналов', price: 2000, min: 0, max: 1,  default: 1  },
-            { id: 'boost',   name: 'Буст',                     price: 250,  min: 0, max: 50, default: 18 },
-        ],
-    },
-    streamer: {
-        title: 'Пак стримера',
-        items: [
-            { id: 'model2d', name: '2D моделька', price: 6000, min: 0, max: 2,  default: 1 },
-            { id: 'emoji',   name: 'Эмодзи',      price: 400,  min: 0, max: 20, default: 5 },
-            { id: 'art',     name: 'Арт',         price: 1500, min: 0, max: 10, default: 3 },
-            { id: 'overlay', name: 'Оверлей',     price: 2500, min: 0, max: 10, default: 4 },
-        ],
-    },
+    ds: { title: 'Пак DS', items: [
+        { id: 'avatar',  name: 'Ава',                      price: 1200, min: 0, max: 5,  default: 1  },
+        { id: 'banner',  name: 'Баннер (сезонный)',        price: 1500, min: 0, max: 12, default: 3  },
+        { id: 'sticker', name: 'Стикер',                   price: 300,  min: 0, max: 30, default: 10 },
+        { id: 'mascot',  name: 'Маскот',                   price: 4000, min: 0, max: 3,  default: 1  },
+        { id: 'roles',   name: 'Настройка ролей и каналов', price: 2000, min: 0, max: 1,  default: 1  },
+        { id: 'boost',   name: 'Буст',                     price: 250,  min: 0, max: 50, default: 18 },
+    ]},
+    streamer: { title: 'Пак стримера', items: [
+        { id: 'model2d', name: '2D моделька', price: 6000, min: 0, max: 2,  default: 1 },
+        { id: 'emoji',   name: 'Эмодзи',      price: 400,  min: 0, max: 20, default: 5 },
+        { id: 'art',     name: 'Арт',         price: 1500, min: 0, max: 10, default: 3 },
+        { id: 'overlay', name: 'Оверлей',     price: 2500, min: 0, max: 10, default: 4 },
+    ]},
 };
 
 let currentPackageId = null;
@@ -318,15 +386,16 @@ function openPackageConfigurator(packageId) {
     const pkg = PACKAGES[packageId]; if (!pkg) return;
     currentPackageId = packageId; currentPackageConfig = {};
     pkg.items.forEach(item => { currentPackageConfig[item.id] = item.default; });
-    document.getElementById('packageTitle').textContent = pkg.title;
+    const titleEl = document.getElementById('packageTitle'); if (titleEl) titleEl.textContent = pkg.title;
     renderPackageConfigurator();
-    document.getElementById('packageModal').classList.add('open');
+    document.getElementById('packageModal')?.classList.add('open');
     document.body.style.overflow = 'hidden';
 }
-function closePackageConfigurator() { document.getElementById('packageModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
+function closePackageConfigurator() { document.getElementById('packageModal')?.classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
 function renderPackageConfigurator() {
     const pkg = PACKAGES[currentPackageId]; if (!pkg) return;
-    document.getElementById('packageConfigurator').innerHTML = pkg.items.map(item => `
+    const wrap = document.getElementById('packageConfigurator'); if (!wrap) return;
+    wrap.innerHTML = pkg.items.map(item => `
         <div class="package-item">
             <div class="package-item-info"><span class="package-item-name">${item.name}</span><span class="package-item-price">${formatMoney(item.price * 100)} / шт.</span></div>
             <div class="package-item-controls"><button type="button" onclick="changePackageItem('${item.id}', -1)">−</button><span class="package-item-count" id="count-${item.id}">${currentPackageConfig[item.id]}</span><button type="button" onclick="changePackageItem('${item.id}', 1)">+</button></div>
@@ -335,51 +404,82 @@ function renderPackageConfigurator() {
     updatePackageTotal();
 }
 function changePackageItem(itemId, delta) {
-    const pkg = PACKAGES[currentPackageId]; const item = pkg.items.find(i => i.id === itemId); if (!item) return;
+    const pkg = PACKAGES[currentPackageId]; if (!pkg) return;
+    const item = pkg.items.find(i => i.id === itemId); if (!item) return;
     let v = currentPackageConfig[itemId] + delta;
-    if (v < item.min) v = item.min; if (v > item.max) v = item.max;
+    if (v < item.min) v = item.min;
+    if (v > item.max) v = item.max;
     currentPackageConfig[itemId] = v;
-    document.getElementById(`count-${itemId}`).textContent = v;
+    const cnt = document.getElementById(`count-${itemId}`); if (cnt) cnt.textContent = v;
     updatePackageTotal();
 }
 function updatePackageTotal() {
     const pkg = PACKAGES[currentPackageId]; if (!pkg) return;
     let total = 0;
     pkg.items.forEach(item => { total += item.price * (currentPackageConfig[item.id] || 0); });
-    document.getElementById('packageTotalPrice').textContent = formatMoney(total * 100);
+    const el = document.getElementById('packageTotalPrice'); if (el) el.textContent = formatMoney(total * 100);
 }
 function orderCustomPackage() {
     const pkg = PACKAGES[currentPackageId]; if (!pkg) return;
     let total = 0; const details = [];
     pkg.items.forEach(item => { const count = currentPackageConfig[item.id] || 0; if (count > 0) { total += item.price * count; details.push(`${item.name}: ${count} шт.`); } });
-    const msg = document.getElementById('formMessage');
-    msg.value = `Пакет: ${pkg.title}\n${details.join('\n')}\nИтого: ${formatMoney(total * 100)}`;
-    const formService = document.getElementById('formService');
-    if (formService) formService.value = pkg.title;
+    const msg = document.getElementById('formMessage'); if (msg) msg.value = `Пакет: ${pkg.title}\n${details.join('\n')}\nИтого: ${formatMoney(total * 100)}`;
+    const formService = document.getElementById('formService'); if (formService) formService.value = pkg.title;
     closePackageConfigurator();
     showToast(`✅ ${pkg.title} настроен — ${formatMoney(total * 100)}`);
     scrollToSection('contact');
 }
 
 /* DASHBOARD */
-function openDashboard() { if (!state.user) return openAuth(); document.getElementById('dashboardModal').classList.add('open'); document.body.style.overflow = 'hidden'; document.getElementById('userMenu').classList.add('hidden'); loadDashboardData(); }
-function closeDashboard() { document.getElementById('dashboardModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
-function switchDashTab(tab) { document.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.dtab === tab)); document.getElementById('dashWallet').classList.toggle('hidden', tab !== 'wallet'); document.getElementById('dashWithdrawals').classList.toggle('hidden', tab !== 'withdrawals'); document.getElementById('dashHistory').classList.toggle('hidden', tab !== 'history'); document.getElementById('dashRolePanel').classList.toggle('hidden', tab !== 'role'); }
+function openDashboard() {
+    if (!state.user) return openAuth();
+    document.getElementById('dashboardModal')?.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    document.getElementById('userMenu')?.classList.add('hidden');
+    loadDashboardData();
+}
+function closeDashboard() { document.getElementById('dashboardModal')?.classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
+function switchDashTab(tab) {
+    document.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.dtab === tab));
+    ['wallet','withdrawals','history','role'].forEach(name => {
+        const el = document.getElementById('dash' + name.charAt(0).toUpperCase() + name.slice(1));
+        if (el) el.classList.toggle('hidden', tab !== name);
+    });
+}
 async function loadDashboardData() {
     updateUI();
-    try { const [txRes, wdRes] = await Promise.all([api('/api/wallet/transactions'), api('/api/wallet/withdrawals')]); state.transactions = txRes.transactions; state.userWithdrawals = wdRes.withdrawals; renderTransactions(); renderWalletStats(); renderUserWithdrawals(); }
-    catch (err) { showToast('❌ ' + err.message, 'error'); }
+    try {
+        const [txRes, wdRes] = await Promise.all([api('/api/wallet/transactions'), api('/api/wallet/withdrawals')]);
+        state.transactions = txRes.transactions; state.userWithdrawals = wdRes.withdrawals;
+        renderTransactions(); renderWalletStats(); renderUserWithdrawals();
+    } catch (err) { showToast('❌ ' + err.message, 'error'); }
 }
-function renderWalletStats() { const totalIn = state.transactions.filter(t => t.type === 'in').reduce((s, t) => s + t.amount, 0); const totalOut = state.transactions.filter(t => t.type === 'out').reduce((s, t) => s + t.amount, 0); document.getElementById('wsIn').textContent = formatMoney(totalIn); document.getElementById('wsOut').textContent = formatMoney(totalOut); document.getElementById('wsProjects').textContent = state.projects.length; }
+function renderWalletStats() {
+    const totalIn = state.transactions.filter(t => t.type === 'in').reduce((s, t) => s + t.amount, 0);
+    const totalOut = state.transactions.filter(t => t.type === 'out').reduce((s, t) => s + t.amount, 0);
+    setText('wsIn', formatMoney(totalIn));
+    setText('wsOut', formatMoney(totalOut));
+    setText('wsProjects', state.projects.length);
+}
 function renderTransactions() {
-    const list = document.getElementById('txList'); if (!list) return;
+    const list = document.getElementById('txList') || document.getElementById('dashTxList');
+    if (!list) return;
     if (!state.transactions.length) { list.innerHTML = '<div class="tx-empty">Пока нет операций</div>'; return; }
-    list.innerHTML = state.transactions.map(tx => { const dateStr = formatDateTime(tx.date); const sign = tx.type === 'in' ? '+' : '−'; const icon = tx.type === 'in' ? 'fa-arrow-down' : 'fa-arrow-up'; return `<div class="tx-row"><div class="tx-icon ${tx.type}"><i class="fas ${icon}"></i></div><div class="tx-info"><div class="tx-title">${escapeHtml(tx.title)}</div><div class="tx-date">${dateStr}</div></div><div class="tx-amount ${tx.type}">${sign} ${formatMoney(tx.amount)}</div></div>`; }).join('');
+    list.innerHTML = state.transactions.map(tx => {
+        const dateStr = formatDateTime(tx.date);
+        const sign = tx.type === 'in' ? '+' : '−';
+        const icon = tx.type === 'in' ? 'fa-arrow-down' : 'fa-arrow-up';
+        return `<div class="tx-row"><div class="tx-icon ${tx.type}"><i class="fas ${icon}"></i></div><div class="tx-info"><div class="tx-title">${escapeHtml(tx.title)}</div><div class="tx-date">${dateStr}</div></div><div class="tx-amount ${tx.type}">${sign} ${formatMoney(tx.amount)}</div></div>`;
+    }).join('');
 }
 function renderUserWithdrawals() {
     const list = document.getElementById('userWithdrawalsList'); if (!list) return;
     if (!state.userWithdrawals.length) { list.innerHTML = '<div class="tx-empty">Пока нет заявок</div>'; return; }
-    list.innerHTML = state.userWithdrawals.map(w => { const cls = WD_STATUS_CLASS[w.status] || 'status-review'; const comment = w.comment ? `<div class="wd-comment">💬 ${escapeHtml(w.comment)}</div>` : ''; return `<div class="withdrawal-card"><div class="wd-head"><div class="wd-amount">${formatMoney(w.amount)}</div><span class="project-status ${cls}">${WD_STATUS[w.status]}</span></div><div class="wd-date">Создано: ${formatDateTime(w.createdAt)}</div>${w.reviewedAt ? `<div class="wd-date">Рассмотрено: ${formatDateTime(w.reviewedAt)}</div>` : ''}${comment}</div>`; }).join('');
+    list.innerHTML = state.userWithdrawals.map(w => {
+        const cls = WD_STATUS_CLASS[w.status] || 'status-review';
+        const comment = w.comment ? `<div class="wd-comment">💬 ${escapeHtml(w.comment)}</div>` : '';
+        return `<div class="withdrawal-card"><div class="wd-head"><div class="wd-amount">${formatMoney(w.amount)}</div><span class="project-status ${cls}">${WD_STATUS[w.status]}</span></div><div class="wd-date">Создано: ${formatDateTime(w.createdAt)}</div>${w.reviewedAt ? `<div class="wd-date">Рассмотрено: ${formatDateTime(w.reviewedAt)}</div>` : ''}${comment}</div>`;
+    }).join('');
 }
 async function requestRole(role) {
     if (!state.user) return openAuth();
@@ -387,65 +487,109 @@ async function requestRole(role) {
     catch (err) { showToast('❌ ' + err.message, 'error'); }
 }
 
-/* MONEY */
-function openDeposit() { state.moneyMode = 'deposit'; document.getElementById('moneyTitle').textContent = 'Пополнение баланса'; document.getElementById('moneySub').textContent = 'Выберите сумму или введите свою'; document.getElementById('moneyNote').innerHTML = 'Комиссия <strong>0%</strong>. Оплата через ЮKassa.'; document.getElementById('moneySubmit').textContent = 'Перейти к оплате'; document.getElementById('moneyAmount').value = ''; document.getElementById('moneyModal').classList.add('open'); }
-function openWithdraw() { state.moneyMode = 'withdraw'; document.getElementById('moneyTitle').textContent = 'Заявка на вывод'; document.getElementById('moneySub').textContent = 'Админ подтвердит вручную'; document.getElementById('moneyNote').innerHTML = 'Комиссия <strong>0%</strong>. Минимум <strong>0.01 ₽</strong>.'; document.getElementById('moneySubmit').textContent = 'Отправить заявку'; document.getElementById('moneyAmount').value = ''; document.getElementById('moneyModal').classList.add('open'); }
-function closeMoney() { document.getElementById('moneyModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
-function setMoney(n) { document.getElementById('moneyAmount').value = n; }
+/* MONEY — совместимость со старым moneyModal и новыми topUpModal/withdrawModal */
+function openDeposit() {
+    if (!state.user) return openAuth();
+    const money = document.getElementById('moneyModal');
+    if (money) {
+        state.moneyMode = 'deposit';
+        setText('moneyTitle', 'Пополнение баланса');
+        setText('moneySub', 'Выберите сумму или введите свою');
+        const note = document.getElementById('moneyNote'); if (note) note.innerHTML = 'Комиссия <strong>0%</strong>. Оплата через ЮKassa.';
+        setText('moneySubmit', 'Перейти к оплате');
+        const amt = document.getElementById('moneyAmount'); if (amt) amt.value = '';
+        money.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        return;
+    }
+    const topUp = document.getElementById('topUpModal');
+    if (topUp) {
+        topUp.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        const amt = document.getElementById('topUpAmount'); if (amt) amt.value = '';
+        const err = document.getElementById('topUpError'); if (err) err.textContent = '';
+    }
+}
+function openWithdraw() {
+    if (!state.user) return openAuth();
+    const money = document.getElementById('moneyModal');
+    if (money) {
+        state.moneyMode = 'withdraw';
+        setText('moneyTitle', 'Заявка на вывод');
+        setText('moneySub', 'Админ подтвердит вручную');
+        const note = document.getElementById('moneyNote'); if (note) note.innerHTML = 'Комиссия <strong>0%</strong>. Минимум <strong>0.01 ₽</strong>.';
+        setText('moneySubmit', 'Отправить заявку');
+        const amt = document.getElementById('moneyAmount'); if (amt) amt.value = '';
+        money.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        return;
+    }
+    const wd = document.getElementById('withdrawModal');
+    if (wd) {
+        wd.classList.add('open');
+        document.body.style.overflow = 'hidden';
+        const amt = document.getElementById('withdrawAmount'); if (amt) amt.value = '';
+        const card = document.getElementById('withdrawCard'); if (card) card.value = '';
+        const err = document.getElementById('withdrawError'); if (err) err.textContent = '';
+    }
+}
+function closeMoney() { document.getElementById('moneyModal')?.classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
+function setMoney(n) { const el = document.getElementById('moneyAmount'); if (el) el.value = n; }
+
 async function submitMoney() {
     if (!state.user) return;
     const amount = Number(document.getElementById('moneyAmount').value);
     if (!amount || isNaN(amount) || amount <= 0) return showToast('⚠️ Введите сумму', 'error');
     if (amount < 1 && state.moneyMode === 'deposit') return showToast('⚠️ Минимум 1 ₽', 'error');
-    if (amount < 0.01 && state.moneyMode === 'withdraw') return showToast('⚠️ Минимум 0.01 ₽', 'error');
-    const btn = document.getElementById('moneySubmit'); btn.disabled = true; const oldText = btn.textContent;
+    const btn = document.getElementById('moneySubmit'); if (btn) { btn.disabled = true; }
+    const oldText = btn ? btn.textContent : '';
     try {
         if (state.moneyMode === 'withdraw') {
             const { user } = await api('/api/wallet/withdraw', { method: 'POST', body: { amount } });
             state.user = user; updateUI(); closeMoney(); await loadDashboardData();
-            showToast(`⏳ Заявка отправлена`);
+            showToast('⏳ Заявка отправлена');
         } else {
-            btn.textContent = 'Создаём платёж...';
+            if (btn) btn.textContent = 'Создаём платёж...';
             const { confirmationUrl } = await api('/api/payments/create', { method: 'POST', body: { amount } });
             closeMoney();
             showToast('🔄 Перенаправляем на ЮKassa...');
             setTimeout(() => { window.location.href = confirmationUrl; }, 800);
         }
     } catch (err) { showToast('❌ ' + err.message, 'error'); }
-    finally { btn.disabled = false; btn.textContent = oldText; }
+    finally { if (btn) { btn.disabled = false; btn.textContent = oldText; } }
 }
 
 /* PROFILE */
 function openProfileEditor() {
     if (!state.user) return openAuth();
     const u = state.user;
-    document.getElementById('profileName').value = u.name;
-    document.getElementById('profileBio').value = u.bio || '';
-    document.getElementById('profileCurrentPass').value = '';
-    document.getElementById('profileNewPass').value = '';
+    const n = document.getElementById('profileName'); if (n) n.value = u.name;
+    const b = document.getElementById('profileBio'); if (b) b.value = u.bio || '';
+    const cp = document.getElementById('profileCurrentPass'); if (cp) cp.value = '';
+    const np = document.getElementById('profileNewPass'); if (np) np.value = '';
     const preview = document.getElementById('avatarPreview');
-    if (u.avatar) preview.innerHTML = `<img src="${escapeHtml(u.avatar)}" alt="">`; else preview.textContent = u.name.charAt(0).toUpperCase();
-    document.getElementById('profileModal').classList.add('open');
+    if (preview) { if (u.avatar) preview.innerHTML = `<img src="${escapeHtml(u.avatar)}" alt="">`; else preview.textContent = u.name.charAt(0).toUpperCase(); }
+    document.getElementById('profileModal')?.classList.add('open');
     document.body.style.overflow = 'hidden';
-    document.getElementById('userMenu').classList.add('hidden');
+    document.getElementById('userMenu')?.classList.add('hidden');
 }
-function closeProfileEditor() { document.getElementById('profileModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
+function closeProfileEditor() { document.getElementById('profileModal')?.classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
 async function handleProfileUpdate(e) {
     e.preventDefault();
     const name = document.getElementById('profileName').value.trim();
     const bio = document.getElementById('profileBio').value.trim();
     const currentPassword = document.getElementById('profileCurrentPass').value;
     const newPassword = document.getElementById('profileNewPass').value;
-    const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
+    const btn = e.target.querySelector('button[type="submit"]'); if (btn) btn.disabled = true;
     try { const { user } = await api('/api/profile/update', { method: 'POST', body: { name, bio, currentPassword, newPassword } }); state.user = user; updateUI(); closeProfileEditor(); showToast('✅ Профиль обновлён'); }
     catch (err) { showToast('❌ ' + err.message, 'error'); }
-    finally { btn.disabled = false; }
+    finally { if (btn) btn.disabled = false; }
 }
 async function uploadAvatar(e) {
     const file = e.target.files?.[0]; if (!file) return;
     if (file.size > 5 * 1024 * 1024) return showToast('❌ Максимум 5 МБ', 'error');
     const fd = new FormData(); fd.append('avatar', file);
-    try { const { user } = await api('/api/profile/avatar', { method: 'POST', body: fd }); state.user = user; updateUI(); document.getElementById('avatarPreview').innerHTML = `<img src="${escapeHtml(user.avatar)}" alt="">`; showToast('✅ Аватар обновлён'); }
+    try { const { user } = await api('/api/profile/avatar', { method: 'POST', body: fd }); state.user = user; updateUI(); const p = document.getElementById('avatarPreview'); if (p) p.innerHTML = `<img src="${escapeHtml(user.avatar)}" alt="">`; showToast('✅ Аватар обновлён'); }
     catch (err) { showToast('❌ ' + err.message, 'error'); }
     e.target.value = '';
 }
@@ -470,24 +614,24 @@ function renderProjects() {
     }).join('');
 }
 function filterProjects(status) { state.projectFilter = status; document.querySelectorAll('#projectFilters .filter').forEach(b => b.classList.toggle('active', b.dataset.status === status)); renderProjects(); }
-function openProjectCreator() { if (!state.user) return openAuth(); if (state.user.role === 'executor') return showToast('⚠️ Исполнители не создают заказы', 'error'); document.getElementById('projectModal').classList.add('open'); document.body.style.overflow = 'hidden'; }
-function closeProjectCreator() { document.getElementById('projectModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
+function openProjectCreator() { if (!state.user) return openAuth(); if (state.user.role === 'executor') return showToast('⚠️ Исполнители не создают заказы', 'error'); document.getElementById('projectModal')?.classList.add('open'); document.body.style.overflow = 'hidden'; }
+function closeProjectCreator() { document.getElementById('projectModal')?.classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
 async function handleProjectCreate(e) {
     e.preventDefault();
     const title = document.getElementById('projTitle').value.trim();
     const description = document.getElementById('projDescription').value.trim();
     const category = document.getElementById('projCategory').value;
     const budget = Number(document.getElementById('projBudget').value) || 0;
-    const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
+    const btn = e.target.querySelector('button[type="submit"]'); if (btn) btn.disabled = true;
     try { await api('/api/projects', { method: 'POST', body: { title, description, category, budget } }); closeProjectCreator(); e.target.reset(); await loadProjects(); showToast('✅ Заказ создан'); }
     catch (err) { showToast('❌ ' + err.message, 'error'); }
-    finally { btn.disabled = false; }
+    finally { if (btn) btn.disabled = false; }
 }
 async function acceptProject(id) { try { await api(`/api/projects/${id}/accept`, { method: 'POST' }); await loadProjects(); showToast('✅ Взято в работу'); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
-async function openProjectDetail(id) { try { const { project } = await api(`/api/projects/${id}`); state.currentProject = project; renderProjectDetail(project); document.getElementById('projectDetailModal').classList.add('open'); document.body.style.overflow = 'hidden'; } catch (err) { showToast('❌ ' + err.message, 'error'); } }
-function closeProjectDetail() { document.getElementById('projectDetailModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
+async function openProjectDetail(id) { try { const { project } = await api(`/api/projects/${id}`); state.currentProject = project; renderProjectDetail(project); document.getElementById('projectDetailModal')?.classList.add('open'); document.body.style.overflow = 'hidden'; } catch (err) { showToast('❌ ' + err.message, 'error'); } }
+function closeProjectDetail() { document.getElementById('projectDetailModal')?.classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
 function renderProjectDetail(p) {
-    const wrap = document.getElementById('projectDetailContent');
+    const wrap = document.getElementById('projectDetailContent'); if (!wrap) return;
     const isClient = p.clientId === state.user.id;
     const isExecutor = p.executor && p.executor.id === state.user.id;
     const isAdmin = state.user.role === 'admin' || state.user.role === 'manager';
@@ -524,21 +668,21 @@ function openLightbox(index) {
     let items = state.allPortfolio;
     if (state.portfolioFilter !== 'all') items = items.filter(i => i.category === state.portfolioFilter);
     const it = items[index]; if (!it) return;
-    document.getElementById('lbImg').src = it.filename;
-    document.getElementById('lbTitle').textContent = it.title;
-    document.getElementById('lbDesc').textContent = `${it.category} · ${it.authorName || ''}${it.description ? ' · ' + it.description : ''}`;
-    document.getElementById('lightbox').classList.add('open'); document.body.style.overflow = 'hidden';
+    const img = document.getElementById('lbImg'); if (img) img.src = it.filename;
+    setText('lbTitle', it.title);
+    setText('lbDesc', `${it.category} · ${it.authorName || ''}${it.description ? ' · ' + it.description : ''}`);
+    document.getElementById('lightbox')?.classList.add('open'); document.body.style.overflow = 'hidden';
 }
-function closeLightbox() { document.getElementById('lightbox').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
-function openMyPortfolio() { if (!state.user) return openAuth(); if (!['executor', 'admin', 'manager'].includes(state.user.role)) return showToast('⚠️ Только для исполнителей', 'error'); document.getElementById('myPortfolioModal').classList.add('open'); document.body.style.overflow = 'hidden'; document.getElementById('userMenu').classList.add('hidden'); loadMyPortfolio(); }
-function closeMyPortfolio() { document.getElementById('myPortfolioModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
+function closeLightbox() { document.getElementById('lightbox')?.classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
+function openMyPortfolio() { if (!state.user) return openAuth(); if (!['executor', 'admin', 'manager'].includes(state.user.role)) return showToast('⚠️ Только для исполнителей', 'error'); document.getElementById('myPortfolioModal')?.classList.add('open'); document.body.style.overflow = 'hidden'; document.getElementById('userMenu')?.classList.add('hidden'); loadMyPortfolio(); }
+function closeMyPortfolio() { document.getElementById('myPortfolioModal')?.classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
 async function loadMyPortfolio() { try { const { items } = await api('/api/portfolio/me'); state.myPortfolio = items; renderMyPortfolio(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 function renderMyPortfolio() {
     const grid = document.getElementById('myPortfolioGrid'); if (!grid) return;
     if (!state.myPortfolio.length) { grid.innerHTML = `<div class="empty-state small"><i class="fas fa-image"></i><p>Пока нет работ</p></div>`; return; }
     grid.innerHTML = state.myPortfolio.map(it => `<div class="my-portfolio-item"><img src="${escapeHtml(it.filename)}" alt="${escapeHtml(it.title)}"><button class="my-portfolio-delete" onclick="deletePortfolioItem(${it.id})">×</button></div>`).join('');
 }
-function previewPortfolioFile(e) { const f = e.target.files?.[0]; if (!f) return; if (f.size > 5 * 1024 * 1024) { showToast('❌ Максимум 5 МБ', 'error'); e.target.value = ''; return; } document.getElementById('uploadZoneText').textContent = f.name; }
+function previewPortfolioFile(e) { const f = e.target.files?.[0]; if (!f) return; if (f.size > 5 * 1024 * 1024) { showToast('❌ Максимум 5 МБ', 'error'); e.target.value = ''; return; } const t = document.getElementById('uploadZoneText'); if (t) t.textContent = f.name; }
 async function handlePortfolioUpload(e) {
     e.preventDefault();
     const file = document.getElementById('portfolioInput').files?.[0]; if (!file) return showToast('⚠️ Выберите файл', 'error');
@@ -547,16 +691,16 @@ async function handlePortfolioUpload(e) {
     const category = document.getElementById('portCategory').value;
     if (!title) return showToast('⚠️ Укажите название', 'error');
     const fd = new FormData(); fd.append('image', file); fd.append('title', title); fd.append('description', description); fd.append('category', category);
-    const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
-    try { await api('/api/portfolio', { method: 'POST', body: fd }); e.target.reset(); document.getElementById('uploadZoneText').textContent = 'Нажмите, чтобы выбрать изображение'; await loadMyPortfolio(); await loadAllPortfolio(); showToast('✅ Загружено'); }
+    const btn = e.target.querySelector('button[type="submit"]'); if (btn) btn.disabled = true;
+    try { await api('/api/portfolio', { method: 'POST', body: fd }); e.target.reset(); const t = document.getElementById('uploadZoneText'); if (t) t.textContent = 'Нажмите, чтобы выбрать изображение'; await loadMyPortfolio(); await loadAllPortfolio(); showToast('✅ Загружено'); }
     catch (err) { showToast('❌ ' + err.message, 'error'); }
-    finally { btn.disabled = false; }
+    finally { if (btn) btn.disabled = false; }
 }
 async function deletePortfolioItem(id) { if (!confirm('Удалить работу?')) return; try { await api(`/api/portfolio/${id}`, { method: 'DELETE' }); await loadMyPortfolio(); await loadAllPortfolio(); showToast('🗑️ Удалено'); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 
 /* SOCKET */
 function connectSocket() {
-    if (!getToken()) return;
+    if (!getToken() || typeof io !== 'function') return;
     if (state.socket) state.socket.disconnect();
     state.socket = io({ auth: { token: getToken() } });
     state.socket.on('connect', () => { if (state.currentChatId) state.socket.emit('chat:join', { chatId: state.currentChatId }); });
@@ -565,17 +709,24 @@ function connectSocket() {
     state.socket.on('presence', ({ userId, online }) => { if (online) state.onlineUsers.add(userId); else state.onlineUsers.delete(userId); renderChatList(); });
     state.socket.on('chat:typing', ({ name }) => { const el = document.getElementById('chatHeadRole'); if (el) { const orig = el.dataset.orig || el.textContent; el.dataset.orig = orig; el.textContent = `${name} печатает...`; clearTimeout(el._t); el._t = setTimeout(() => { el.textContent = orig; }, 2000); } });
 }
-function incrementUnreadBadge() { const b1 = document.getElementById('chatBadge'), b2 = document.getElementById('msgrBadge'); const cur = parseInt(b1.textContent || '0', 10) || 0; const next = cur + 1; [b1, b2].forEach(b => { if (b) { b.textContent = next; b.classList.remove('hidden'); } }); }
+function incrementUnreadBadge() { const b1 = document.getElementById('chatBadge'), b2 = document.getElementById('msgrBadge'); const cur = parseInt(b1?.textContent || '0', 10) || 0; const next = cur + 1; [b1, b2].forEach(b => { if (b) { b.textContent = next; b.classList.remove('hidden'); } }); }
 
 /* MESSENGER */
-function openMessenger() { if (!state.user) return openAuth(); document.getElementById('messenger').classList.add('open'); document.body.style.overflow = 'hidden'; document.getElementById('userMenu').classList.add('hidden'); loadChats(); closeChat(); }
-function closeMessenger() { document.getElementById('messenger').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; if (state.currentChatId) state.socket?.emit('chat:leave', { chatId: state.currentChatId }); closeChat(); }
+function openMessenger() { if (!state.user) return openAuth(); document.getElementById('messenger')?.classList.add('open'); document.body.style.overflow = 'hidden'; document.getElementById('userMenu')?.classList.add('hidden'); loadChats(); closeChat(); }
+function closeMessenger() { document.getElementById('messenger')?.classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; if (state.currentChatId) state.socket?.emit('chat:leave', { chatId: state.currentChatId }); closeChat(); }
 async function loadChats() { if (!state.user) return; try { const { chats } = await api('/api/chats'); state.chats = chats; renderChatList(); updateTotalUnread(); } catch {} }
 function updateTotalUnread() { const total = state.chats.reduce((s, c) => s + c.unread, 0); const b1 = document.getElementById('chatBadge'), b2 = document.getElementById('msgrBadge'); if (total > 0) [b1, b2].forEach(b => { if (b) { b.textContent = total > 99 ? '99+' : total; b.classList.remove('hidden'); } }); else [b1, b2].forEach(b => { if (b) b.classList.add('hidden'); }); }
 function renderChatList() {
     const list = document.getElementById('chatList'); if (!list) return;
     if (!state.chats.length) { list.innerHTML = `<div class="empty-state small"><i class="fas fa-comments"></i><p>Нет чатов</p></div>`; return; }
-    list.innerHTML = state.chats.map(c => { const peer = c.peer; const preview = c.lastMessage?.text || 'Нет сообщений'; const time = c.lastMessage ? formatTime(c.lastMessage.createdAt) : ''; const unread = c.unread > 0 ? `<span class="chat-unread">${c.unread}</span>` : ''; const online = state.onlineUsers.has(peer.id) ? `<span class="chat-online"></span>` : ''; return `<div class="chat-row" onclick="openChatWith(${peer.id})"><div class="chat-avatar">${userAvatarHtml(peer)}${online}</div><div class="chat-info"><div class="chat-name">${escapeHtml(peer.name)}</div><div class="chat-preview">${escapeHtml(preview)}</div></div><div class="chat-meta"><div class="chat-time">${time}</div>${unread}</div></div>`; }).join('');
+    list.innerHTML = state.chats.map(c => {
+        const peer = c.peer;
+        const preview = c.lastMessage?.text || 'Нет сообщений';
+        const time = c.lastMessage ? formatTime(c.lastMessage.createdAt) : '';
+        const unread = c.unread > 0 ? `<span class="chat-unread">${c.unread}</span>` : '';
+        const online = state.onlineUsers.has(peer.id) ? `<span class="chat-online"></span>` : '';
+        return `<div class="chat-row" onclick="openChatWith(${peer.id})"><div class="chat-avatar">${userAvatarHtml(peer)}${online}</div><div class="chat-info"><div class="chat-name">${escapeHtml(peer.name)}</div><div class="chat-preview">${escapeHtml(preview)}</div></div><div class="chat-meta"><div class="chat-time">${time}</div>${unread}</div></div>`;
+    }).join('');
 }
 async function openChatWith(peerId) {
     if (!state.user) return openAuth();
@@ -587,28 +738,28 @@ async function openChatWith(peerId) {
         else { const usersRes = await api('/api/users/list'); state.chatPeer = usersRes.users.find(u => u.id === peerId); }
         const { messages } = await api(`/api/chats/${chatId}/messages`);
         state.chatMessages[chatId] = messages;
-        document.getElementById('chatList').classList.add('hidden');
-        document.getElementById('chatWindow').classList.remove('hidden');
-        document.getElementById('chatHead').classList.remove('hidden');
-        document.getElementById('msgrBack').classList.remove('hidden');
-        document.getElementById('msgrTitle').innerHTML = '<i class="fas fa-comments"></i> Чат';
-        document.getElementById('chatHeadAvatar').innerHTML = userAvatarHtml(state.chatPeer);
-        document.getElementById('chatHeadName').textContent = state.chatPeer?.name || '—';
-        document.getElementById('chatHeadRole').textContent = ROLE_LABELS[state.chatPeer?.role] || '';
+        document.getElementById('chatList')?.classList.add('hidden');
+        document.getElementById('chatWindow')?.classList.remove('hidden');
+        document.getElementById('chatHead')?.classList.remove('hidden');
+        document.getElementById('msgrBack')?.classList.remove('hidden');
+        const t = document.getElementById('msgrTitle'); if (t) t.innerHTML = '<i class="fas fa-comments"></i> Чат';
+        const av = document.getElementById('chatHeadAvatar'); if (av) av.innerHTML = userAvatarHtml(state.chatPeer);
+        setText('chatHeadName', state.chatPeer?.name || '—');
+        setText('chatHeadRole', ROLE_LABELS[state.chatPeer?.role] || '');
         renderChatMessages(messages);
         state.socket?.emit('chat:join', { chatId });
-        document.getElementById('messenger').classList.add('open'); document.body.style.overflow = 'hidden';
+        document.getElementById('messenger')?.classList.add('open'); document.body.style.overflow = 'hidden';
         await loadChats();
-        setTimeout(() => document.getElementById('chatInput').focus(), 300);
+        setTimeout(() => document.getElementById('chatInput')?.focus(), 300);
     } catch (err) { showToast('❌ ' + err.message, 'error'); }
 }
 function closeChat() {
     if (state.currentChatId) state.socket?.emit('chat:leave', { chatId: state.currentChatId });
     state.currentChatId = null; state.chatPeer = null;
-    document.getElementById('chatWindow').classList.add('hidden');
-    document.getElementById('chatList').classList.remove('hidden');
-    document.getElementById('msgrBack').classList.add('hidden');
-    document.getElementById('msgrTitle').innerHTML = '<i class="fas fa-comments"></i> Сообщения';
+    document.getElementById('chatWindow')?.classList.add('hidden');
+    document.getElementById('chatList')?.classList.remove('hidden');
+    document.getElementById('msgrBack')?.classList.add('hidden');
+    const t = document.getElementById('msgrTitle'); if (t) t.innerHTML = '<i class="fas fa-comments"></i> Сообщения';
     renderChatList();
 }
 function renderChatMessages(messages) { const wrap = document.getElementById('chatMessages'); if (!wrap) return; if (!messages.length) { wrap.innerHTML = `<div class="empty-state small"><i class="fas fa-comment"></i><p>Начните переписку</p></div>`; return; } wrap.innerHTML = messages.map(m => msgHtml(m)).join(''); wrap.scrollTop = wrap.scrollHeight; }
@@ -618,10 +769,15 @@ function sendMessage(e) { e.preventDefault(); const input = document.getElementB
 document.addEventListener('input', (e) => { if (e.target.id === 'chatInput' && state.currentChatId && state.socket) { clearTimeout(window._typingTimer); window._typingTimer = setTimeout(() => { state.socket.emit('chat:typing', { chatId: state.currentChatId }); }, 300); } });
 
 /* ADMIN */
-async function openAdminPanel() { if (!state.user || state.user.role !== 'admin') return showToast('⛔ Нет доступа', 'error'); document.getElementById('adminModal').classList.add('open'); document.body.style.overflow = 'hidden'; document.getElementById('userMenu').classList.add('hidden'); await loadAdminData(); switchAdminTab('dashboard'); }
-function closeAdminPanel() { document.getElementById('adminModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
-function switchAdminTab(tab) { document.querySelectorAll('.admin-tab').forEach(t => t.classList.toggle('active', t.dataset.atab === tab)); document.getElementById('adminDashboard').classList.toggle('hidden', tab !== 'dashboard'); document.getElementById('adminWithdrawals').classList.toggle('hidden', tab !== 'withdrawals'); document.getElementById('adminRequests').classList.toggle('hidden', tab !== 'requests'); document.getElementById('adminUsers').classList.toggle('hidden', tab !== 'users'); }
-
+async function openAdminPanel() { if (!state.user || state.user.role !== 'admin') return showToast('⛔ Нет доступа', 'error'); document.getElementById('adminModal')?.classList.add('open'); document.body.style.overflow = 'hidden'; document.getElementById('userMenu')?.classList.add('hidden'); await loadAdminData(); switchAdminTab('dashboard'); }
+function closeAdminPanel() { document.getElementById('adminModal')?.classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
+function switchAdminTab(tab) {
+    document.querySelectorAll('.admin-tab').forEach(t => t.classList.toggle('active', t.dataset.atab === tab));
+    ['dashboard','withdrawals','requests','users'].forEach(name => {
+        const el = document.getElementById('admin' + name.charAt(0).toUpperCase() + name.slice(1));
+        if (el) el.classList.toggle('hidden', tab !== name);
+    });
+}
 async function loadAdminData() {
     try {
         const [uR, rR, sR, wR] = await Promise.all([api('/api/admin/users'), api('/api/admin/requests'), api('/api/admin/stats'), api('/api/admin/withdrawals')]);
@@ -659,15 +815,21 @@ function renderAdminDashboard() {
 }
 function renderAdminWithdrawals() {
     const list = document.getElementById('withdrawalsList'); const badge = document.getElementById('wdCount'); if (!list) return;
-    const pending = state.adminWithdrawals.filter(w => w.status === 'pending'); badge.textContent = pending.length;
+    const pending = state.adminWithdrawals.filter(w => w.status === 'pending'); if (badge) badge.textContent = pending.length;
     if (!state.adminWithdrawals.length) { list.innerHTML = '<div class="admin-empty">💸 Нет заявок</div>'; return; }
-    list.innerHTML = state.adminWithdrawals.map(w => { const cls = WD_STATUS_CLASS[w.status] || 'status-review'; const av = w.user.avatar ? `<img src="${escapeHtml(w.user.avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : escapeHtml(w.user.name.charAt(0).toUpperCase()); const actions = w.status === 'pending' ? `<div class="request-actions" style="margin-top:10px"><button class="admin-act-btn primary" onclick="approveWithdrawal(${w.id})"><i class="fas fa-check"></i> Одобрить</button><button class="admin-act-btn danger" onclick="rejectWithdrawal(${w.id})"><i class="fas fa-times"></i> Отклонить</button></div>` : ''; return `<div class="withdrawal-card ${w.status === 'pending' ? 'pending' : ''}"><div class="wd-head"><div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0"><div class="admin-user-avatar" style="width:36px;height:36px;font-size:0.9rem">${av}</div><div style="min-width:0;flex:1"><div class="wd-user">${escapeHtml(w.user.name)}</div><div class="wd-email">${escapeHtml(w.user.email)}</div></div></div><div class="wd-amount">${formatMoney(w.amount)}</div><span class="project-status ${cls}">${WD_STATUS[w.status]}</span></div><div class="wd-date">Создано: ${formatDateTime(w.createdAt)}</div>${w.reviewedAt ? `<div class="wd-date">Рассмотрено: ${formatDateTime(w.reviewedAt)}</div>` : ''}${w.comment ? `<div class="wd-comment">💬 ${escapeHtml(w.comment)}</div>` : ''}${actions}</div>`; }).join('');
+    list.innerHTML = state.adminWithdrawals.map(w => {
+        const cls = WD_STATUS_CLASS[w.status] || 'status-review';
+        const av = w.user.avatar ? `<img src="${escapeHtml(w.user.avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : escapeHtml(w.user.name.charAt(0).toUpperCase());
+        const actions = w.status === 'pending' ? `<div class="request-actions" style="margin-top:10px"><button class="admin-act-btn primary" onclick="approveWithdrawal(${w.id})"><i class="fas fa-check"></i> Одобрить</button><button class="admin-act-btn danger" onclick="rejectWithdrawal(${w.id})"><i class="fas fa-times"></i> Отклонить</button></div>` : '';
+        const card = w.cardNumber ? `<div class="wd-date">💳 ${escapeHtml(w.cardNumber)}</div>` : '';
+        return `<div class="withdrawal-card ${w.status === 'pending' ? 'pending' : ''}"><div class="wd-head"><div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0"><div class="admin-user-avatar" style="width:36px;height:36px;font-size:0.9rem">${av}</div><div style="min-width:0;flex:1"><div class="wd-user">${escapeHtml(w.user.name)}</div><div class="wd-email">${escapeHtml(w.user.email)}</div></div></div><div class="wd-amount">${formatMoney(w.amount)}</div><span class="project-status ${cls}">${WD_STATUS[w.status]}</span></div>${card}<div class="wd-date">Создано: ${formatDateTime(w.createdAt)}</div>${w.reviewedAt ? `<div class="wd-date">Рассмотрено: ${formatDateTime(w.reviewedAt)}</div>` : ''}${w.comment ? `<div class="wd-comment">💬 ${escapeHtml(w.comment)}</div>` : ''}${actions}</div>`;
+    }).join('');
 }
 async function approveWithdrawal(id) { if (!confirm('Подтвердить выплату?')) return; try { await api(`/api/admin/withdrawals/${id}/approve`, { method: 'POST' }); showToast('✅ Одобрено'); await loadAdminData(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 async function rejectWithdrawal(id) { const comment = prompt('Причина отклонения:', ''); if (comment === null) return; try { await api(`/api/admin/withdrawals/${id}/reject`, { method: 'POST', body: { comment } }); showToast('↩️ Отклонено'); await loadAdminData(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 function renderAdminRequests() {
     const list = document.getElementById('requestsList'); const badge = document.getElementById('reqCount'); if (!list) return;
-    badge.textContent = state.adminRequests.length;
+    if (badge) badge.textContent = state.adminRequests.length;
     if (!state.adminRequests.length) { list.innerHTML = '<div class="admin-empty">🎉 Нет заявок</div>'; return; }
     list.innerHTML = state.adminRequests.map(u => { const dateStr = new Date(u.createdAt).toLocaleDateString('ru-RU'); const av = u.avatar ? `<img src="${escapeHtml(u.avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : escapeHtml(u.name.charAt(0).toUpperCase()); return `<div class="request-card"><div class="request-head"><div class="admin-user-avatar">${av}</div><div class="request-info"><div class="request-name">${escapeHtml(u.name)}</div><div class="request-role">→ ${ROLE_LABELS[u.requestedRole] || u.requestedRole}</div><div class="request-date">${escapeHtml(u.email)} · с ${dateStr}</div></div></div><div class="request-actions"><button class="admin-act-btn primary" onclick="approveRequest(${u.id})"><i class="fas fa-check"></i> Одобрить</button><button class="admin-act-btn danger" onclick="rejectRequest(${u.id})"><i class="fas fa-times"></i> Отклонить</button></div></div>`; }).join('');
 }
@@ -706,13 +868,14 @@ async function adminAdjustBalance(userId) {
     try { await api('/api/admin/balance', { method: 'POST', body: { userId, amount } }); showToast('✅ Баланс обновлён'); await loadAdminData(); await fetchMe(); } catch (err) { showToast('❌ ' + err.message, 'error'); }
 }
 async function openUserFull(userId) {
-    try { const data = await api(`/api/admin/users/${userId}/full`); renderUserFull(data); document.getElementById('userFullModal').classList.add('open'); document.body.style.overflow = 'hidden'; } catch (err) { showToast('❌ ' + err.message, 'error'); }
+    try { const data = await api(`/api/admin/users/${userId}/full`); renderUserFull(data); document.getElementById('userFullModal')?.classList.add('open'); document.body.style.overflow = 'hidden'; } catch (err) { showToast('❌ ' + err.message, 'error'); }
 }
-function closeUserFull() { document.getElementById('userFullModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
+function closeUserFull() { document.getElementById('userFullModal')?.classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
 function renderUserFull(data) {
     const { user, transactions, withdrawals, stats } = data;
     const av = user.avatar ? `<img src="${escapeHtml(user.avatar)}" alt="">` : escapeHtml(user.name.charAt(0).toUpperCase());
-    document.getElementById('userFullContent').innerHTML = `
+    const wrap = document.getElementById('userFullContent'); if (!wrap) return;
+    wrap.innerHTML = `
         <div class="user-modal-head"><div class="user-modal-avatar">${av}</div><div><h3>${escapeHtml(user.name)}</h3><div class="user-modal-email">${escapeHtml(user.email)}</div><div style="margin-top:6px"><span class="admin-user-role role-badge-${user.role}">${ROLE_LABELS[user.role] || user.role}</span></div></div></div>
         <div class="user-modal-stats">
             <div class="user-modal-stat"><div class="user-modal-stat-value">${formatMoney(user.balance)}</div><div class="user-modal-stat-label">Баланс</div></div>
@@ -727,12 +890,12 @@ function renderUserFull(data) {
         <div class="user-modal-panel hidden" id="userFullWd">${withdrawals.length ? withdrawals.map(w => { const cls = WD_STATUS_CLASS[w.status] || 'status-review'; return `<div class="withdrawal-card ${w.status === 'pending' ? 'pending' : ''}"><div class="wd-head"><div class="wd-amount">${formatMoney(w.amount)}</div><span class="project-status ${cls}">${WD_STATUS[w.status]}</span></div><div class="wd-date">Создано: ${formatDateTime(w.createdAt)}</div>${w.reviewedAt ? `<div class="wd-date">Рассмотрено: ${formatDateTime(w.reviewedAt)}</div>` : ''}${w.comment ? `<div class="wd-comment">💬 ${escapeHtml(w.comment)}</div>` : ''}</div>`; }).join('') : '<div class="tx-empty">Нет заявок</div>'}</div>
     `;
 }
-function switchUserTab(tab) { document.querySelectorAll('.user-modal-tab').forEach(t => t.classList.toggle('active', t.dataset.utab === tab)); document.getElementById('userFullTx').classList.toggle('hidden', tab !== 'tx'); document.getElementById('userFullWd').classList.toggle('hidden', tab !== 'wd'); }
+function switchUserTab(tab) { document.querySelectorAll('.user-modal-tab').forEach(t => t.classList.toggle('active', t.dataset.utab === tab)); document.getElementById('userFullTx')?.classList.toggle('hidden', tab !== 'tx'); document.getElementById('userFullWd')?.classList.toggle('hidden', tab !== 'wd'); }
 
 /* SERVICE / PLAN / CONTACT */
 function selectService(name, price) { showToast(`✨ ${name} — ${price}`); const select = document.getElementById('formService'); if (select) { const found = Array.from(select.options).find(o => o.value === name || o.text === name); if (found) select.value = found.value; } scrollToSection('contact'); }
-function selectPlan(name, price) { document.getElementById('planDisplay').textContent = `${name} — ${price}`; document.getElementById('selectedPlan').style.display = 'block'; const msg = document.getElementById('formMessage'); if (!msg.value.includes('Пакет:')) msg.value = msg.value ? `${msg.value}\nПакет: ${name} (${price})` : `Пакет: ${name} (${price})`; showToast(`✅ ${name}`); scrollToSection('contact'); }
-function handleSubmit(e) { e.preventDefault(); const name = document.getElementById('formName').value || 'Клиент'; showToast(`🎉 ${name}, заявка отправлена!`); e.target.reset(); document.getElementById('selectedPlan').style.display = 'none'; }
+function selectPlan(name, price) { const disp = document.getElementById('planDisplay'); if (disp) disp.textContent = `${name} — ${price}`; const sel = document.getElementById('selectedPlan'); if (sel) sel.style.display = 'block'; const msg = document.getElementById('formMessage'); if (msg && !msg.value.includes('Пакет:')) msg.value = msg.value ? `${msg.value}\nПакет: ${name} (${price})` : `Пакет: ${name} (${price})`; showToast(`✅ ${name}`); scrollToSection('contact'); }
+function handleSubmit(e) { e.preventDefault(); const name = document.getElementById('formName')?.value || 'Клиент'; showToast(`🎉 ${name}, заявка отправлена!`); e.target.reset(); const sp = document.getElementById('selectedPlan'); if (sp) sp.style.display = 'none'; }
 
 /* FILTERS */
 document.querySelectorAll('#projectFilters .filter').forEach(btn => { btn.addEventListener('click', () => filterProjects(btn.dataset.status)); });
@@ -763,6 +926,205 @@ async function init() {
     await fetchMe();
     if (!state.user) { await loadProjects(); await loadAllPortfolio(); }
     setTimeout(onScroll, 200);
-    console.log('🐾 Paw Art Studio v3.7 ready');
+    console.log('🐾 Paw Art Studio v3.8 ready');
 }
 init();
+
+/* ==================== РЕГИСТРАЦИЯ С ВЕРИФИКАЦИЕЙ EMAIL ==================== */
+
+function getRefFromUrl() {
+    return new URLSearchParams(location.search).get('ref') || null;
+}
+
+async function registerUser(name, email, password) {
+    try {
+        const ref = getRefFromUrl() || localStorage.getItem('paw_ref');
+        const data = await api('/api/auth/register', {
+            method: 'POST',
+            body: { name, email, password, ref },
+        });
+        state.pendingEmail = data.email;
+
+        // Переключаем панели внутри authModal
+        document.querySelectorAll('[data-auth-panel]').forEach(p => {
+            p.hidden = p.dataset.authPanel !== 'verify';
+        });
+        const loginForm = document.getElementById('loginForm'); if (loginForm) loginForm.classList.add('hidden');
+        const registerForm = document.getElementById('registerForm'); if (registerForm) registerForm.classList.add('hidden');
+        const verifyForm = document.getElementById('verifyForm'); if (verifyForm) verifyForm.classList.remove('hidden');
+
+        // Обновляем активный таб
+        document.querySelectorAll('.modal-tabs button, .auth-tab').forEach(t => {
+            const tTab = t.dataset.authTab || t.dataset.tab;
+            t.classList.toggle('active', tTab === 'verify');
+        });
+
+        const target = document.getElementById('verifyEmailTarget');
+        if (target) target.textContent = data.email;
+
+        showToast('📧 Код подтверждения отправлен на ' + data.email);
+    } catch (e) {
+        const errEl = document.getElementById('registerError');
+        if (errEl) errEl.textContent = e.message;
+        showToast('❌ ' + e.message, 'error');
+    }
+}
+
+async function verifyEmail(email, code) {
+    if (!code) return showToast('⚠️ Введите код', 'error');
+    try {
+        const data = await api('/api/auth/verify-email', {
+            method: 'POST',
+            body: { email, code },
+        });
+        setToken(data.token);
+        state.user = data.user;
+        closeAuth();
+        showToast('🎉 Email подтверждён! Добро пожаловать, ' + data.user.name + '!');
+        await afterLogin();
+    } catch (e) {
+        const errEl = document.getElementById('verifyError');
+        if (errEl) errEl.textContent = e.message;
+        showToast('❌ ' + e.message, 'error');
+    }
+}
+
+async function resendCode(email) {
+    if (!email) return showToast('⚠️ Email не найден', 'error');
+    try {
+        await api('/api/auth/resend-code', { method: 'POST', body: { email } });
+        showToast('📧 Код отправлен повторно');
+    } catch (e) {
+        const errEl = document.getElementById('verifyError');
+        if (errEl) errEl.textContent = e.message;
+        showToast('❌ ' + e.message, 'error');
+    }
+}
+
+/* ==================== РЕФЕРАЛЬНЫЙ ТРЕКИНГ ==================== */
+(function trackReferral() {
+    const ref = getRefFromUrl();
+    if (ref) {
+        fetch('/api/referrals/click/' + encodeURIComponent(ref)).catch(() => {});
+        localStorage.setItem('paw_ref', ref);
+    }
+})();
+
+/* ==================== ВЫВОД СРЕДСТВ С КАРТОЙ ==================== */
+
+async function requestWithdraw(amount, cardNumber) {
+    try {
+        const data = await api('/api/wallet/withdraw', {
+            method: 'POST',
+            body: { amount, cardNumber },
+        });
+        state.user = data.user;
+        closeMoney();
+        const wd = document.getElementById('withdrawModal'); if (wd) wd.classList.remove('open');
+        if (!isAnyModalOpen()) document.body.style.overflow = '';
+        showToast('⏳ Заявка на вывод создана. Ожидайте подтверждения администратора.');
+        if (typeof loadDashboardData === 'function') await loadDashboardData();
+        updateUI();
+    } catch (e) {
+        const errEl = document.getElementById('withdrawError');
+        if (errEl) errEl.textContent = e.message;
+        showToast('❌ ' + e.message, 'error');
+    }
+}
+
+/* ==================== ОБРАБОТЧИКИ ФОРМ И КНОПОК ==================== */
+
+// Шаг 1: регистрация
+document.getElementById('registerForm')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const name = document.getElementById('regName').value.trim();
+    const email = document.getElementById('regEmail').value.trim();
+    const password = document.getElementById('regPassword').value;
+    registerUser(name, email, password);
+});
+
+// Шаг 2: ввод кода
+document.getElementById('verifyForm')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const code = document.getElementById('verifyCode').value.trim();
+    verifyEmail(state.pendingEmail, code);
+});
+
+// Кнопки в форме верификации
+document.getElementById('resendCodeBtn')?.addEventListener('click', () => {
+    if (state.pendingEmail) resendCode(state.pendingEmail);
+});
+document.getElementById('backToRegisterBtn')?.addEventListener('click', () => {
+    document.querySelectorAll('[data-auth-panel]').forEach(p => {
+        p.hidden = p.dataset.authPanel !== 'register';
+    });
+    document.getElementById('verifyForm')?.classList.add('hidden');
+    document.getElementById('registerForm')?.classList.remove('hidden');
+    document.getElementById('loginForm')?.classList.add('hidden');
+    document.querySelectorAll('.modal-tabs button, .auth-tab').forEach(t => {
+        const tTab = t.dataset.authTab || t.dataset.tab;
+        t.classList.toggle('active', tTab === 'register');
+    });
+});
+
+// Форма входа
+document.getElementById('loginForm')?.addEventListener('submit', handleLogin);
+
+// Табы в authModal
+document.querySelectorAll('.modal-tabs button, .auth-tab').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const tab = btn.dataset.authTab || btn.dataset.tab;
+        if (tab && tab !== 'verify') switchAuthTab(tab);
+    });
+});
+
+// Форма пополнения (topUpModal — мой HTML)
+document.getElementById('topUpForm')?.addEventListener('submit', async (e) => {
+    e.preventDefault();
+    const amount = Number(document.getElementById('topUpAmount').value);
+    if (!amount || amount < 1) return showToast('⚠️ Минимум 1 ₽', 'error');
+    try {
+        const { confirmationUrl } = await api('/api/payments/create', { method: 'POST', body: { amount } });
+        showToast('🔄 Перенаправляем на ЮKassa...');
+        setTimeout(() => { window.location.href = confirmationUrl; }, 800);
+    } catch (err) {
+        const errEl = document.getElementById('topUpError');
+        if (errEl) errEl.textContent = err.message;
+        showToast('❌ ' + err.message, 'error');
+    }
+});
+
+// Форма вывода (withdrawModal — мой HTML)
+document.getElementById('withdrawForm')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const amount = document.getElementById('withdrawAmount').value;
+    const cardNumber = document.getElementById('withdrawCard').value;
+    requestWithdraw(amount, cardNumber);
+});
+
+// Кнопки хедера в моём HTML
+document.getElementById('btnLogin')?.addEventListener('click', openAuth);
+document.getElementById('heroRegister')?.addEventListener('click', openAuth);
+document.getElementById('btnRegister')?.addEventListener('click', () => {
+    openAuth();
+    switchAuthTab('register');
+});
+document.getElementById('btnDashboard')?.addEventListener('click', openDashboard);
+document.getElementById('btnLogout')?.addEventListener('click', logout);
+document.getElementById('btnTopUp')?.addEventListener('click', openDeposit);
+document.getElementById('btnWithdraw')?.addEventListener('click', openWithdraw);
+
+// Кнопки закрытия модалок с data-close="..."
+document.querySelectorAll('[data-close]').forEach(btn => {
+    btn.addEventListener('click', () => {
+        const id = btn.dataset.close;
+        const el = document.getElementById(id);
+        if (el) el.classList.remove('open');
+        if (id === 'authModal') {
+            document.querySelectorAll('[data-auth-panel]').forEach(p => {
+                p.hidden = p.dataset.authPanel !== 'login';
+            });
+        }
+        if (!isAnyModalOpen()) document.body.style.overflow = '';
+    });
+});
