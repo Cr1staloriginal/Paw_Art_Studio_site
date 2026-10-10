@@ -1,0 +1,27 @@
+/* Paw Art Studio — wallet / mascot upgrade */
+.paw-upgrade-tabs{display:flex;gap:8px;flex-wrap:wrap;margin:18px 0}
+.paw-upgrade-tabs button{border:1px solid var(--border,#3b2b42);background:var(--bg-2,#211723);color:var(--text-soft,#d4c7d8);padding:10px 14px;border-radius:12px;cursor:pointer;font:inherit;font-size:.88rem}
+.paw-upgrade-tabs button.active{background:linear-gradient(135deg,#ec4899,#8b5cf6);color:white;border-color:transparent}
+.paw-upgrade-panel{background:var(--bg-card,#1b141e);border:1px solid var(--border,#3b2b42);border-radius:18px;padding:20px;margin-bottom:14px}
+.paw-upgrade-panel h4{font-size:1.1rem;margin-bottom:8px}
+.paw-upgrade-muted{color:var(--text-mute,#a99bac);font-size:.9rem;line-height:1.5}
+.paw-upgrade-row{display:flex;gap:10px;flex-wrap:wrap;margin-top:14px}
+.paw-upgrade-row input{flex:1;min-width:160px;background:var(--bg-2,#211723);color:var(--text,#fff);border:1px solid var(--border,#3b2b42);border-radius:12px;padding:12px;font:inherit}
+.paw-upgrade-code{overflow-wrap:anywhere;background:rgba(139,92,246,.12);border:1px dashed rgba(167,139,250,.6);border-radius:12px;padding:12px;margin-top:12px;font-family:monospace}
+.paw-upgrade-pill{display:inline-flex;align-items:center;gap:6px;border-radius:30px;padding:6px 10px;background:rgba(34,211,238,.1);color:var(--accent-3,#67e8f9);font-size:.8rem}
+.paw-mascot-card{position:relative;min-height:480px;display:flex;align-items:center;justify-content:center;overflow:hidden;border-radius:28px;border:1px solid rgba(196,181,253,.24);background:radial-gradient(circle at 70% 25%,rgba(236,72,153,.22),transparent 35%),radial-gradient(circle at 25% 80%,rgba(34,211,238,.16),transparent 35%),linear-gradient(145deg,#24172e,#15111d);padding:28px}
+.paw-mascot-image{width:auto;height:auto;max-width:82%;max-height:74%;object-fit:contain;filter:drop-shadow(0 20px 40px rgba(236,72,153,.35)) drop-shadow(0 0 20px rgba(139,92,246,.25));animation:paw-float 4s ease-in-out infinite;position:relative;z-index:2;margin-bottom:70px}
+.paw-mascot-copy{position:absolute;left:22px;right:22px;bottom:20px;padding:15px 17px;border:1px solid rgba(255,255,255,.13);border-radius:16px;background:rgba(20,14,25,.75);backdrop-filter:blur(12px);z-index:3}
+.paw-mascot-copy strong{display:block;font-size:1rem;margin-bottom:4px}
+.paw-mascot-copy span{color:#cbbbd4;font-size:.86rem}
+.paw-support-button{display:inline-flex;gap:8px;align-items:center;justify-content:center}
+@keyframes paw-float{0%,100%{transform:translateY(0) rotate(-2deg)}50%{transform:translateY(-10px) rotate(2deg)}}
+@media(max-width:600px){
+  .paw-upgrade-panel{padding:15px}
+  .paw-mascot-card{min-height:340px}
+  .paw-mascot-image{max-width:90%;max-height:70%;margin-bottom:60px}
+  .paw-upgrade-tabs button{flex:1}
+}
+@media(max-width:900px){
+  .hero-gallery.paw-mascot-card{aspect-ratio:auto;max-width:100%;margin:0 auto}
+}
