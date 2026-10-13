@@ -25,3 +25,26 @@
 @media(max-width:900px){
   .hero-gallery.paw-mascot-card{aspect-ratio:auto;max-width:100%;margin:0 auto}
 }
+
+
+/* Service details, prices and quantity calculator */
+.paw-services-grid .paw-service-card{cursor:pointer;position:relative;transition:transform .22s ease,border-color .22s ease,box-shadow .22s ease}
+.paw-services-grid .paw-service-card:hover,.paw-services-grid .paw-service-card:focus-visible{transform:translateY(-5px);border-color:rgba(236,72,153,.65);box-shadow:0 14px 38px rgba(139,92,246,.15);outline:none}
+.paw-service-hint{display:block;margin-top:12px;font-size:.78rem;color:#c4a7d9}
+.paw-services-note{margin:20px auto 0;max-width:780px;text-align:center;color:var(--text-mute,#a99bac);font-size:.9rem;line-height:1.6}
+.paw-service-modal{position:fixed;inset:0;z-index:10050;display:flex;align-items:center;justify-content:center;padding:18px;background:rgba(10,7,14,.78);backdrop-filter:blur(9px);opacity:0;visibility:hidden;transition:opacity .2s ease,visibility .2s ease}
+.paw-service-modal.is-open{opacity:1;visibility:visible}
+.paw-service-dialog{position:relative;width:min(100%,520px);max-height:min(88vh,760px);overflow:auto;padding:28px;border:1px solid rgba(196,181,253,.28);border-radius:24px;background:linear-gradient(145deg,#24172e,#15111d);box-shadow:0 25px 80px rgba(0,0,0,.45);color:#fff;transform:translateY(12px);transition:transform .2s ease}
+.paw-service-modal.is-open .paw-service-dialog{transform:translateY(0)}
+.paw-service-close{position:absolute;right:14px;top:12px;width:38px;height:38px;border:0;border-radius:12px;background:rgba(255,255,255,.08);color:#fff;font-size:1.5rem;cursor:pointer}
+.paw-service-dialog h3{font-size:1.5rem;margin:0 44px 12px 0}
+.paw-service-dialog p{color:#d4c7d8;line-height:1.65}
+.paw-service-price{font-size:1.25rem;font-weight:800;color:#f0abfc;margin:18px 0 8px}
+.paw-service-quantity{display:flex;align-items:center;justify-content:space-between;gap:16px;margin:18px 0;padding:14px;border:1px solid rgba(255,255,255,.12);border-radius:14px}
+.paw-service-quantity label{font-size:.92rem;color:#e9dff0}
+.paw-service-quantity input{width:92px;padding:10px;border-radius:10px;border:1px solid #5b4566;background:#211723;color:white;font:inherit}
+.paw-service-actions{display:flex;flex-wrap:wrap;gap:10px;margin-top:22px}
+.paw-service-actions button{flex:1;min-width:150px;padding:12px 16px;border-radius:12px;border:1px solid transparent;font:inherit;font-weight:700;cursor:pointer}
+.paw-service-order{background:linear-gradient(135deg,#ec4899,#8b5cf6);color:#fff}
+.paw-service-cancel{background:rgba(255,255,255,.08);color:#eee;border-color:rgba(255,255,255,.12)!important}
+@media(max-width:600px){.paw-service-dialog{padding:22px 18px}.paw-service-actions button{width:100%}.paw-service-quantity{align-items:flex-start;flex-direction:column}.paw-service-quantity input{width:100%}}
