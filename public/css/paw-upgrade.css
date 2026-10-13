@@ -49,3 +49,36 @@
 .paw-service-order{background:linear-gradient(135deg,#ec4899,#8b5cf6);color:#fff}
 .paw-service-cancel{background:rgba(255,255,255,.08);color:#eee;border-color:rgba(255,255,255,.12)!important}
 @media(max-width:600px){.paw-service-dialog{padding:22px 18px}.paw-service-actions button{width:100%}.paw-service-quantity{align-items:flex-start;flex-direction:column}.paw-service-quantity input{width:100%}}
+
+
+/* Mobile polish for service modal and quantity range */
+.paw-service-dialog{width:min(100%,560px);max-height:calc(100vh - 32px);max-height:calc(100dvh - 32px);overflow:auto;overscroll-behavior:contain;padding:clamp(18px,4vw,30px)}
+.paw-service-dialog h3{line-height:1.25;overflow-wrap:anywhere}
+.paw-service-dialog p{overflow-wrap:anywhere}
+.paw-service-quantity{display:block}
+.paw-service-quantity-head{display:flex;align-items:center;justify-content:space-between;gap:12px;margin-bottom:16px}
+.paw-service-quantity-head label{font-weight:700}
+.paw-service-quantity-head output{font-weight:800;color:#f0abfc;font-variant-numeric:tabular-nums}
+.paw-service-quantity input[type=range]{display:block;width:100%;min-width:0;margin:8px 0 4px;accent-color:#ec4899;cursor:pointer;touch-action:pan-y}
+.paw-service-quantity input[type=range]:focus-visible{outline:2px solid #f0abfc;outline-offset:6px;border-radius:10px}
+.paw-service-range-limits{display:flex;justify-content:space-between;gap:12px;color:#bfaec8;font-size:.8rem}
+.paw-service-order:disabled{opacity:.5;cursor:not-allowed;filter:grayscale(.35)}
+.paw-service-note{font-size:.92rem}
+.paw-services-grid .paw-service-card{min-width:0;overflow-wrap:anywhere}
+.paw-service-hint{line-height:1.5}
+@media(max-width:600px){
+  .paw-service-modal{align-items:flex-end;padding:8px 8px max(8px,env(safe-area-inset-bottom))}
+  .paw-service-dialog{width:100%;max-height:calc(100vh - 16px);max-height:calc(100dvh - 16px);border-radius:22px;padding:22px 16px 18px}
+  .paw-service-dialog h3{font-size:1.3rem;margin-right:42px}
+  .paw-service-dialog p{font-size:.94rem;line-height:1.55}
+  .paw-service-quantity{padding:13px;margin:15px 0}
+  .paw-service-quantity-head{align-items:flex-start}
+  .paw-service-quantity input[type=range]{min-height:32px}
+  .paw-service-actions{display:grid;grid-template-columns:1fr;gap:9px}
+  .paw-service-actions button{width:100%;min-width:0;min-height:46px;padding:12px}
+  .paw-service-price{font-size:1.2rem}
+  .paw-services-grid .paw-service-card:hover{transform:none}
+}
+@media(prefers-reduced-motion:reduce){
+  .paw-service-modal,.paw-service-dialog,.paw-services-grid .paw-service-card{transition:none}
+}
