@@ -11,6 +11,7 @@ const cors = require('cors');
 const multer = require('multer');
 const nodemailer = require('nodemailer');
 const { YooKassa } = require('yookassa-api-sdk');
+const crypto = require('crypto');
 
 const app = express();
 const server = http.createServer(app);
@@ -569,7 +570,7 @@ app.post('/api/payments/create', auth, async (req, res) => {
       confirmation: { type: 'redirect', return_url: `${SITE_URL}/dashboard` },
       description: `Пополнение баланса Paw Art Studio (#${req.user.id})`,
       metadata: { userId: String(req.user.id) },
-    });
+    }, crypto.randomUUID());
 
     db.prepare(`INSERT INTO payments (user_id, payment_id, amount, status, created_at)
                 VALUES (?, ?, ?, 'pending', ?)`)
@@ -577,8 +578,25 @@ app.post('/api/payments/create', auth, async (req, res) => {
 
     res.json({ paymentId: payment.id, confirmationUrl: payment.confirmation.confirmation_url });
   } catch (err) {
-    console.error('❌ ЮKassa ошибка:', err);
-    res.status(500).json({ error: 'Не удалось создать платёж: ' + (err.message || 'неизвестно') });
+    const providerMessage = String(
+      err?.description || err?.response?.data?.description ||
+      err?.response?.data?.message || err?.message || 'неизвестная ошибка'
+    );
+    const providerCode = err?.code || err?.response?.data?.code || err?.error_code || null;
+    const providerStatus = err?.status || err?.statusCode || err?.response?.status || null;
+
+    // Never log credentials or request headers; retain only useful diagnostic fields.
+    console.error('❌ ЮKassa: создание платежа отклонено', {
+      message: providerMessage,
+      code: providerCode,
+      status: providerStatus,
+    });
+
+    const forbidden = /transaction forbidden|unspecified error/i.test(providerMessage);
+    const userMessage = forbidden
+      ? 'ЮKassa отклонила создание платежа. Проверьте статус магазина и актуальность Shop ID/секретного ключа в настройках сервера. Если данные верны, обратитесь в поддержку ЮKassa — ограничение может быть на стороне магазина.'
+      : 'Не удалось создать платёж в ЮKassa. Попробуйте позже; подробности ошибки записаны в журнал сервера.';
+    res.status(502).json({ error: userMessage, code: providerCode || undefined });
   }
 });
 
