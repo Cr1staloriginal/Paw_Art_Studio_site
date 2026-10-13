@@ -58,7 +58,7 @@
         : 'Это предварительный расчёт по выбранному количеству. Окончательную стоимость подтвердим до начала работы.');
     $('pawServiceMin').textContent = min + ' шт.';
     $('pawServiceMax').textContent = max + ' шт.';
-    $('pawServiceOrder').disabled = kind === 'fixed' && qty === 0;
+    modal.querySelector('.paw-service-order').disabled = kind === 'fixed' && qty === 0;
   };
 
   const open = (card) => {
@@ -77,7 +77,6 @@
     modal.classList.add('is-open');
     modal.setAttribute('aria-hidden', 'false');
     document.body.style.overflow = 'hidden';
-    $('pawServiceClose')?.focus();
     modal.querySelector('.paw-service-close').focus();
   };
 
