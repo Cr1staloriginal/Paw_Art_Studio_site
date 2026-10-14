@@ -82,3 +82,14 @@
 @media(prefers-reduced-motion:reduce){
   .paw-service-modal,.paw-service-dialog,.paw-services-grid .paw-service-card{transition:none}
 }
+
+
+/* Service preview illustrations and password recovery controls */
+.paw-services-grid .paw-service-card{padding:0 0 22px;overflow:hidden}
+.paw-service-image{display:block;width:100%;height:clamp(150px,20vw,220px);object-fit:cover;margin:0 0 18px;border-radius:0;background:#21152b}
+.paw-services-grid .paw-service-card .service-icon,.paw-services-grid .paw-service-card h3,.paw-services-grid .paw-service-card>p,.paw-services-grid .paw-service-card>.price,.paw-services-grid .paw-service-card>.paw-service-hint{margin-left:clamp(18px,2.5vw,26px);margin-right:clamp(18px,2.5vw,26px)}
+.paw-service-image+.service-icon{margin-top:0}
+.auth-forgot-link{display:block;align-self:flex-end;background:transparent;border:0;color:var(--accent-light);font:inherit;font-size:.88rem;text-decoration:underline;cursor:pointer;padding:4px 0 10px}
+.auth-help{color:var(--text-mute);font-size:.92rem;margin-bottom:10px}
+.auth-error{color:#f87171;font-size:.85rem;min-height:1em;margin:0}
+@media(max-width:600px){.paw-service-image{height:190px}.paw-services-grid .paw-service-card{padding-bottom:18px}}
