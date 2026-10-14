@@ -730,35 +730,66 @@ app.post('/api/payments/create', auth, async (req, res) => {
   }
 });
 
-app.post('/api/payments/webhook', express.json(), (req, res) => {
+app.post('/api/payments/webhook', async (req, res) => {
   const { event, object } = req.body || {};
-  console.log('🔔 Webhook:', event, object?.id);
-
-  if (event === 'payment.succeeded' && object) {
-    const userId = parseInt(object.metadata?.userId, 10);
-    const amount = Math.round(parseFloat(object.amount?.value || '0') * 100);
-
-    if (userId && amount > 0) {
-      const existing = db.prepare('SELECT id, status FROM payments WHERE payment_id = ?').get(object.id);
-      if (existing && existing.status === 'succeeded') return res.status(200).send('OK');
-
-      if (existing) {
-        db.prepare('UPDATE payments SET status = ? WHERE payment_id = ?').run('succeeded', object.id);
-      } else {
-        db.prepare(`INSERT INTO payments (user_id, payment_id, amount, status, created_at)
-                    VALUES (?, ?, ?, 'succeeded', ?)`).run(userId, object.id, amount, Date.now());
-      }
-
-      const user = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
-      if (user) {
-        db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(amount, userId);
-        db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at)
-                    VALUES (?, 'Пополнение через ЮKassa', ?, 'in', ?)`).run(userId, amount, Date.now());
-        console.log(`✅ Зачислено ${amount / 100} ₽ → #${userId}`);
-      }
-    }
+  if (event !== 'payment.succeeded' || !object?.id || !yookassa ||
+      !process.env.YOOKASSA_SHOP_ID || !process.env.YOOKASSA_SECRET_KEY) {
+    return res.status(200).send('OK');
   }
-  res.status(200).send('OK');
+
+  try {
+    // Treat webhook payload as untrusted. Confirm status and amount against YooKassa API.
+    const response = await fetch(`https://api.yookassa.ru/v3/payments/${encodeURIComponent(String(object.id))}`, {
+      headers: {
+        Authorization: 'Basic ' + Buffer.from(`${process.env.YOOKASSA_SHOP_ID}:${process.env.YOOKASSA_SECRET_KEY}`).toString('base64'),
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) {
+      recordDeveloperLog('warn', 'YooKassa payment verification failed', { status: response.status });
+      return res.status(503).send('Payment verification unavailable');
+    }
+    const payment = await response.json();
+    if (payment.status !== 'succeeded' || payment.id !== object.id ||
+        payment.amount?.currency !== 'RUB' || !payment.metadata?.userId) {
+      return res.status(200).send('OK');
+    }
+
+    const userId = Number.parseInt(payment.metadata.userId, 10);
+    const amount = Math.round(Number(payment.amount.value) * 100);
+    if (!Number.isSafeInteger(userId) || userId <= 0 || !Number.isSafeInteger(amount) || amount <= 0) {
+      recordDeveloperLog('warn', 'YooKassa payment metadata rejected');
+      return res.status(200).send('OK');
+    }
+
+    const existing = db.prepare('SELECT id, user_id, amount, status FROM payments WHERE payment_id = ?').get(payment.id);
+    // Only a locally created, pending payment for the same user and amount may be credited.
+    if (!existing || existing.user_id !== userId || existing.amount !== amount) {
+      recordDeveloperLog('warn', 'YooKassa payment did not match pending local record');
+      return res.status(200).send('OK');
+    }
+    if (existing.status === 'succeeded') return res.status(200).send('OK');
+    if (existing.status !== 'pending') return res.status(200).send('OK');
+
+    const user = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
+    if (!user) return res.status(200).send('OK');
+
+    const now = Date.now();
+    const credit = db.transaction(() => {
+      const changed = db.prepare("UPDATE payments SET status = 'succeeded' WHERE payment_id = ? AND status = 'pending'").run(payment.id);
+      if (changed.changes !== 1) return false;
+      db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(amount, userId);
+      db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at)
+                  VALUES (?, 'Пополнение через ЮKassa', ?, 'in', ?)`).run(userId, amount, now);
+      return true;
+    });
+    if (credit()) console.log(`✅ Подтверждено ЮKassa и зачислено ${amount / 100} ₽ → #${userId}`);
+    res.status(200).send('OK');
+  } catch (error) {
+    recordDeveloperLog('error', 'YooKassa webhook verification error', { message: error.message });
+    res.status(503).send('Temporary payment verification error');
+  }
 });
 
 /* ==================== PROFILE ==================== */
