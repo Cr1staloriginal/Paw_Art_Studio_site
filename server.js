@@ -765,7 +765,12 @@ app.post('/api/payments/webhook', async (req, res) => {
 
     const existing = db.prepare('SELECT id, user_id, amount, status FROM payments WHERE payment_id = ?').get(payment.id);
     // Only a locally created, pending payment for the same user and amount may be credited.
-    if (!existing || existing.user_id !== userId || existing.amount !== amount) {
+    if (!existing) {
+      // A webhook can race with local persistence; ask YooKassa to retry rather than lose a real payment.
+      recordDeveloperLog('warn', 'YooKassa payment has no local record yet');
+      return res.status(503).send('Payment record not ready');
+    }
+    if (existing.user_id !== userId || existing.amount !== amount) {
       recordDeveloperLog('warn', 'YooKassa payment did not match pending local record');
       return res.status(200).send('OK');
     }
