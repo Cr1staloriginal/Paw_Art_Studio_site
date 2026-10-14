@@ -1,0 +1,58 @@
+<!doctype html>
+<html lang="ru">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="robots" content="noindex,nofollow">
+  <title>Developer Console · Paw Art Studio</title>
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=JetBrains+Mono:wght@400;600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/css/developer.css">
+</head>
+<body>
+  <div class="shell">
+    <aside class="sidebar">
+      <a class="brand" href="/">🐾 <span>PAW <b>DEV</b></span></a>
+      <p class="eyebrow">DEVELOPER CONSOLE</p>
+      <nav>
+        <a class="active" href="#overview">Обзор системы</a>
+        <a href="#logs">Технические логи</a>
+        <a href="#maintenance">Обслуживание</a>
+      </nav>
+      <div class="side-note">Доступ к данным защищён серверной проверкой прав.</div>
+      <a class="back-link" href="/">← На сайт</a>
+    </aside>
+    <main class="main">
+      <header class="topbar">
+        <div><p class="eyebrow">PAW ART STUDIO / OPERATIONS</p><h1>Панель разработчика</h1><p class="muted">Состояние платформы и инструменты обслуживания</p></div>
+        <button id="refreshBtn" class="button secondary">↻ Обновить</button>
+      </header>
+      <div id="notice" class="notice" role="status">Проверяем права доступа…</div>
+      <section id="overview" class="section">
+        <div class="section-heading"><h2>Обзор системы</h2><span id="updatedAt" class="muted">—</span></div>
+        <div class="cards">
+          <article class="metric"><span>Сервис</span><strong id="serviceStatus">—</strong><small id="uptime">Ожидание данных</small></article>
+          <article class="metric"><span>База данных</span><strong id="dbStatus">—</strong><small id="dbDetail">Проверка доступности</small></article>
+          <article class="metric"><span>Пользователи</span><strong id="userCount">—</strong><small>Всего аккаунтов</small></article>
+          <article class="metric"><span>ЮKassa</span><strong id="yooStatus">—</strong><small><span id="pendingCount">—</span> платежей ожидают подтверждения</small></article>
+        </div>
+      </section>
+      <section id="logs" class="section panel">
+        <div class="section-heading"><div><h2>Технические логи</h2><p class="muted">Ошибки, собранные процессом с момента запуска</p></div><button id="logsBtn" class="button secondary">Загрузить логи</button></div>
+        <div class="log-toolbar"><label for="logLevel">Уровень</label><select id="logLevel"><option value="">Все</option><option value="error">Ошибки</option><option value="warn">Предупреждения</option><option value="info">Информация</option></select></div>
+        <div id="logsList" class="logs"><p class="muted">Логи ещё не загружены.</p></div>
+      </section>
+      <section id="maintenance" class="section panel">
+        <div class="section-heading"><div><h2>Обслуживание</h2><p class="muted">Безопасные операции, не изменяющие пользовательские данные</p></div></div>
+        <div class="tools">
+          <article class="tool"><div><h3>Целостность базы</h3><p>Запустить SQLite integrity_check и получить результат.</p></div><button id="checkDbBtn" class="button">Проверить БД</button></article>
+          <article class="tool"><div><h3>Резервная копия</h3><p>Создать согласованную копию SQLite и скачать её на устройство.</p></div><button id="backupBtn" class="button">Создать бэкап</button></article>
+        </div>
+        <pre id="maintenanceResult" class="result" hidden></pre>
+      </section>
+      <footer>Developer Console · Paw Art Studio <span id="runtimeVersion"></span></footer>
+    </main>
+  </div>
+  <script src="/js/developer.js" defer></script>
+</body>
+</html>
