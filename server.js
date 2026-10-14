@@ -247,6 +247,8 @@ function safeAddColumn(table, column, definition) {
     }
   } catch (e) { console.warn(`⚠️ Миграция ${table}.${column}:`, e.message); }
 }
+db.exec("CREATE TABLE IF NOT EXISTS password_reset_codes (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL COLLATE NOCASE, code_hash TEXT NOT NULL, expires_at INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL)");
+db.exec("CREATE INDEX IF NOT EXISTS idx_password_reset_email ON password_reset_codes(email, created_at DESC)");
 safeAddColumn('users', 'referral_code', 'TEXT');
 safeAddColumn('users', 'referred_by', 'INTEGER');
 
@@ -441,11 +443,8 @@ app.post('/api/auth/register', async (req, res) => {
       const myRefCode = generateReferralCode();
       const info = db.prepare(`INSERT INTO users
         (name, email, password, role, balance, email_verified, verification_code, verification_expires, referral_code, referred_by, created_at)
-        VALUES (?, ?, ?, 'client', 50000, 0, ?, ?, ?, ?, ?)`)
+        VALUES (?, ?, ?, 'client', 0, 0, ?, ?, ?, ?, ?)`)
         .run(String(name).trim(), cleanEmail, hash, code, expires, myRefCode, referrer ? referrer.id : null, now);
-      db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at)
-                  VALUES (?, 'Бонус новичка', 50000, 'in', ?)`)
-        .run(info.lastInsertRowid, now);
       return info.lastInsertRowid;
     });
 
@@ -500,6 +499,60 @@ app.post('/api/auth/resend-code', async (req, res) => {
     console.error('❌ Ошибка отправки письма:', err.message)
   );
   res.json({ ok: true, message: 'Код отправлен повторно' });
+});
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Укажите корректный email' });
+  const user = db.prepare('SELECT id, email_verified FROM users WHERE email = ?').get(email);
+  if (user && user.email_verified === 1) {
+    const code = generateCode();
+    const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+    const now = Date.now();
+    db.prepare('DELETE FROM password_reset_codes WHERE email = ?').run(email);
+    db.prepare('INSERT INTO password_reset_codes (email, code_hash, expires_at, created_at) VALUES (?, ?, ?, ?)').run(email, codeHash, now + 15 * 60 * 1000, now);
+    try {
+      if (!process.env.SMTP_HOST) throw new Error('SMTP не настроен');
+      await mailer.sendMail({
+        from: process.env.SMTP_FROM || 'Paw Art Studio <no-reply@pawartstudio.store>',
+        to: email,
+        subject: 'Сброс пароля — Paw Art Studio',
+        html: '<h2>Сброс пароля Paw Art Studio</h2><p>Код для установки нового пароля:</p><h1 style="font-size:32px;letter-spacing:4px">' + code + '</h1><p>Код действует 15 минут. Если вы не запрашивали сброс, проигнорируйте письмо.</p>'
+      });
+    } catch (err) {
+      db.prepare('DELETE FROM password_reset_codes WHERE email = ?').run(email);
+      console.error('Ошибка отправки письма сброса пароля:', err.message);
+      return res.status(503).json({ error: 'Не удалось отправить письмо. Попробуйте позже или обратитесь в поддержку.' });
+    }
+  }
+  res.json({ ok: true, message: 'Если аккаунт существует, код отправлен на почту' });
+});
+
+app.post('/api/auth/reset-password', (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const code = String(req.body?.code || '').trim();
+  const password = String(req.body?.password || '');
+  if (!email || !/^\d{6}$/.test(code) || password.length < 6) return res.status(400).json({ error: 'Проверьте email, шестизначный код и пароль (минимум 6 символов)' });
+  const record = db.prepare('SELECT * FROM password_reset_codes WHERE email = ? ORDER BY created_at DESC LIMIT 1').get(email);
+  if (!record) return res.status(400).json({ error: 'Код не найден. Запросите новый.' });
+  if (Date.now() > record.expires_at) {
+    db.prepare('DELETE FROM password_reset_codes WHERE id = ?').run(record.id);
+    return res.status(400).json({ error: 'Код истёк. Запросите новый.' });
+  }
+  if (record.attempts >= 5) {
+    db.prepare('DELETE FROM password_reset_codes WHERE id = ?').run(record.id);
+    return res.status(429).json({ error: 'Слишком много попыток. Запросите новый код.' });
+  }
+  const hash = crypto.createHash('sha256').update(code).digest('hex');
+  if (hash !== record.code_hash) {
+    db.prepare('UPDATE password_reset_codes SET attempts = attempts + 1 WHERE id = ?').run(record.id);
+    return res.status(400).json({ error: 'Неверный код' });
+  }
+  const user = db.prepare('SELECT id FROM users WHERE email = ? AND email_verified = 1').get(email);
+  if (!user) return res.status(400).json({ error: 'Аккаунт не найден или email не подтверждён' });
+  db.prepare('UPDATE users SET password = ? WHERE id = ?').run(bcrypt.hashSync(password, 10), user.id);
+  db.prepare('DELETE FROM password_reset_codes WHERE email = ?').run(email);
+  res.json({ ok: true, message: 'Пароль успешно изменён' });
 });
 
 app.post('/api/auth/login', (req, res) => {
