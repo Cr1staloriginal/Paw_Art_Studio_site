@@ -24,7 +24,7 @@ cp .env.example .env
 
 # 4. Запустить
 npm start
-
+```
 
 ## Developer Console
 
