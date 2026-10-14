@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const os = require('os');
 const fs = require('fs');
 const http = require('http');
 const { Server: SocketServer } = require('socket.io');
@@ -17,9 +18,17 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
-const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
+const JWT_SECRET = process.env.JWT_SECRET;
+if (!JWT_SECRET || JWT_SECRET === 'dev_secret_change_me' || JWT_SECRET.length < 32) {
+  if (process.env.NODE_ENV === 'production') throw new Error('JWT_SECRET must be a unique random value of at least 32 characters in production');
+  console.warn('⚠️ Укажите случайный JWT_SECRET длиной не менее 32 символов.');
+}
+const ACTIVE_JWT_SECRET = JWT_SECRET || crypto.randomBytes(48).toString('hex');
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@example.com').toLowerCase();
-const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'change_me';
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD;
+if (process.env.NODE_ENV === 'production' && (!ADMIN_EMAIL || !ADMIN_PASSWORD || ADMIN_PASSWORD === 'change_me' || ADMIN_PASSWORD.length < 12)) {
+  throw new Error('Set ADMIN_EMAIL and a strong ADMIN_PASSWORD (12+ characters) in production');
+}
 const IS_PROD = process.env.NODE_ENV === 'production';
 const DATABASE_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'paw.db');
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
@@ -106,6 +115,7 @@ db.exec(`
     avatar TEXT,
     bio TEXT,
     is_root INTEGER NOT NULL DEFAULT 0,
+    is_developer INTEGER NOT NULL DEFAULT 0,
     email_verified INTEGER NOT NULL DEFAULT 0,
     verification_code TEXT,
     verification_expires INTEGER,
@@ -249,6 +259,7 @@ function safeAddColumn(table, column, definition) {
 }
 db.exec("CREATE TABLE IF NOT EXISTS password_reset_codes (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL COLLATE NOCASE, code_hash TEXT NOT NULL, expires_at INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL)");
 db.exec("CREATE INDEX IF NOT EXISTS idx_password_reset_email ON password_reset_codes(email, created_at DESC)");
+safeAddColumn('users', 'is_developer', 'INTEGER NOT NULL DEFAULT 0');
 safeAddColumn('users', 'referral_code', 'TEXT');
 safeAddColumn('users', 'referred_by', 'INTEGER');
 
@@ -259,7 +270,7 @@ try {
 // --- Главный админ ---
 const adminExists = db.prepare('SELECT * FROM users WHERE email = ?').get(ADMIN_EMAIL);
 if (!adminExists) {
-  const hash = bcrypt.hashSync(ADMIN_PASSWORD, 10);
+  const hash = bcrypt.hashSync(ADMIN_PASSWORD || crypto.randomBytes(32).toString('hex'), 10);
   db.prepare(`INSERT INTO users (name, email, password, role, balance, is_root, email_verified, referral_code, created_at)
               VALUES (?, ?, ?, 'admin', 0, 1, 1, ?, ?)`)
     .run('Главный админ', ADMIN_EMAIL, hash, 'ROOT-' + Math.random().toString(36).slice(2, 8), Date.now());
@@ -269,7 +280,7 @@ if (!adminExists) {
     db.prepare(`UPDATE users SET role = 'admin', is_root = 1 WHERE id = ?`).run(adminExists.id);
     console.log(`👑 Главный админ восстановлен`);
   }
-  if (!bcrypt.compareSync(ADMIN_PASSWORD, adminExists.password)) {
+  if (ADMIN_PASSWORD && !bcrypt.compareSync(ADMIN_PASSWORD, adminExists.password)) {
     db.prepare('UPDATE users SET password = ? WHERE id = ?')
       .run(bcrypt.hashSync(ADMIN_PASSWORD, 10), adminExists.id);
     console.log(`🔑 Пароль главного админа обновлён`);
@@ -315,7 +326,7 @@ function auth(req, res, next) {
   const h = req.headers.authorization;
   if (!h || !h.startsWith('Bearer ')) return res.status(401).json({ error: 'Требуется авторизация' });
   try {
-    const payload = jwt.verify(h.slice(7), JWT_SECRET);
+    const payload = jwt.verify(h.slice(7), ACTIVE_JWT_SECRET);
     const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id);
     if (!user) return res.status(401).json({ error: 'Не найден' });
     req.user = user;
@@ -336,6 +347,22 @@ function rootOnly(req, res, next) {
   next();
 }
 
+function developerOnly(req, res, next) {
+  if (req.user.is_developer !== 1) return res.status(403).json({ error: 'Доступ только для уполномоченного разработчика' });
+  next();
+}
+
+const developerLogs = [];
+function recordDeveloperLog(level, message, details = {}) {
+  developerLogs.push({ at: Date.now(), level, message: String(message).slice(0, 300), details });
+  if (developerLogs.length > 500) developerLogs.splice(0, developerLogs.length - 500);
+}
+const originalConsoleError = console.error.bind(console);
+console.error = (...args) => {
+  try { recordDeveloperLog('error', args.map(v => v instanceof Error ? v.message : typeof v === 'string' ? v : JSON.stringify(v)).join(' ').slice(0, 300)); } catch {}
+  originalConsoleError(...args);
+};
+
 function publicUser(u) {
   if (!u) return null;
   return {
@@ -348,6 +375,7 @@ function publicUser(u) {
     avatar: u.avatar,
     bio: u.bio,
     isRoot: u.is_root === 1,
+    isDeveloper: u.is_developer === 1,
     emailVerified: u.email_verified === 1,
     referralCode: u.referral_code,
     createdAt: u.created_at,
@@ -404,6 +432,55 @@ async function sendVerificationEmail(email, code) {
 app.get('/health', (req, res) =>
   res.json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() })
 );
+
+/* ==================== DEVELOPER CONSOLE ==================== */
+// This console is documented for the site owner. Access requires explicit authorization.
+app.get('/api/developer/overview', auth, developerOnly, (req, res) => {
+  try {
+    const dbCheck = db.prepare('PRAGMA quick_check').get();
+    const counts = {
+      users: db.prepare('SELECT COUNT(*) AS n FROM users').get().n,
+      projects: db.prepare('SELECT COUNT(*) AS n FROM projects').get().n,
+      paymentsPending: db.prepare("SELECT COUNT(*) AS n FROM payments WHERE status = 'pending'").get().n,
+      paymentsSucceeded: db.prepare("SELECT COUNT(*) AS n FROM payments WHERE status = 'succeeded'").get().n,
+    };
+    res.json({ service: { status: 'ok', uptimeSeconds: Math.floor(process.uptime()), node: process.version, environment: IS_PROD ? 'production' : 'development' }, database: { status: dbCheck?.quick_check === 'ok' ? 'ok' : 'warning', check: dbCheck?.quick_check || 'unknown' }, payments: { yookassaConfigured: Boolean(yookassa) }, counts, recentErrors: developerLogs.filter(item => item.level === 'error').slice(-20).reverse() });
+  } catch (error) {
+    recordDeveloperLog('error', 'Developer overview failed', { message: error.message });
+    res.status(500).json({ error: 'Не удалось собрать диагностику' });
+  }
+});
+app.get('/api/developer/logs', auth, developerOnly, (req, res) => {
+  const level = ['error', 'warn', 'info'].includes(req.query.level) ? req.query.level : null;
+  const limit = Math.max(1, Math.min(200, Number.parseInt(req.query.limit, 10) || 100));
+  const rows = level ? developerLogs.filter(item => item.level === level) : developerLogs;
+  res.json({ logs: rows.slice(-limit).reverse() });
+});
+app.post('/api/developer/backup', auth, developerOnly, async (req, res) => {
+  const backupPath = path.join(os.tmpdir(), `paw-art-studio-backup-${Date.now()}-${crypto.randomBytes(6).toString('hex')}.db`);
+  try {
+    await db.backup(backupPath);
+    recordDeveloperLog('info', 'Database backup created', { actorId: req.user.id });
+    res.download(backupPath, 'paw-art-studio-backup.db', error => {
+      fs.promises.unlink(backupPath).catch(() => {});
+      if (error) recordDeveloperLog('error', 'Database backup download failed', { actorId: req.user.id, message: error.message });
+    });
+  } catch (error) {
+    fs.promises.unlink(backupPath).catch(() => {});
+    recordDeveloperLog('error', 'Database backup failed', { actorId: req.user.id, message: error.message });
+    res.status(500).json({ error: 'Не удалось создать резервную копию базы данных' });
+  }
+});
+app.post('/api/developer/database-check', auth, developerOnly, (req, res) => {
+  try {
+    const result = db.prepare('PRAGMA integrity_check').all();
+    recordDeveloperLog('info', 'Database integrity check executed', { actorId: req.user.id });
+    res.json({ ok: result.length === 1 && result[0].integrity_check === 'ok', result });
+  } catch (error) {
+    recordDeveloperLog('error', 'Database integrity check failed', { actorId: req.user.id, message: error.message });
+    res.status(500).json({ error: 'Проверка базы данных завершилась ошибкой' });
+  }
+});
 
 /* ==================== AUTH ==================== */
 app.post('/api/auth/register', async (req, res) => {
@@ -478,7 +555,7 @@ app.post('/api/auth/verify-email', (req, res) => {
     .run(user.id);
 
   const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
-  const token = jwt.sign({ id: updated.id }, JWT_SECRET, { expiresIn: '30d' });
+  const token = jwt.sign({ id: updated.id }, ACTIVE_JWT_SECRET, { expiresIn: '12h' });
   res.json({ token, user: publicUser(updated) });
 });
 
@@ -571,7 +648,7 @@ app.post('/api/auth/login', (req, res) => {
     user.referral_code = newCode;
   }
 
-  const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30d' });
+  const token = jwt.sign({ id: user.id }, ACTIVE_JWT_SECRET, { expiresIn: '12h' });
   res.json({ token, user: publicUser(user) });
 });
 
@@ -653,35 +730,71 @@ app.post('/api/payments/create', auth, async (req, res) => {
   }
 });
 
-app.post('/api/payments/webhook', express.json(), (req, res) => {
+app.post('/api/payments/webhook', async (req, res) => {
   const { event, object } = req.body || {};
-  console.log('🔔 Webhook:', event, object?.id);
-
-  if (event === 'payment.succeeded' && object) {
-    const userId = parseInt(object.metadata?.userId, 10);
-    const amount = Math.round(parseFloat(object.amount?.value || '0') * 100);
-
-    if (userId && amount > 0) {
-      const existing = db.prepare('SELECT id, status FROM payments WHERE payment_id = ?').get(object.id);
-      if (existing && existing.status === 'succeeded') return res.status(200).send('OK');
-
-      if (existing) {
-        db.prepare('UPDATE payments SET status = ? WHERE payment_id = ?').run('succeeded', object.id);
-      } else {
-        db.prepare(`INSERT INTO payments (user_id, payment_id, amount, status, created_at)
-                    VALUES (?, ?, ?, 'succeeded', ?)`).run(userId, object.id, amount, Date.now());
-      }
-
-      const user = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
-      if (user) {
-        db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(amount, userId);
-        db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at)
-                    VALUES (?, 'Пополнение через ЮKassa', ?, 'in', ?)`).run(userId, amount, Date.now());
-        console.log(`✅ Зачислено ${amount / 100} ₽ → #${userId}`);
-      }
-    }
+  if (event !== 'payment.succeeded' || !object?.id || !yookassa ||
+      !process.env.YOOKASSA_SHOP_ID || !process.env.YOOKASSA_SECRET_KEY) {
+    return res.status(200).send('OK');
   }
-  res.status(200).send('OK');
+
+  try {
+    // Treat webhook payload as untrusted. Confirm status and amount against YooKassa API.
+    const response = await fetch(`https://api.yookassa.ru/v3/payments/${encodeURIComponent(String(object.id))}`, {
+      headers: {
+        Authorization: 'Basic ' + Buffer.from(`${process.env.YOOKASSA_SHOP_ID}:${process.env.YOOKASSA_SECRET_KEY}`).toString('base64'),
+        Accept: 'application/json',
+      },
+      signal: AbortSignal.timeout(8000),
+    });
+    if (!response.ok) {
+      recordDeveloperLog('warn', 'YooKassa payment verification failed', { status: response.status });
+      return res.status(503).send('Payment verification unavailable');
+    }
+    const payment = await response.json();
+    if (payment.status !== 'succeeded' || payment.id !== object.id ||
+        payment.amount?.currency !== 'RUB' || !payment.metadata?.userId) {
+      return res.status(200).send('OK');
+    }
+
+    const userId = Number.parseInt(payment.metadata.userId, 10);
+    const amount = Math.round(Number(payment.amount.value) * 100);
+    if (!Number.isSafeInteger(userId) || userId <= 0 || !Number.isSafeInteger(amount) || amount <= 0) {
+      recordDeveloperLog('warn', 'YooKassa payment metadata rejected');
+      return res.status(200).send('OK');
+    }
+
+    const existing = db.prepare('SELECT id, user_id, amount, status FROM payments WHERE payment_id = ?').get(payment.id);
+    // Only a locally created, pending payment for the same user and amount may be credited.
+    if (!existing) {
+      // A webhook can race with local persistence; ask YooKassa to retry rather than lose a real payment.
+      recordDeveloperLog('warn', 'YooKassa payment has no local record yet');
+      return res.status(503).send('Payment record not ready');
+    }
+    if (existing.user_id !== userId || existing.amount !== amount) {
+      recordDeveloperLog('warn', 'YooKassa payment did not match pending local record');
+      return res.status(200).send('OK');
+    }
+    if (existing.status === 'succeeded') return res.status(200).send('OK');
+    if (existing.status !== 'pending') return res.status(200).send('OK');
+
+    const user = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
+    if (!user) return res.status(200).send('OK');
+
+    const now = Date.now();
+    const credit = db.transaction(() => {
+      const changed = db.prepare("UPDATE payments SET status = 'succeeded' WHERE payment_id = ? AND status = 'pending'").run(payment.id);
+      if (changed.changes !== 1) return false;
+      db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(amount, userId);
+      db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at)
+                  VALUES (?, 'Пополнение через ЮKassa', ?, 'in', ?)`).run(userId, amount, now);
+      return true;
+    });
+    if (credit()) console.log(`✅ Подтверждено ЮKassa и зачислено ${amount / 100} ₽ → #${userId}`);
+    res.status(200).send('OK');
+  } catch (error) {
+    recordDeveloperLog('error', 'YooKassa webhook verification error', { message: error.message });
+    res.status(503).send('Temporary payment verification error');
+  }
 });
 
 /* ==================== PROFILE ==================== */
@@ -724,13 +837,8 @@ app.post('/api/profile/avatar', auth, upload.single('avatar'), (req, res) => {
 
 /* ==================== WALLET ==================== */
 app.post('/api/wallet/deposit', auth, (req, res) => {
-  const k = Math.round(Number(req.body?.amount) * 100);
-  if (!k || isNaN(k) || k <= 0) return res.status(400).json({ error: 'Некорректная сумма' });
-  db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(k, req.user.id);
-  db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at)
-              VALUES (?, 'Пополнение баланса', ?, 'in', ?)`).run(req.user.id, k, Date.now());
-  const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
-  res.json({ user: publicUser(u) });
+  // Never credit a wallet from a client-supplied amount; credits require a verified provider payment.
+  return res.status(410).json({ error: 'Ручное пополнение отключено. Используйте защищённый платёжный процесс ЮKassa.' });
 });
 
 app.post('/api/wallet/withdraw', auth, (req, res) => {
@@ -962,17 +1070,38 @@ app.get('/api/portfolio', (req, res) => {
 });
 
 /* ==================== CHATS ==================== */
+io.use((socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token;
+    if (!token) return next(new Error('Требуется авторизация'));
+    const payload = jwt.verify(token, ACTIVE_JWT_SECRET);
+    const user = db.prepare('SELECT id, role, is_root, is_developer FROM users WHERE id = ?').get(payload.id);
+    if (!user) return next(new Error('Пользователь не найден'));
+    socket.data.user = user;
+    next();
+  } catch { next(new Error('Недействительная авторизация')); }
+});
 io.on('connection', (socket) => {
-  socket.on('chat:join', ({ chatId }) => {
-    if (chatId) socket.join('chat:' + chatId);
+  const userId = socket.data.user.id;
+  socket.on('chat:join', (payload = {}, ack) => {
+    const chatId = Number(payload.chatId);
+    if (!Number.isSafeInteger(chatId) || chatId <= 0) return typeof ack === 'function' && ack({ error: 'Некорректный чат' });
+    const chat = db.prepare('SELECT id, user_a, user_b FROM chats WHERE id = ?').get(chatId);
+    if (!chat || (chat.user_a !== userId && chat.user_b !== userId)) return typeof ack === 'function' && ack({ error: 'Нет доступа к этому чату' });
+    socket.join('chat:' + chatId);
+    if (typeof ack === 'function') ack({ ok: true });
   });
-  socket.on('chat:message', ({ chatId, senderId, text }) => {
-    if (!chatId || !senderId || !text) return;
+  socket.on('chat:send', (payload = {}, ack) => {
+    const chatId = Number(payload.chatId);
+    const text = typeof payload.text === 'string' ? payload.text.trim().slice(0, 2000) : '';
+    if (!Number.isSafeInteger(chatId) || chatId <= 0 || !text) return typeof ack === 'function' && ack({ error: 'Некорректное сообщение' });
+    const chat = db.prepare('SELECT id, user_a, user_b FROM chats WHERE id = ?').get(chatId);
+    if (!chat || (chat.user_a !== userId && chat.user_b !== userId) || !socket.rooms.has('chat:' + chatId)) return typeof ack === 'function' && ack({ error: 'Нет доступа к этому чату' });
     const now = Date.now();
-    const info = db.prepare(`INSERT INTO messages (chat_id, sender_id, text, created_at)
-                             VALUES (?, ?, ?, ?)`).run(chatId, senderId, String(text).slice(0, 2000), now);
-    const msg = db.prepare('SELECT * FROM messages WHERE id = ?').get(info.lastInsertRowid);
-    io.to('chat:' + chatId).emit('chat:message', msg);
+    const info = db.prepare('INSERT INTO messages (chat_id, sender_id, text, created_at) VALUES (?, ?, ?, ?)').run(chatId, userId, text, now);
+    const msg = db.prepare('SELECT id, chat_id, sender_id, text, created_at, read_at FROM messages WHERE id = ?').get(info.lastInsertRowid);
+    io.to('chat:' + chatId).emit('chat:new', { ...msg, chatId, senderId: userId, createdAt: now });
+    if (typeof ack === 'function') ack({ ok: true, id: msg.id });
   });
 });
 
