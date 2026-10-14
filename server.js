@@ -555,7 +555,7 @@ app.post('/api/auth/verify-email', (req, res) => {
     .run(user.id);
 
   const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
-  const token = jwt.sign({ id: updated.id }, JWT_SECRET, { expiresIn: '30d' });
+  const token = jwt.sign({ id: updated.id }, ACTIVE_JWT_SECRET, { expiresIn: '12h' });
   res.json({ token, user: publicUser(updated) });
 });
 
