@@ -98,8 +98,56 @@ function closeAuth() {
     document.getElementById('loginForm')?.classList.add('hidden');
     document.getElementById('registerForm')?.classList.add('hidden');
     document.getElementById('verifyForm')?.classList.add('hidden');
+    document.getElementById('forgotPasswordForm')?.classList.add('hidden');
+    document.getElementById('resetPasswordForm')?.classList.add('hidden');
     // Сбрасываем активный таб на login
     document.querySelectorAll('.auth-tab').forEach(t => t.classList.toggle('active', t.dataset.tab === 'login'));
+}
+
+function showForgotPassword() {
+    ['loginForm','registerForm','verifyForm','resetPasswordForm'].forEach(id => document.getElementById(id)?.classList.add('hidden'));
+    document.getElementById('authTabs')?.classList.add('hidden');
+    document.getElementById('forgotPasswordForm')?.classList.remove('hidden');
+    const subtitle = document.getElementById('authSubtitle');
+    if (subtitle) subtitle.textContent = 'Восстановление доступа';
+    const loginEmail = document.getElementById('loginEmail')?.value.trim();
+    const forgotEmail = document.getElementById('forgotEmail');
+    if (forgotEmail && loginEmail && !forgotEmail.value) forgotEmail.value = loginEmail;
+    const error = document.getElementById('resetPasswordError'); if (error) error.textContent = '';
+}
+async function handleForgotPassword(e) {
+    e.preventDefault();
+    const email = document.getElementById('forgotEmail').value.trim();
+    const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
+    try {
+        await api('/api/auth/forgot-password', { method: 'POST', body: { email } });
+        state.pendingEmail = email;
+        document.getElementById('forgotPasswordForm').classList.add('hidden');
+        document.getElementById('resetPasswordForm').classList.remove('hidden');
+        document.getElementById('authSubtitle').textContent = 'Установить новый пароль';
+        showToast('Если аккаунт существует, код отправлен на почту');
+    } catch (err) { showToast('❌ ' + err.message, 'error'); }
+    finally { btn.disabled = false; }
+}
+async function handleResetPassword(e) {
+    e.preventDefault();
+    const code = document.getElementById('resetCode').value.trim();
+    const password = document.getElementById('resetNewPassword').value;
+    const confirm = document.getElementById('resetConfirmPassword').value;
+    const error = document.getElementById('resetPasswordError');
+    if (password.length < 6) { error.textContent = 'Пароль должен содержать минимум 6 символов'; return; }
+    if (password !== confirm) { error.textContent = 'Пароли не совпадают'; return; }
+    const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
+    try {
+        await api('/api/auth/reset-password', { method: 'POST', body: { email: state.pendingEmail || document.getElementById('forgotEmail').value.trim(), code, password } });
+        e.target.reset();
+        document.getElementById('resetPasswordForm').classList.add('hidden');
+        document.getElementById('authTabs').classList.remove('hidden');
+        switchAuthTab('login');
+        document.getElementById('loginEmail').value = state.pendingEmail || '';
+        showToast('Пароль изменён. Теперь войдите с новым паролем.');
+    } catch (err) { error.textContent = err.message; showToast('❌ ' + err.message, 'error'); }
+    finally { btn.disabled = false; }
 }
 
 function switchAuthTab(tab) {
@@ -108,6 +156,8 @@ function switchAuthTab(tab) {
     document.getElementById('loginForm').classList.toggle('hidden', tab !== 'login');
     document.getElementById('registerForm').classList.toggle('hidden', tab !== 'register');
     document.getElementById('verifyForm').classList.add('hidden');
+    document.getElementById('forgotPasswordForm')?.classList.add('hidden');
+    document.getElementById('resetPasswordForm')?.classList.add('hidden');
     const sub = document.getElementById('authSubtitle');
     if (sub) sub.textContent = tab === 'register' ? 'Создайте новый аккаунт' : 'Войдите или создайте аккаунт';
 }
