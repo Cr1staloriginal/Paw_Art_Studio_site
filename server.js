@@ -1,6 +1,7 @@
 require('dotenv').config();
 const express = require('express');
 const path = require('path');
+const os = require('os');
 const fs = require('fs');
 const http = require('http');
 const { Server: SocketServer } = require('socket.io');
@@ -279,7 +280,7 @@ if (!adminExists) {
     db.prepare(`UPDATE users SET role = 'admin', is_root = 1 WHERE id = ?`).run(adminExists.id);
     console.log(`👑 Главный админ восстановлен`);
   }
-  if (!bcrypt.compareSync(ADMIN_PASSWORD, adminExists.password)) {
+  if (ADMIN_PASSWORD && !bcrypt.compareSync(ADMIN_PASSWORD, adminExists.password)) {
     db.prepare('UPDATE users SET password = ? WHERE id = ?')
       .run(bcrypt.hashSync(ADMIN_PASSWORD, 10), adminExists.id);
     console.log(`🔑 Пароль главного админа обновлён`);
@@ -454,6 +455,21 @@ app.get('/api/developer/logs', auth, developerOnly, (req, res) => {
   const limit = Math.max(1, Math.min(200, Number.parseInt(req.query.limit, 10) || 100));
   const rows = level ? developerLogs.filter(item => item.level === level) : developerLogs;
   res.json({ logs: rows.slice(-limit).reverse() });
+});
+app.post('/api/developer/backup', auth, developerOnly, async (req, res) => {
+  const backupPath = path.join(os.tmpdir(), `paw-art-studio-backup-${Date.now()}-${crypto.randomBytes(6).toString('hex')}.db`);
+  try {
+    await db.backup(backupPath);
+    recordDeveloperLog('info', 'Database backup created', { actorId: req.user.id });
+    res.download(backupPath, 'paw-art-studio-backup.db', error => {
+      fs.promises.unlink(backupPath).catch(() => {});
+      if (error) recordDeveloperLog('error', 'Database backup download failed', { actorId: req.user.id, message: error.message });
+    });
+  } catch (error) {
+    fs.promises.unlink(backupPath).catch(() => {});
+    recordDeveloperLog('error', 'Database backup failed', { actorId: req.user.id, message: error.message });
+    res.status(500).json({ error: 'Не удалось создать резервную копию базы данных' });
+  }
 });
 app.post('/api/developer/database-check', auth, developerOnly, (req, res) => {
   try {
@@ -1039,7 +1055,7 @@ io.on('connection', (socket) => {
     socket.join('chat:' + chatId);
     if (typeof ack === 'function') ack({ ok: true });
   });
-  socket.on('chat:message', (payload = {}, ack) => {
+  socket.on('chat:send', (payload = {}, ack) => {
     const chatId = Number(payload.chatId);
     const text = typeof payload.text === 'string' ? payload.text.trim().slice(0, 2000) : '';
     if (!Number.isSafeInteger(chatId) || chatId <= 0 || !text) return typeof ack === 'function' && ack({ error: 'Некорректное сообщение' });
@@ -1048,7 +1064,7 @@ io.on('connection', (socket) => {
     const now = Date.now();
     const info = db.prepare('INSERT INTO messages (chat_id, sender_id, text, created_at) VALUES (?, ?, ?, ?)').run(chatId, userId, text, now);
     const msg = db.prepare('SELECT id, chat_id, sender_id, text, created_at, read_at FROM messages WHERE id = ?').get(info.lastInsertRowid);
-    io.to('chat:' + chatId).emit('chat:message', msg);
+    io.to('chat:' + chatId).emit('chat:new', { ...msg, chatId, senderId: userId, createdAt: now });
     if (typeof ack === 'function') ack({ ok: true, id: msg.id });
   });
 });
