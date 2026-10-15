@@ -587,3 +587,14 @@ textarea.content-input { min-height: 70px; resize: vertical; }
 .content-image-row .btn { padding: 10px 16px; min-height: auto; margin-top: 6px; flex-shrink: 0; }
 .content-editor-actions { position: sticky; bottom: 0; background: var(--bg-card); padding-top: 16px; border-top: 1px solid var(--border); }
 .content-editor-actions .btn { width: 100%; }
+
+
+/* Email verification form */
+.verify-intro { min-width: 0; text-align: center; margin-bottom: 18px; }
+.verify-intro > p:first-child { margin: 0; color: var(--text-soft); font-size: 0.92rem; line-height: 1.5; overflow-wrap: anywhere; }
+.verify-intro strong { overflow-wrap: anywhere; word-break: break-word; }
+.verify-hint { margin: 6px 0 0; font-size: 0.82rem; color: var(--text-mute); text-align: center; line-height: 1.5; overflow-wrap: anywhere; }
+.verify-error { color: #f87171; font-size: 0.85rem; line-height: 1.5; min-height: 1.2em; margin: 4px 0 8px; overflow-wrap: anywhere; }
+#verifyCode { width: 100%; max-width: 100%; box-sizing: border-box; font-variant-numeric: tabular-nums; }
+#verifyForm button { width: 100%; max-width: 100%; white-space: normal; }
+@media (max-width: 480px) { .verify-intro { margin-bottom: 16px; } .verify-hint { font-size: 0.82rem; } }
