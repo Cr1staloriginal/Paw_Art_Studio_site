@@ -9,6 +9,7 @@
     <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet" />
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css" />
     <link rel="stylesheet" href="css/style.css" />
+    <link rel="stylesheet" href="css/mobile.css" />
     <style>
         body { background: var(--bg); height: 100vh; overflow: hidden; }
         .msgr-page { display: grid; grid-template-columns: 340px 1fr; height: 100vh; max-width: 1400px; margin: 0 auto; border-left: 1px solid var(--border); border-right: 1px solid var(--border); background: var(--bg-card); }
@@ -35,6 +36,40 @@
             .msgr-main { display: none; }
             .msgr-page.chat-open .msgr-sidebar { display: none; }
             .msgr-page.chat-open .msgr-main { display: flex; }
+        }
+
+        /* Messenger layout for touch devices and the on-screen keyboard. */
+        .msgr-page, .msgr-sidebar, .msgr-main, .chat-window { min-width: 0; min-height: 0; }
+        .chat-head, .chat-input { flex-shrink: 0; }
+        .chat-messages { min-height: 0; overscroll-behavior: contain; }
+        .chat-input input { min-width: 0; font-size: 16px; }
+        .chat-row { min-height: 64px; }
+        @media (max-width: 800px) {
+            body { height: 100dvh; min-height: 0; }
+            .msgr-page { width: 100%; height: 100dvh; min-height: 0; border: 0; }
+            .msgr-sidebar-head { padding: 12px 14px; padding-top: max(12px, env(safe-area-inset-top, 0px)); }
+            .msgr-sidebar-search { padding: 12px 14px; }
+            .msgr-main { min-height: 0; }
+            .chat-window { height: 100%; min-height: 0; }
+            .chat-head { gap: 9px; padding: 10px 12px; padding-top: max(10px, env(safe-area-inset-top, 0px)); }
+            .chat-back { display: inline-flex; align-items: center; justify-content: center; min-width: 42px; min-height: 42px; }
+            .chat-head-info { min-width: 0; }
+            .chat-head-name, .chat-head-role { overflow-wrap: anywhere; }
+            .chat-messages { padding: 14px 12px; gap: 10px; }
+            .msg { max-width: min(88%, 520px); overflow-wrap: anywhere; }
+            .chat-input { gap: 8px; padding: 10px 12px calc(10px + env(safe-area-inset-bottom, 0px)); }
+            .chat-input input { width: 100%; }
+            .chat-input button { min-width: 44px; min-height: 44px; flex-shrink: 0; }
+            .msgr-page.chat-open .msgr-main { height: 100%; }
+        }
+        @media (max-width: 420px) {
+            .msgr-sidebar-head { gap: 8px; }
+            .msgr-sidebar-head .logo { font-size: 1rem; }
+            .msgr-new-chat-btn { min-width: 42px; min-height: 42px; }
+            .chat-head-avatar { flex-shrink: 0; }
+            .chat-head-name { font-size: .95rem; }
+            .msg { max-width: 92%; padding: 9px 11px; }
+            .chat-input { padding-left: 9px; padding-right: 9px; }
         }
     </style>
 </head>
