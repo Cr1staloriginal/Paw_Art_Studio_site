@@ -77,6 +77,27 @@
                     <span>Маскоты, стикеры и визуал с характером ✨</span>
                 </div>
             </div>
+
+            <div class="package-offers">
+                <div class="package-offers-heading">
+                    <h3>Готовые паки</h3>
+                    <p>Собери комплект под свой проект — меняй количество каждого элемента и сразу смотри итоговую стоимость.</p>
+                </div>
+                <div class="package-offers-grid">
+                    <article class="package-offer-card">
+                        <div class="package-offer-icon">💬</div>
+                        <h4>Пак DS</h4>
+                        <p>Аватарки, сезонные баннеры, стикеры, маскот и оформление Discord-сервера.</p>
+                        <button class="btn" type="button" onclick="openPackageConfigurator('ds')">Настроить пак</button>
+                    </article>
+                    <article class="package-offer-card">
+                        <div class="package-offer-icon">🎥</div>
+                        <h4>Пак стримера</h4>
+                        <p>2D-модель, эмодзи, арт и оверлеи для оформления стрима.</p>
+                        <button class="btn" type="button" onclick="openPackageConfigurator('streamer')">Настроить пак</button>
+                    </article>
+                </div>
+            </div>
         </div>
     </section>
 
@@ -566,6 +587,22 @@
         </div>
         <div class="money-note" id="moneyNote">Комиссия <strong>0%</strong>. Оплата через ЮKassa.</div>
         <button class="btn" id="moneySubmit" onclick="submitMoney()">Перейти к оплате</button>
+    </div>
+</div>
+
+<div class="modal" id="packageModal" onclick="if(event.target===this) closePackageConfigurator()">
+    <div class="modal-box package-modal-box">
+        <button class="modal-close" type="button" onclick="closePackageConfigurator()" aria-label="Закрыть">×</button>
+        <div class="auth-head">
+            <div class="auth-logo">🐾</div>
+            <div><h3 id="packageTitle">Настройка пака</h3><p>Выбери состав комплекта</p></div>
+        </div>
+        <div id="packageConfigurator" class="package-configurator"></div>
+        <div class="package-total">
+            <div><span class="package-total-label">Предварительная стоимость</span><strong class="package-total-price" id="packageTotalPrice">0 ₽</strong></div>
+            <button class="btn" type="button" onclick="orderCustomPackage()">Заказать пак</button>
+        </div>
+        <p class="paw-upgrade-muted">Итоговая стоимость предварительная — детали и сроки согласуем перед началом работы.</p>
     </div>
 </div>
 
