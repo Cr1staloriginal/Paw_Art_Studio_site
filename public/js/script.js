@@ -616,7 +616,9 @@ async function handleProjectCreate(e) {
     const title = document.getElementById('projTitle').value.trim();
     const description = document.getElementById('projDescription').value.trim();
     const category = document.getElementById('projCategory').value;
-    const budget = Number(document.getElementById('projBudget').value) || 0;
+    // Бюджет больше не запрашивается в форме; поле оставлено необязательным для API-совместимости.
+    const budgetInput = document.getElementById('projBudget');
+    const budget = budgetInput ? (Number(budgetInput.value) || 0) : 0;
     const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
     try { await api('/api/projects', { method: 'POST', body: { title, description, category, budget } }); closeProjectCreator(); e.target.reset(); await loadProjects(); showToast('✅ Заказ создан'); }
     catch (err) { showToast('❌ ' + err.message, 'error'); }

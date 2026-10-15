@@ -11,6 +11,7 @@
   modal.innerHTML = `
     <section class="paw-service-dialog" role="dialog" aria-modal="true" aria-labelledby="pawServiceTitle" aria-describedby="pawServiceDescription">
       <button type="button" class="paw-service-close" aria-label="Закрыть окно">×</button>
+      <img class="paw-service-detail-image" id="pawServiceImage" alt="" hidden>
       <h3 id="pawServiceTitle"></h3>
       <p id="pawServiceDescription"></p>
       <div class="paw-service-quantity" id="pawServiceQuantityWrap">
@@ -68,6 +69,17 @@
     const max = Number(card.dataset.max ?? 1);
     $('pawServiceTitle').textContent = card.dataset.service || 'Услуга';
     $('pawServiceDescription').textContent = card.dataset.detail || card.querySelector('p')?.textContent || '';
+    const sourceImage = card.querySelector('.service-image img, img');
+    const detailImage = $('pawServiceImage');
+    if (sourceImage?.getAttribute('src')) {
+      detailImage.src = sourceImage.getAttribute('src');
+      detailImage.alt = sourceImage.alt || ('Пример услуги «' + (card.dataset.service || 'Услуга') + '»');
+      detailImage.hidden = false;
+    } else {
+      detailImage.removeAttribute('src');
+      detailImage.alt = '';
+      detailImage.hidden = true;
+    }
     $('pawServiceQuantityWrap').hidden = kind === 'quote';
     $('pawServiceQuantity').min = String(min);
     $('pawServiceQuantity').max = String(max);
@@ -79,6 +91,19 @@
     document.body.style.overflow = 'hidden';
     modal.querySelector('.paw-service-close').focus();
   };
+
+  // Добавляем отдельную кнопку с подробностями в каждую карточку услуги.
+  document.querySelectorAll('.paw-service-card').forEach((card) => {
+    const content = card.querySelector('.service-content') || card;
+    if (!content.querySelector('.paw-service-more')) {
+      const button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'paw-service-more';
+      button.textContent = 'Подробнее';
+      button.setAttribute('aria-label', 'Подробнее об услуге ' + (card.dataset.service || ''));
+      content.appendChild(button);
+    }
+  });
 
   document.addEventListener('click', (event) => {
     const card = event.target.closest('.paw-service-card');
@@ -105,15 +130,14 @@
       const category = document.getElementById('projCategory');
       const titleInput = document.getElementById('projTitle');
       const description = document.getElementById('projDescription');
-      const budget = document.getElementById('projBudget');
 
       if (category && Array.from(category.options).some((item) => item.value === title)) category.value = title;
       if (titleInput) titleInput.value = title + (kind === 'quote' ? '' : (kind === 'fixed' ? '' : ' — ' + qty + ' шт.'));
       if (description) {
         description.value = (activeCard.dataset.detail || '') +
-          (kind === 'quote' ? '' : '\\nКоличество: ' + qty + '. Предварительная стоимость: ' + price + '.');
+          (kind === 'quote' ? '' : '\nКоличество: ' + qty + '. Предварительная стоимость: ' + price + '.');
       }
-      if (budget) budget.value = kind === 'quote' ? '' : String(qty * Number(activeCard.dataset.unitPrice || 0));
+      // Поле бюджета убрано из формы заказа; предварительная цена остаётся в окне услуги.
 
       close();
       if (typeof window.openProjectCreator === 'function') {

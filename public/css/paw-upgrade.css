@@ -213,3 +213,14 @@
     .services-grid .service-card:hover { transform: none; }
     .services-grid .service-card:hover .service-image img { transform: none; }
 }
+
+
+/* Service details modal: image preview and explicit details buttons */
+.paw-service-detail-image{display:block;width:100%;max-height:min(42vh,320px);object-fit:contain;margin:0 0 20px;border-radius:16px;background:rgba(255,255,255,.04)}
+.paw-service-detail-image[hidden]{display:none!important}
+.paw-services-grid .paw-service-more{display:inline-flex;align-items:center;justify-content:center;gap:8px;min-height:42px;margin-top:18px;padding:10px 16px;border:1px solid rgba(190,145,255,.38);border-radius:12px;background:rgba(160,110,255,.10);color:#e7d5ff;font:inherit;font-size:.92rem;font-weight:700;cursor:pointer;transition:background .2s ease,border-color .2s ease,transform .2s ease}
+.paw-services-grid .paw-service-more::after{content:'→';font-size:1.1em}
+.paw-services-grid .paw-service-more:hover,.paw-services-grid .paw-service-more:focus-visible{background:rgba(160,110,255,.2);border-color:rgba(190,145,255,.75);transform:translateY(-1px);outline:2px solid transparent}
+.services-grid .service-content{align-items:flex-start}
+.services-grid .service-card .paw-service-more{margin-top:18px}
+@media(max-width:600px){.paw-service-detail-image{max-height:34vh;margin-bottom:16px}.paw-services-grid .paw-service-more{width:100%}}
