@@ -462,24 +462,42 @@ app.post('/api/auth/register', async (req, res) => {
 });
 
 app.post('/api/auth/verify-email', (req, res) => {
-  const { email, code } = req.body || {};
-  if (!email || !code) return res.status(400).json({ error: 'Укажите email и код' });
+  try {
+    const { email, code } = req.body || {};
+    if (!email || code === undefined || code === null) return res.status(400).json({ error: 'Укажите email и код' });
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanCode = String(code).trim();
+    if (!/^\d{6}$/.test(cleanCode)) return res.status(400).json({ error: 'Введите шестизначный код из письма' });
 
-  const cleanEmail = String(email).trim().toLowerCase();
-  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(cleanEmail);
-  if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
-  if (user.email_verified === 1) return res.status(400).json({ error: 'Email уже подтверждён' });
-  if (!user.verification_code || user.verification_code !== String(code).trim())
-    return res.status(400).json({ error: 'Неверный код' });
-  if (user.verification_expires && Date.now() > user.verification_expires)
-    return res.status(400).json({ error: 'Код истёк. Запросите новый.' });
+    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(cleanEmail);
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (user.email_verified === 1) return res.status(400).json({ error: 'Email уже подтверждён. Попробуйте войти.' });
+    if (!user.verification_code) return res.status(400).json({ error: 'Код не найден. Запросите новый.' });
+    if (String(user.verification_code) !== cleanCode) return res.status(400).json({ error: 'Неверный код. Проверьте письмо и попробуйте снова.' });
+    if (!user.verification_expires || Date.now() > Number(user.verification_expires)) {
+      return res.status(400).json({ error: 'Код истёк. Запросите новый.' });
+    }
 
-  db.prepare('UPDATE users SET email_verified = 1, verification_code = NULL, verification_expires = NULL WHERE id = ?')
-    .run(user.id);
+    const updated = db.transaction(() => {
+      const result = db.prepare(\`
+        UPDATE users
+        SET email_verified = 1, verification_code = NULL, verification_expires = NULL
+        WHERE id = ? AND email_verified = 0 AND verification_code = ? AND verification_expires > ?
+      \`).run(user.id, cleanCode, Date.now());
+      if (result.changes !== 1) throw new Error('VERIFY_STATE_CHANGED');
+      return db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+    })();
 
-  const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
-  const token = jwt.sign({ id: updated.id }, JWT_SECRET, { expiresIn: '30d' });
-  res.json({ token, user: publicUser(updated) });
+    if (!updated) return res.status(500).json({ error: 'Не удалось загрузить данные пользователя' });
+    const token = jwt.sign({ id: updated.id }, JWT_SECRET, { expiresIn: '30d' });
+    return res.json({ ok: true, token, user: publicUser(updated) });
+  } catch (err) {
+    if (err.message === 'VERIFY_STATE_CHANGED') {
+      return res.status(409).json({ error: 'Код уже использован или истёк. Запросите новый.' });
+    }
+    console.error('❌ Ошибка подтверждения email:', err);
+    return res.status(500).json({ error: 'Ошибка сервера при подтверждении email. Попробуйте позже.' });
+  }
 });
 
 app.post('/api/auth/resend-code', async (req, res) => {
