@@ -33,12 +33,6 @@ input, select, textarea { min-width: 0; }
   min-width: 0;
   overflow-wrap: anywhere;
 }
-.service-card img, .service-image img, .portfolio-item img,
-.portfolio-gallery img, .project-card img {
-  width: 100%;
-  height: auto;
-  object-fit: cover;
-}
 button, .btn, .filter, .dash-tab, .project-act-btn {
   max-width: 100%;
   white-space: normal;
