@@ -40,3 +40,8 @@ Thumbs.db
 .cache/
 dist/
 build/
+
+# Service artwork is part of the site and must be versioned
+public/uploads/*
+!public/uploads/services/
+!public/uploads/services/**
