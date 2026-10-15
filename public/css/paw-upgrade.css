@@ -170,7 +170,7 @@
     box-sizing: border-box;
 }
 .services-grid .service-card--text .service-content {
-    padding-top: 36px;
+    padding-top: 24px;
 }
 .services-grid .service-card h3 {
     margin: 0 0 14px;
@@ -224,3 +224,26 @@
 .services-grid .service-content{align-items:flex-start}
 .services-grid .service-card .paw-service-more{margin-top:18px}
 @media(max-width:600px){.paw-service-detail-image{max-height:34vh;margin-bottom:16px}.paw-services-grid .paw-service-more{width:100%}}
+
+
+/* Restore package offers and configurable pack modal */
+.package-offers { margin-top: clamp(28px, 4vw, 48px); }
+.package-offers-heading { max-width: 720px; margin: 0 auto 20px; text-align: center; }
+.package-offers-heading h3 { margin: 0 0 8px; font-size: clamp(1.35rem, 2vw, 1.8rem); }
+.package-offers-heading p { margin: 0; color: var(--text-mute, #b8a8bf); line-height: 1.65; }
+.package-offers-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.package-offer-card { min-width: 0; display: flex; flex-direction: column; align-items: flex-start; gap: 10px; padding: 24px; border: 1px solid var(--border, #3b2b42); border-radius: 18px; background: var(--bg-card, #1b141e); }
+.package-offer-icon { width: 48px; height: 48px; display: grid; place-items: center; border-radius: 14px; background: rgba(160,110,255,.13); font-size: 1.5rem; }
+.package-offer-card h4 { margin: 0; font-size: 1.15rem; }
+.package-offer-card p { flex: 1; margin: 0 0 8px; color: var(--text-mute, #b8a8bf); line-height: 1.65; }
+.package-offer-card .btn { width: 100%; }
+.package-configurator { margin-top: 18px; }
+.package-item { gap: 14px; }
+.package-item-controls { flex-shrink: 0; }
+.package-total-price { white-space: nowrap; }
+@media(max-width:600px) {
+  .package-offers-grid { grid-template-columns: 1fr; }
+  .package-offer-card { padding: 18px; }
+  .package-total { align-items: stretch; }
+  .package-total > div { display: flex; flex-direction: column; gap: 5px; }
+}
