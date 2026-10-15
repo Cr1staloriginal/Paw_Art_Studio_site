@@ -409,17 +409,18 @@ async function saveContent() {
 /* PACKAGE CONFIGURATOR */
 const PACKAGES = {
     ds: { title: 'Пак DS', items: [
-        { id: 'avatar',  name: 'Аватарка',                 price: 1200, min: 0, max: 5,  default: 1  },
+        { id: 'avatar',  name: 'Ава',                       price: 1200, min: 0, max: 5,  default: 1  },
         { id: 'banner',  name: 'Баннер (сезонный)',         price: 1500, min: 0, max: 12, default: 3  },
         { id: 'sticker', name: 'Стикер',                    price: 300,  min: 0, max: 30, default: 10 },
-        { id: 'mascot',  name: 'Маскот',                    price: 4000, min: 0, max: 1,  default: 1  },
+        { id: 'mascot',  name: 'Маскот',                    price: 4000, min: 0, max: 3,  default: 1  },
         { id: 'roles',   name: 'Настройка ролей и каналов', price: 2000, min: 0, max: 1,  default: 1  },
+        { id: 'boost',   name: 'Буст',                      price: 250,  min: 0, max: 50, default: 18 },
     ]},
     streamer: { title: 'Пак стримера', items: [
-        { id: 'model2d', name: '2D-модель', price: 6000, min: 0, max: 2,  default: 1 },
-        { id: 'emoji',   name: 'Эмодзи',    price: 400,  min: 0, max: 20, default: 5 },
-        { id: 'art',     name: 'Арт',       price: 3000, min: 0, max: 10, default: 1 },
-        { id: 'overlay', name: 'Оверлей',   price: 3000, min: 0, max: 5,  default: 1 },
+        { id: 'model2d', name: '2D моделька', price: 6000, min: 0, max: 2,  default: 1 },
+        { id: 'emoji',   name: 'Эмодзи',      price: 400,  min: 0, max: 20, default: 5 },
+        { id: 'art',     name: 'Арт',         price: 1500, min: 0, max: 10, default: 3 },
+        { id: 'overlay', name: 'Оверлей',     price: 2500, min: 0, max: 10, default: 4 },
     ]},
     // Возвращены только комплекты без прямого дубля самостоятельных услуг.
     brand: { title: 'Пак «Бренд»', items: [
