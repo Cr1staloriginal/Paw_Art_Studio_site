@@ -358,19 +358,23 @@
             <button type="submit" class="btn">Войти</button>
         </form>
         <form class="auth-form hidden" id="registerForm" onsubmit="handleRegister(event)">
-            <label>Имя</label><input type="text" id="regName" placeholder="Как вас зовут?" required />
-            <label>Email</label><input type="email" id="regEmail" placeholder="your@email.com" required />
-            <label>Пароль</label><input type="password" id="regPassword" placeholder="Минимум 6 символов" minlength="6" required />
-            <div class="role-info-box"><i class="fas fa-info-circle"></i><span>На указанный email придёт код подтверждения. Баланс пополняется самостоятельно через кошелёк.</span></div>
+            <label for="regName">Имя</label>
+            <input type="text" id="regName" placeholder="Как вас зовут?" autocomplete="name" required />
+            <label for="regEmail">Email</label>
+            <input type="email" id="regEmail" placeholder="your@email.com" autocomplete="email" required />
+            <label for="regPassword">Пароль</label>
+            <input type="password" id="regPassword" placeholder="Минимум 6 символов" minlength="6" autocomplete="new-password" required />
+            <div class="role-info-box"><i class="fas fa-info-circle"></i><span>На указанный email придёт код подтверждения регистрации.</span></div>
             <button type="submit" class="btn">Получить код на email</button>
         </form>
         <form class="auth-form hidden" id="verifyForm" onsubmit="handleVerify(event)">
-            <div style="text-align:center;margin-bottom:14px;">
-                <p style="color:var(--text-soft);font-size:0.92rem;">Мы отправили код на <strong id="verifyEmailTarget">—</strong></p>
+            <div class="verify-intro">
+                <p>Мы отправили код на <strong id="verifyEmailTarget">—</strong></p>
+                <p class="verify-hint" id="verifyHint">Не пришло? Проверьте папку Спам или запросите код повторно.</p>
             </div>
-            <label>Код из письма</label>
-            <input type="text" id="verifyCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" placeholder="6 цифр" required />
-            <p id="verifyError" style="color:#f87171;font-size:0.85rem;min-height:1.1em;margin:0;"></p>
+            <label for="verifyCode">Код из письма</label>
+            <input type="text" id="verifyCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" minlength="6" autocomplete="one-time-code" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 6)" placeholder="6 цифр" aria-describedby="verifyHint verifyError" required />
+            <p id="verifyError" class="verify-error" role="alert" aria-live="polite"></p>
             <button type="submit" class="btn">Подтвердить</button>
             <button type="button" class="btn btn-outline" id="resendCodeBtn">Отправить код повторно</button>
             <button type="button" class="btn btn-ghost" id="backToRegisterBtn">← Назад</button>
