@@ -135,7 +135,7 @@
       if (titleInput) titleInput.value = title + (kind === 'quote' ? '' : (kind === 'fixed' ? '' : ' — ' + qty + ' шт.'));
       if (description) {
         description.value = (activeCard.dataset.detail || '') +
-          (kind === 'quote' ? '' : '\\nКоличество: ' + qty + '. Предварительная стоимость: ' + price + '.');
+          (kind === 'quote' ? '' : '\nКоличество: ' + qty + '. Предварительная стоимость: ' + price + '.');
       }
       // Поле бюджета убрано из формы заказа; предварительная цена остаётся в окне услуги.
 
