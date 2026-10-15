@@ -479,11 +479,7 @@ app.post('/api/auth/verify-email', (req, res) => {
     }
 
     const updated = db.transaction(() => {
-      const result = db.prepare(\`
-        UPDATE users
-        SET email_verified = 1, verification_code = NULL, verification_expires = NULL
-        WHERE id = ? AND email_verified = 0 AND verification_code = ? AND verification_expires > ?
-      \`).run(user.id, cleanCode, Date.now());
+      const result = db.prepare('UPDATE users SET email_verified = 1, verification_code = NULL, verification_expires = NULL WHERE id = ? AND email_verified = 0 AND verification_code = ? AND verification_expires > ?').run(user.id, cleanCode, Date.now());
       if (result.changes !== 1) throw new Error('VERIFY_STATE_CHANGED');
       return db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
     })();
