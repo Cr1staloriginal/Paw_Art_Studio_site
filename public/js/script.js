@@ -201,21 +201,55 @@ async function handleRegister(e) {
 
 async function handleVerify(e) {
     e.preventDefault();
-    const code = document.getElementById('verifyCode').value.trim();
-    if (!code) return showToast('⚠️ Введите код', 'error');
-    const btn = e.target.querySelector('button[type="submit"]'); if (btn) btn.disabled = true;
-    try {
-        const data = await api('/api/auth/verify-email', { method: 'POST', body: { email: state.pendingEmail, code } });
-        setToken(data.token);
-        state.user = data.user;
-        closeAuth();
-        showToast('🎉 Email подтверждён! Добро пожаловать, ' + data.user.name + '!');
-        await afterLogin();
-    } catch (err) {
-        const vErr = document.getElementById('verifyError'); if (vErr) vErr.textContent = err.message;
-        showToast('❌ ' + err.message, 'error');
+    const form = e.currentTarget;
+    const codeInput = document.getElementById('verifyCode');
+    const errorEl = document.getElementById('verifyError');
+    const btn = form.querySelector('button[type="submit"]');
+    const code = codeInput.value.replace(/\D/g, '').slice(0, 6);
+    const email = state.pendingEmail;
+    codeInput.value = code;
+    if (errorEl) errorEl.textContent = '';
+
+    if (!email) {
+        if (errorEl) errorEl.textContent = 'Email не найден. Вернитесь к регистрации и запросите код заново.';
+        return;
     }
-    finally { if (btn) btn.disabled = false; }
+    if (!/^\d{6}$/.test(code)) {
+        if (errorEl) errorEl.textContent = 'Введите ровно 6 цифр из письма.';
+        codeInput.focus();
+        return;
+    }
+
+    if (btn) btn.disabled = true;
+    codeInput.disabled = true;
+    let data;
+    try {
+        data = await api('/api/auth/verify-email', { method: 'POST', body: { email, code } });
+        if (!data || typeof data.token !== 'string' || !data.token || !data.user || !data.user.id) {
+            throw new Error('Сервер вернул неполные данные. Попробуйте позже.');
+        }
+    } catch (err) {
+        console.error('Ошибка подтверждения email:', err);
+        if (errorEl) errorEl.textContent = err.message || 'Не удалось подтвердить email. Попробуйте ещё раз.';
+        showToast('❌ ' + (err.message || 'Ошибка подтверждения email'), 'error');
+        if (btn) btn.disabled = false;
+        codeInput.disabled = false;
+        return;
+    }
+
+    setToken(data.token);
+    state.user = data.user;
+    closeAuth();
+    showToast('🎉 Email подтверждён! Добро пожаловать, ' + data.user.name + '!');
+    try {
+        await afterLogin();
+    } catch (loginError) {
+        console.error('Ошибка загрузки данных после авторизации:', loginError);
+        showToast('Вы вошли, но не все данные кабинета удалось загрузить. Обновите страницу.', 'error');
+    } finally {
+        if (btn) btn.disabled = false;
+        codeInput.disabled = false;
+    }
 }
 
 async function resendCode() {
