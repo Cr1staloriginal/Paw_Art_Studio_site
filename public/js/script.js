@@ -409,18 +409,30 @@ async function saveContent() {
 /* PACKAGE CONFIGURATOR */
 const PACKAGES = {
     ds: { title: 'Пак DS', items: [
-        { id: 'avatar',  name: 'Ава',                      price: 1200, min: 0, max: 5,  default: 1  },
-        { id: 'banner',  name: 'Баннер (сезонный)',        price: 1500, min: 0, max: 12, default: 3  },
-        { id: 'sticker', name: 'Стикер',                   price: 300,  min: 0, max: 30, default: 10 },
-        { id: 'mascot',  name: 'Маскот',                   price: 4000, min: 0, max: 3,  default: 1  },
+        { id: 'avatar',  name: 'Аватарка',                 price: 1200, min: 0, max: 5,  default: 1  },
+        { id: 'banner',  name: 'Баннер (сезонный)',         price: 1500, min: 0, max: 12, default: 3  },
+        { id: 'sticker', name: 'Стикер',                    price: 300,  min: 0, max: 30, default: 10 },
+        { id: 'mascot',  name: 'Маскот',                    price: 4000, min: 0, max: 1,  default: 1  },
         { id: 'roles',   name: 'Настройка ролей и каналов', price: 2000, min: 0, max: 1,  default: 1  },
-        { id: 'boost',   name: 'Буст',                     price: 250,  min: 0, max: 50, default: 18 },
     ]},
     streamer: { title: 'Пак стримера', items: [
-        { id: 'model2d', name: '2D моделька', price: 6000, min: 0, max: 2,  default: 1 },
-        { id: 'emoji',   name: 'Эмодзи',      price: 400,  min: 0, max: 20, default: 5 },
-        { id: 'art',     name: 'Арт',         price: 1500, min: 0, max: 10, default: 3 },
-        { id: 'overlay', name: 'Оверлей',     price: 2500, min: 0, max: 10, default: 4 },
+        { id: 'model2d', name: '2D-модель', price: 6000, min: 0, max: 2,  default: 1 },
+        { id: 'emoji',   name: 'Эмодзи',    price: 400,  min: 0, max: 20, default: 5 },
+        { id: 'art',     name: 'Арт',       price: 3000, min: 0, max: 10, default: 1 },
+        { id: 'overlay', name: 'Оверлей',   price: 3000, min: 0, max: 5,  default: 1 },
+    ]},
+    // Возвращены только комплекты без прямого дубля самостоятельных услуг.
+    brand: { title: 'Пак «Бренд»', items: [
+        { id: 'brand-mascot',  name: 'Маскот',  price: 4000, min: 0, max: 1,  default: 1 },
+        { id: 'brand-sticker', name: 'Стикер',  price: 300,  min: 0, max: 30, default: 10 },
+        { id: 'brand-overlay', name: 'Оверлей', price: 3000, min: 0, max: 3,  default: 1 },
+    ]},
+    full: { title: 'Пак «Под ключ»', items: [
+        { id: 'full-mascot',    name: 'Маскот',   price: 4000, min: 0, max: 1,  default: 1 },
+        { id: 'full-sticker',   name: 'Стикер',   price: 300,  min: 0, max: 30, default: 10 },
+        { id: 'full-overlay',   name: 'Оверлей',  price: 3000, min: 0, max: 3,  default: 1 },
+        { id: 'full-banner',    name: 'Баннер',   price: 1500, min: 0, max: 5,  default: 2 },
+        { id: 'full-animation', name: 'Анимация', price: 5000, min: 0, max: 2,  default: 1 },
     ]},
 };
 
@@ -465,14 +477,26 @@ function updatePackageTotal() {
 function orderCustomPackage() {
     const pkg = PACKAGES[currentPackageId]; if (!pkg) return;
     let total = 0; const details = [];
-    pkg.items.forEach(item => { const count = currentPackageConfig[item.id] || 0; if (count > 0) { total += item.price * count; details.push(`${item.name}: ${count} шт.`); } });
-    const msg = document.getElementById('formMessage');
-    msg.value = `Пакет: ${pkg.title}\n${details.join('\n')}\nИтого: ${formatMoney(total * 100)}`;
-    const formService = document.getElementById('formService');
-    if (formService) formService.value = pkg.title;
+    pkg.items.forEach(item => {
+        const count = currentPackageConfig[item.id] || 0;
+        if (count > 0) {
+            total += item.price * count;
+            details.push(`${item.name}: ${count} шт. — ${formatMoney(item.price * count * 100)}`);
+        }
+    });
+    if (!details.length) return showToast('⚠️ Добавьте хотя бы один элемент в пак', 'error');
+
+    const titleInput = document.getElementById('projTitle');
+    const description = document.getElementById('projDescription');
+    const category = document.getElementById('projCategory');
+    if (titleInput) titleInput.value = pkg.title;
+    if (description) description.value = `Состав пакета «${pkg.title}»:\n${details.join('\n')}\n\nПредварительная стоимость: ${formatMoney(total * 100)}. Итоговую стоимость и сроки согласуем перед началом работы.`;
+    if (category) category.value = 'Другое';
+
     closePackageConfigurator();
-    showToast(`✅ ${pkg.title} настроен — ${formatMoney(total * 100)}`);
-    scrollToSection('contact');
+    showToast(`✅ ${pkg.title} добавлен в заявку — ${formatMoney(total * 100)}`);
+    if (typeof openProjectCreator === 'function') openProjectCreator();
+    else document.getElementById('projects')?.scrollIntoView({ behavior: 'smooth' });
 }
 
 /* DASHBOARD */
