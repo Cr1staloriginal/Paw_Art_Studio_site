@@ -649,11 +649,28 @@ async function uploadAvatar(e) {
 }
 
 /* PROJECTS */
+function normalizeProject(p) {
+    if (!p || typeof p !== 'object') return p;
+    const client = p.client && typeof p.client === 'object' ? p.client : {};
+    const executor = p.executor && typeof p.executor === 'object' ? p.executor : {};
+    const clientId = p.clientId ?? p.client_id ?? client.id ?? 0;
+    const executorId = p.executorId ?? p.executor_id ?? executor.id ?? null;
+    return {
+        ...p, clientId, executorId,
+        client: { id: client.id ?? clientId, name: client.name || p.client_name || 'Пользователь', avatar: client.avatar ?? p.client_avatar ?? null },
+        executor: executorId ? { id: executor.id ?? executorId, name: executor.name || p.executor_name || 'Исполнитель', avatar: executor.avatar ?? p.executor_avatar ?? null } : null,
+    };
+}
 async function loadProjects() {
     const list = document.getElementById('projectsList'); if (!list) return;
     if (!state.user) { list.innerHTML = `<div class="empty-state"><i class="fas fa-folder-open"></i><p>Войдите, чтобы увидеть заказы</p></div>`; return; }
-    try { const { projects } = await api('/api/projects'); state.projects = projects; renderProjects(); }
-    catch (err) { list.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>${escapeHtml(err.message)}</p></div>`; }
+    try {
+        const data = await api('/api/projects');
+        state.projects = (Array.isArray(data?.projects) ? data.projects : []).map(normalizeProject);
+        renderProjects();
+    } catch (err) {
+        list.innerHTML = `<div class="empty-state"><i class="fas fa-exclamation-triangle"></i><p>${escapeHtml(err.message)}</p></div>`;
+    }
 }
 function renderProjects() {
     const list = document.getElementById('projectsList'); if (!list) return;
@@ -665,8 +682,10 @@ function renderProjects() {
         const canOpen = p.clientId === state.user.id || (p.executor && p.executor.id === state.user.id) || state.user.role === 'admin' || state.user.role === 'manager' || state.user.role === 'executor';
         // Старые/неполные записи могут не содержать объект client — карточка всё равно должна отображаться.
         const client = p.client && typeof p.client === 'object' ? p.client : {};
-        const clientName = typeof client.name === 'string' && client.name.trim() ? client.name.trim() : 'Клиент';
-        const clientAvatar = client.avatar ? `<img src="${escapeHtml(client.avatar)}" alt="">` : escapeHtml(clientName.charAt(0).toUpperCase() || 'К');
+        const clientName = typeof (client.name || p.client_name) === 'string' && (client.name || p.client_name).trim()
+            ? (client.name || p.client_name).trim() : 'Пользователь';
+        const clientAvatarUrl = client.avatar ?? p.client_avatar ?? null;
+        const clientAvatar = clientAvatarUrl ? `<img src="${escapeHtml(clientAvatarUrl)}" alt="">` : escapeHtml(clientName.charAt(0).toUpperCase() || 'П');
         return `<div class="project-card" onclick="${canOpen ? `openProjectDetail(${p.id})` : `showToast('Возьмите в работу')`}"><div class="project-head"><div><div class="project-title">${escapeHtml(p.title || 'Без названия')}</div><div class="project-client"><span class="project-client-avatar">${clientAvatar}</span>${escapeHtml(clientName)}</div></div><span class="project-status status-${p.status}">${STATUS_LABELS[p.status] || p.status || 'Неизвестен'}</span></div><div class="project-desc">${escapeHtml(p.description || '')}</div><div class="project-meta"><span class="project-category">${escapeHtml(p.category || 'Без категории')}</span><span class="project-budget">${p.budget > 0 ? formatMoney(p.budget) : '—'}</span></div>${p.executor ? `<div class="project-executor" style="margin-top:8px">Исполнитель: <b>${escapeHtml(p.executor.name || 'Исполнитель')}</b></div>` : ''}${canTake ? `<div class="project-actions"><button class="project-act-btn primary" onclick="event.stopPropagation(); acceptProject(${p.id})"><i class="fas fa-hand-paper"></i> Взять</button></div>` : ''}</div>`;
     }).join('');
 }
@@ -687,16 +706,26 @@ async function handleProjectCreate(e) {
     finally { btn.disabled = false; }
 }
 async function acceptProject(id) { try { await api(`/api/projects/${id}/accept`, { method: 'POST' }); await loadProjects(); showToast('✅ Взято в работу'); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
-async function openProjectDetail(id) { try { const { project } = await api(`/api/projects/${id}`); state.currentProject = project; renderProjectDetail(project); document.getElementById('projectDetailModal').classList.add('open'); document.body.style.overflow = 'hidden'; } catch (err) { showToast('❌ ' + err.message, 'error'); } }
+async function openProjectDetail(id) {
+    try {
+        const { project } = await api(`/api/projects/${id}`);
+        const normalized = normalizeProject(project);
+        state.currentProject = normalized;
+        renderProjectDetail(normalized);
+        document.getElementById('projectDetailModal').classList.add('open');
+        document.body.style.overflow = 'hidden';
+    } catch (err) { showToast('❌ ' + err.message, 'error'); }
+}
 function closeProjectDetail() { document.getElementById('projectDetailModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
 function renderProjectDetail(p) {
     const wrap = document.getElementById('projectDetailContent');
     if (!p || typeof p !== 'object' || !wrap) return;
+    p = normalizeProject(p);
     const client = p.client && typeof p.client === 'object' ? p.client : {};
-    const clientName = typeof client.name === 'string' && client.name.trim() ? client.name.trim() : 'Клиент';
-    const isClient = p.clientId === state.user.id;
-    const isExecutor = p.executor && p.executor.id === state.user.id;
-    const isAdmin = state.user.role === 'admin' || state.user.role === 'manager';
+    const clientName = client.name || p.client_name || 'Пользователь';
+    const isClient = Number(p.clientId ?? p.client_id) === Number(state.user?.id);
+    const isExecutor = Number(p.executor?.id ?? p.executor_id) === Number(state.user?.id);
+    const isAdmin = state.user?.role === 'admin' || state.user?.role === 'manager';
     const canChangeStatus = isClient || isExecutor || isAdmin;
     const statuses = ['open', 'in_progress', 'review', 'completed', 'cancelled'];
     wrap.innerHTML = `
