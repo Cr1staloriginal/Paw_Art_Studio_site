@@ -663,8 +663,11 @@ function renderProjects() {
     list.innerHTML = items.map(p => {
         const canTake = state.user.role === 'executor' && p.status === 'open';
         const canOpen = p.clientId === state.user.id || (p.executor && p.executor.id === state.user.id) || state.user.role === 'admin' || state.user.role === 'manager' || state.user.role === 'executor';
-        const clientAvatar = p.client.avatar ? `<img src="${escapeHtml(p.client.avatar)}" alt="">` : escapeHtml(p.client.name.charAt(0).toUpperCase());
-        return `<div class="project-card" onclick="${canOpen ? `openProjectDetail(${p.id})` : `showToast('Возьмите в работу')`}"><div class="project-head"><div><div class="project-title">${escapeHtml(p.title)}</div><div class="project-client"><span class="project-client-avatar">${clientAvatar}</span>${escapeHtml(p.client.name)}</div></div><span class="project-status status-${p.status}">${STATUS_LABELS[p.status]}</span></div><div class="project-desc">${escapeHtml(p.description)}</div><div class="project-meta"><span class="project-category">${escapeHtml(p.category)}</span><span class="project-budget">${p.budget > 0 ? formatMoney(p.budget) : '—'}</span></div>${p.executor ? `<div class="project-executor" style="margin-top:8px">Исполнитель: <b>${escapeHtml(p.executor.name)}</b></div>` : ''}${canTake ? `<div class="project-actions"><button class="project-act-btn primary" onclick="event.stopPropagation(); acceptProject(${p.id})"><i class="fas fa-hand-paper"></i> Взять</button></div>` : ''}</div>`;
+        // Старые/неполные записи могут не содержать объект client — карточка всё равно должна отображаться.
+        const client = p.client && typeof p.client === 'object' ? p.client : {};
+        const clientName = typeof client.name === 'string' && client.name.trim() ? client.name.trim() : 'Клиент';
+        const clientAvatar = client.avatar ? `<img src="${escapeHtml(client.avatar)}" alt="">` : escapeHtml(clientName.charAt(0).toUpperCase() || 'К');
+        return `<div class="project-card" onclick="${canOpen ? `openProjectDetail(${p.id})` : `showToast('Возьмите в работу')`}"><div class="project-head"><div><div class="project-title">${escapeHtml(p.title || 'Без названия')}</div><div class="project-client"><span class="project-client-avatar">${clientAvatar}</span>${escapeHtml(clientName)}</div></div><span class="project-status status-${p.status}">${STATUS_LABELS[p.status] || p.status || 'Неизвестен'}</span></div><div class="project-desc">${escapeHtml(p.description || '')}</div><div class="project-meta"><span class="project-category">${escapeHtml(p.category || 'Без категории')}</span><span class="project-budget">${p.budget > 0 ? formatMoney(p.budget) : '—'}</span></div>${p.executor ? `<div class="project-executor" style="margin-top:8px">Исполнитель: <b>${escapeHtml(p.executor.name || 'Исполнитель')}</b></div>` : ''}${canTake ? `<div class="project-actions"><button class="project-act-btn primary" onclick="event.stopPropagation(); acceptProject(${p.id})"><i class="fas fa-hand-paper"></i> Взять</button></div>` : ''}</div>`;
     }).join('');
 }
 function filterProjects(status) { state.projectFilter = status; document.querySelectorAll('#projectFilters .filter').forEach(b => b.classList.toggle('active', b.dataset.status === status)); renderProjects(); }
@@ -688,6 +691,9 @@ async function openProjectDetail(id) { try { const { project } = await api(`/api
 function closeProjectDetail() { document.getElementById('projectDetailModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
 function renderProjectDetail(p) {
     const wrap = document.getElementById('projectDetailContent');
+    if (!p || typeof p !== 'object' || !wrap) return;
+    const client = p.client && typeof p.client === 'object' ? p.client : {};
+    const clientName = typeof client.name === 'string' && client.name.trim() ? client.name.trim() : 'Клиент';
     const isClient = p.clientId === state.user.id;
     const isExecutor = p.executor && p.executor.id === state.user.id;
     const isAdmin = state.user.role === 'admin' || state.user.role === 'manager';
@@ -696,7 +702,7 @@ function renderProjectDetail(p) {
     wrap.innerHTML = `
         <div class="pd-title">${escapeHtml(p.title)}</div>
         <div style="margin-bottom:12px"><span class="project-status status-${p.status}">${STATUS_LABELS[p.status]}</span></div>
-        <div class="pd-row"><span class="pd-label">Заказчик</span><span class="pd-value">${escapeHtml(p.client.name)}</span></div>
+        <div class="pd-row"><span class="pd-label">Заказчик</span><span class="pd-value">${escapeHtml(clientName)}</span></div>
         <div class="pd-row"><span class="pd-label">Категория</span><span class="pd-value">${escapeHtml(p.category)}</span></div>
         <div class="pd-row"><span class="pd-label">Бюджет</span><span class="pd-value">${p.budget > 0 ? formatMoney(p.budget) : '—'}</span></div>
         ${p.executor ? `<div class="pd-row"><span class="pd-label">Исполнитель</span><span class="pd-value">${escapeHtml(p.executor.name)}</span></div>` : ''}
