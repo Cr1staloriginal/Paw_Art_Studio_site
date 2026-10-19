@@ -543,7 +543,7 @@ async function loadDashboardData() {
     try { const [txRes, wdRes] = await Promise.all([api('/api/wallet/transactions'), api('/api/wallet/withdrawals')]); state.transactions = txRes.transactions; state.userWithdrawals = wdRes.withdrawals; renderTransactions(); renderWalletStats(); renderUserWithdrawals(); }
     catch (err) { showToast('❌ ' + err.message, 'error'); }
 }
-function renderWalletStats() { const totalIn = state.transactions.filter(t => t.type === 'in').reduce((s, t) => s + t.amount, 0); const totalOut = state.transactions.filter(t => t.type === 'out').reduce((s, t) => s + t.amount, 0); document.getElementById('wsIn').textContent = formatMoney(totalIn); document.getElementById('wsOut').textContent = formatMoney(totalOut); document.getElementById('wsProjects').textContent = state.projects.length; }
+function renderWalletStats() { const totalIn = state.transactions.filter(t => t.type === 'in').reduce((s, t) => s + t.amount, 0); const totalOut = state.transactions.filter(t => t.type === 'out').reduce((s, t) => s + t.amount, 0); const userId = Number(state.user?.id); const userProjects = userId ? state.projects.filter(p => Number(p.client_id ?? p.clientId ?? p.client?.id) === userId || Number(p.executor_id ?? p.executorId ?? p.executor?.id) === userId) : []; document.getElementById('wsIn').textContent = formatMoney(totalIn); document.getElementById('wsOut').textContent = formatMoney(totalOut); document.getElementById('wsProjects').textContent = userProjects.length; }
 function renderTransactions() {
     const list = document.getElementById('txList'); if (!list) return;
     if (!state.transactions.length) { list.innerHTML = '<div class="tx-empty">Пока нет операций</div>'; return; }
