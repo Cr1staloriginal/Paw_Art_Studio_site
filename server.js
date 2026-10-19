@@ -938,10 +938,28 @@ app.post('/api/role/request', auth, (req, res) => {
 
 /* ==================== PROJECTS ==================== */
 app.get('/api/projects', (req, res) => {
-  const items = db.prepare(`SELECT p.*, u.name AS client_name, u.avatar AS client_avatar
-                            FROM projects p JOIN users u ON u.id = p.client_id
-                            ORDER BY p.created_at DESC LIMIT 100`).all();
-  res.json({ projects: items });
+  try {
+    const rows = db.prepare(`SELECT p.*,
+                                    u.name AS client_name, u.avatar AS client_avatar,
+                                    e.name AS executor_name, e.avatar AS executor_avatar
+                             FROM projects p
+                             LEFT JOIN users u ON u.id = p.client_id
+                             LEFT JOIN users e ON e.id = p.executor_id
+                             ORDER BY p.created_at DESC LIMIT 100`).all();
+    const projects = rows.map(p => ({
+      ...p,
+      clientId: p.client_id ?? null,
+      executorId: p.executor_id ?? null,
+      client: { id: p.client_id ?? 0, name: p.client_name || 'Пользователь', avatar: p.client_avatar ?? null },
+      executor: p.executor_id ? {
+        id: p.executor_id, name: p.executor_name || 'Исполнитель', avatar: p.executor_avatar ?? null,
+      } : null,
+    }));
+    res.json({ projects });
+  } catch (err) {
+    console.error('❌ Ошибка загрузки заказов:', err);
+    res.status(500).json({ error: 'Не удалось загрузить заказы' });
+  }
 });
 
 app.post('/api/projects', auth, (req, res) => {
