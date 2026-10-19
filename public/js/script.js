@@ -310,7 +310,12 @@ function updateUI() {
 
         if (u.role === 'admin') {
             adminBtn.classList.remove('hidden'); adminMenuLink.classList.remove('hidden');
-            if (u.isRoot) { adminBtn.style.background = 'linear-gradient(135deg, #fbbf24, #f59e0b)'; adminBtn.title = '👑 Главный админ'; if (contentLink) contentLink.classList.remove('hidden'); }
+            const isRoot = u.isRoot === true || Number(u.isRoot ?? u.is_root ?? 0) === 1;
+            if (isRoot) {
+                adminBtn.style.background = 'linear-gradient(135deg, #fbbf24, #f59e0b)';
+                adminBtn.title = '👑 Главный админ';
+                if (contentLink) contentLink.classList.remove('hidden');
+            }
             else { adminBtn.style.background = ''; adminBtn.title = 'Админ'; if (contentLink) contentLink.classList.add('hidden'); }
         } else {
             adminBtn.classList.add('hidden'); adminMenuLink.classList.add('hidden');
@@ -1093,18 +1098,37 @@ async function loadAdminData() {
         state.adminRequests = Array.isArray(requestsResult.value?.requests)
             ? requestsResult.value.requests : [];
         renderAdminRequests();
-    } else console.error('[Admin] Ошибка загрузки заявок:', requestsResult.reason);
+    } else {
+        state.adminRequests = [];
+        const requestsList = document.getElementById('requestsList');
+        if (requestsList) requestsList.innerHTML = '<div class="admin-empty">Не удалось загрузить заявки. Проверьте права и серверные логи.</div>';
+        const reqCount = document.getElementById('reqCount');
+        if (reqCount) reqCount.textContent = '—';
+        console.error('[Admin] Ошибка загрузки заявок:', requestsResult.reason);
+    }
 
     if (statsResult.status === 'fulfilled') {
         state.adminStats = statsResult.value;
         renderAdminDashboard();
-    } else console.error('[Admin] Ошибка загрузки статистики:', statsResult.reason);
+    } else {
+        state.adminStats = null;
+        const dashboard = document.getElementById('dashboardStats');
+        if (dashboard) dashboard.innerHTML = '<div class="admin-empty">Не удалось загрузить статистику. Проверьте права, API и логи сервера.</div>';
+        console.error('[Admin] Ошибка загрузки статистики:', statsResult.reason);
+    }
 
     if (withdrawalsResult.status === 'fulfilled') {
         state.adminWithdrawals = Array.isArray(withdrawalsResult.value?.withdrawals)
             ? withdrawalsResult.value.withdrawals : [];
         renderAdminWithdrawals();
-    } else console.error('[Admin] Ошибка загрузки выплат:', withdrawalsResult.reason);
+    } else {
+        state.adminWithdrawals = [];
+        const withdrawalsList = document.getElementById('withdrawalsList');
+        if (withdrawalsList) withdrawalsList.innerHTML = '<div class="admin-empty">Не удалось загрузить выплаты. Проверьте права и серверные логи.</div>';
+        const wdCount = document.getElementById('wdCount');
+        if (wdCount) wdCount.textContent = '—';
+        console.error('[Admin] Ошибка загрузки выплат:', withdrawalsResult.reason);
+    }
 }
 function renderAdminDashboard() {
     const wrap = document.getElementById('dashboardStats'); if (!wrap || !state.adminStats) return;
