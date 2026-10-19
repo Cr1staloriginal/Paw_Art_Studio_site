@@ -514,6 +514,23 @@
                 <option value="Арт">Арт</option><option value="Анимация">Анимация</option>
                 <option value="3D арт">3D арт</option>
             </select>
+
+            <div id="adminAuthorBlock" class="hidden">
+                <label for="portAuthorName">Имя автора *</label>
+                <input type="text" id="portAuthorName"
+                    placeholder="Например, Crystal" maxlength="100" autocomplete="off" />
+
+                <label for="portAuthorUser">Привязать к зарегистрированному пользователю</label>
+                <select id="portAuthorUser">
+                    <option value="">Без привязки к аккаунту</option>
+                </select>
+
+                <p class="form-hint">
+                    Выберите пользователя, чтобы использовать его имя и аватар из профиля.
+                    Если аккаунт не выбран, будет использовано введённое имя.
+                </p>
+            </div>
+
             <button type="submit" class="btn">Загрузить</button>
         </form>
         <div class="my-portfolio-grid" id="myPortfolioGrid"></div>
