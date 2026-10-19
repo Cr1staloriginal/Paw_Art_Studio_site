@@ -625,25 +625,61 @@ app.get('/api/content', (req, res) => {
   res.json({ content });
 });
 
+const CONTENT_KEY_ALLOWLIST = new Set([
+  'hero_eyebrow', 'hero_title', 'hero_subtitle', 'hero_badge_1', 'hero_badge_2',
+  'hero_badge_3', 'hero_image', 'about_title', 'about_text', 'about_quote',
+  'about_stat_1', 'about_stat_1_desc', 'about_stat_2', 'about_stat_2_desc',
+  'about_stat_3', 'about_stat_3_desc', 'contact_discord', 'contact_telegram',
+  'contact_email', 'support_email', 'support_telegram', 'footer_text',
+  ...Array.from({ length: 7 }, (_, i) => i + 1).flatMap(n => [
+    `service_${n}_name`, `service_${n}_desc`, `service_${n}_price`, `service_${n}_image`
+  ]),
+  ...Array.from({ length: 5 }, (_, i) => i + 1).flatMap(n => [
+    `pricing_${n}_name`, `pricing_${n}_price`, `pricing_${n}_features`,
+    `faq_${n}_q`, `faq_${n}_a`
+  ])
+]);
+
 app.post('/api/admin/content', auth, rootOnly, (req, res) => {
   const updates = req.body?.updates;
-  if (!updates || typeof updates !== 'object')
-    return res.status(400).json({ error: 'Нет данных' });
+  if (!updates || typeof updates !== 'object' || Array.isArray(updates))
+    return res.status(400).json({ error: 'Ожидается объект updates' });
+  const entries = Object.entries(updates);
+  if (!entries.length) return res.status(400).json({ error: 'Нет полей для сохранения' });
+  if (entries.length > 100) return res.status(400).json({ error: 'Слишком много полей' });
+  for (const [key, value] of entries) {
+    if (!CONTENT_KEY_ALLOWLIST.has(key))
+      return res.status(400).json({ error: `Недопустимый ключ: ${key}` });
+    if (value !== null && value !== undefined && typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean')
+      return res.status(400).json({ error: `Недопустимое значение для ${key}` });
+    if (String(value ?? '').length > 20000)
+      return res.status(400).json({ error: `Поле ${key} слишком длинное` });
+  }
+
   const now = Date.now();
   const stmt = db.prepare(`INSERT INTO site_content (key, value, updated_at)
     VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`);
   try {
     const tx = db.transaction(items => {
-      for (const [k, v] of Object.entries(items)) stmt.run(k, String(v ?? ''), now);
+      for (const [key, value] of items) stmt.run(key, String(value ?? ''), now);
     });
-    tx(updates);
-    res.json({ ok: true, count: Object.keys(updates).length });
-  } catch (e) { res.status(500).json({ error: e.message }); }
+    tx(entries);
+    res.json({ ok: true, count: entries.length });
+  } catch (e) {
+    console.error('[admin/content] Ошибка сохранения:', e);
+    res.status(500).json({ error: 'Не удалось сохранить контент' });
+  }
 });
 
-app.post('/api/admin/content/upload', auth, rootOnly, contentUpload.single('image'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
-  res.json({ url: '/uploads/content/' + req.file.filename });
+app.post('/api/admin/content/upload', auth, rootOnly, (req, res, next) => {
+  contentUpload.single('image')(req, res, err => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Файл больше 5 МБ' });
+      return res.status(400).json({ error: 'Допустимы изображения PNG, JPG, WEBP, GIF и SVG' });
+    }
+    if (!req.file) return res.status(400).json({ error: 'Выберите изображение' });
+    res.json({ ok: true, url: '/uploads/content/' + req.file.filename });
+  });
 });
 
 /* ==================== YOOKASSA ==================== */
