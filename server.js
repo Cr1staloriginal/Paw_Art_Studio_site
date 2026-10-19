@@ -86,7 +86,7 @@ const contentStorage = multer.diskStorage({
 const contentUpload = multer({
   storage: contentStorage,
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => cb(null, /^image\/(png|jpe?g|gif|webp|svg\+xml)$/i.test(file.mimetype)),
+  fileFilter: (req, file, cb) => cb(null, /^image\/(png|jpe?g|gif|webp)$/i.test(file.mimetype)),
 });
 
 // --- БД ---
@@ -675,7 +675,7 @@ app.post('/api/admin/content/upload', auth, rootOnly, (req, res, next) => {
   contentUpload.single('image')(req, res, err => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Файл больше 5 МБ' });
-      return res.status(400).json({ error: 'Допустимы изображения PNG, JPG, WEBP, GIF и SVG' });
+      return res.status(400).json({ error: 'Допустимы изображения PNG, JPG, WEBP и GIF' });
     }
     if (!req.file) return res.status(400).json({ error: 'Выберите изображение' });
     res.json({ ok: true, url: '/uploads/content/' + req.file.filename });
