@@ -252,6 +252,16 @@ db.exec("CREATE INDEX IF NOT EXISTS idx_password_reset_email ON password_reset_c
 safeAddColumn('users', 'referral_code', 'TEXT');
 safeAddColumn('users', 'referred_by', 'INTEGER');
 
+// Portfolio author fields: user_id remains the uploader.
+safeAddColumn('portfolio', 'author_name', 'TEXT');
+safeAddColumn('portfolio', 'author_user_id', 'INTEGER');
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_portfolio_author_user
+  ON portfolio(author_user_id);
+  CREATE INDEX IF NOT EXISTS idx_portfolio_uploader
+  ON portfolio(user_id);
+`);
+
 try {
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ref_code ON users(referral_code) WHERE referral_code IS NOT NULL');
 } catch (e) { /* ignore */ }
@@ -994,13 +1004,213 @@ app.post('/api/projects', auth, (req, res) => {
 });
 
 /* ==================== PORTFOLIO ==================== */
-app.post('/api/portfolio', auth, upload.single('image'), (req, res) => {
-  if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
-  const { title, description, category } = req.body || {};
-  const info = db.prepare(`INSERT INTO portfolio (user_id, filename, title, description, category, created_at)
-                           VALUES (?, ?, ?, ?, ?, ?)`)
-    .run(req.user.id, req.file.filename, title || 'Без названия', description || '', category || 'other', Date.now());
-  res.json({ id: info.lastInsertRowid, url: '/uploads/portfolio/' + req.file.filename });
+
+// Authorize before Multer writes an uploaded file.
+function portfolioUploadAccess(req, res, next) {
+  const user = req.user;
+  if (user.role === 'executor' || user.role === 'admin' || Number(user.is_root) === 1) {
+    return next();
+  }
+  return res.status(403).json({ error: 'Нет прав для загрузки работ в портфолио' });
+}
+
+app.post('/api/portfolio', auth, portfolioUploadAccess, upload.single('image'), (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
+
+    const { title, description, category } = req.body || {};
+    const cleanTitle = String(title || '').trim();
+    const cleanDescription = String(description || '').trim();
+    const cleanCategory = String(category || 'Другое').trim();
+
+    const removeUploadedFile = () => {
+      if (req.file?.path) fs.unlink(req.file.path, () => {});
+    };
+
+    if (!cleanTitle) {
+      removeUploadedFile();
+      return res.status(400).json({ error: 'Укажите название работы' });
+    }
+    if (cleanTitle.length > 120) {
+      removeUploadedFile();
+      return res.status(400).json({ error: 'Название не должно превышать 120 символов' });
+    }
+    if (cleanDescription.length > 500) {
+      removeUploadedFile();
+      return res.status(400).json({ error: 'Описание не должно превышать 500 символов' });
+    }
+
+    const user = req.user;
+    let authorUserId = null;
+    let authorName = '';
+
+    if (user.role === 'executor') {
+      // Never trust author fields submitted by an executor.
+      authorUserId = user.id;
+      authorName = user.name;
+    } else {
+      const rawAuthorUserId = String(req.body.authorUserId || '').trim();
+
+      if (rawAuthorUserId) {
+        const parsedId = Number(rawAuthorUserId);
+        if (!Number.isSafeInteger(parsedId) || parsedId <= 0) {
+          removeUploadedFile();
+          return res.status(400).json({ error: 'Некорректный пользователь' });
+        }
+
+        const author = db.prepare('SELECT id, name FROM users WHERE id = ?').get(parsedId);
+        if (!author) {
+          removeUploadedFile();
+          return res.status(400).json({ error: 'Выбранный пользователь не найден' });
+        }
+
+        authorUserId = author.id;
+        authorName = author.name;
+      } else {
+        authorName = String(req.body.authorName || '').trim();
+        if (!authorName) {
+          removeUploadedFile();
+          return res.status(400).json({ error: 'Укажите имя автора' });
+        }
+        if (authorName.length > 100) {
+          removeUploadedFile();
+          return res.status(400).json({ error: 'Имя автора слишком длинное' });
+        }
+      }
+    }
+
+    const result = db.prepare(`
+      INSERT INTO portfolio (
+        user_id, author_user_id, author_name, filename,
+        title, description, category, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      user.id, authorUserId, authorName, req.file.filename,
+      cleanTitle, cleanDescription, cleanCategory, Date.now()
+    );
+
+    return res.status(201).json({
+      ok: true,
+      id: Number(result.lastInsertRowid),
+      filename: req.file.filename,
+      url: '/uploads/portfolio/' + encodeURIComponent(req.file.filename),
+      authorName
+    });
+  } catch (err) {
+    console.error('Ошибка загрузки портфолио:', err);
+    if (req.file?.path) fs.unlink(req.file.path, () => {});
+    return res.status(500).json({ error: 'Не удалось сохранить работу' });
+  }
+});
+
+app.get('/api/portfolio/all', (req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT
+        p.id, p.filename, p.title, p.description, p.category,
+        p.created_at AS createdAt,
+        COALESCE(
+          NULLIF(TRIM(u.name), ''),
+          NULLIF(TRIM(p.author_name), ''),
+          NULLIF(TRIM(uploader.name), ''),
+          'Аноним'
+        ) AS authorName,
+        u.avatar AS authorAvatar
+      FROM portfolio p
+      LEFT JOIN users u ON u.id = p.author_user_id
+      LEFT JOIN users uploader ON uploader.id = p.user_id
+      ORDER BY p.created_at DESC, p.id DESC
+      LIMIT 200
+    `).all();
+
+    const items = rows.map(row => ({
+      ...row,
+      filename: row.filename
+        ? (row.filename.startsWith('/uploads/')
+            ? row.filename
+            : '/uploads/portfolio/' + encodeURIComponent(row.filename))
+        : null,
+      authorName: row.authorName || 'Аноним',
+      authorAvatar: row.authorAvatar || null
+    }));
+
+    return res.json({ items });
+  } catch (err) {
+    console.error('Ошибка загрузки публичного портфолио:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить портфолио' });
+  }
+});
+
+app.get('/api/portfolio/me', auth, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const rows = db.prepare(`
+      SELECT p.id, p.filename, p.title, p.description, p.category,
+             p.created_at AS createdAt, p.author_name AS authorName,
+             p.author_user_id AS authorUserId
+      FROM portfolio p
+      WHERE p.author_user_id = ? OR p.user_id = ?
+      ORDER BY p.created_at DESC, p.id DESC
+      LIMIT 200
+    `).all(userId, userId);
+
+    const items = rows.map(row => ({
+      ...row,
+      filename: row.filename
+        ? (row.filename.startsWith('/uploads/')
+            ? row.filename
+            : '/uploads/portfolio/' + encodeURIComponent(row.filename))
+        : null
+    }));
+
+    return res.json({ items });
+  } catch (err) {
+    console.error('Ошибка загрузки личного портфолио:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить ваши работы' });
+  }
+});
+
+app.get('/api/users/list', auth, (req, res) => {
+  if (req.user.role !== 'admin' && Number(req.user.is_root) !== 1) {
+    return res.status(403).json({ error: 'Недостаточно прав' });
+  }
+
+  try {
+    const users = db.prepare(`
+      SELECT id, name, avatar
+      FROM users
+      ORDER BY name COLLATE NOCASE ASC
+      LIMIT 1000
+    `).all();
+    return res.json({ users });
+  } catch (err) {
+    console.error('Ошибка списка пользователей:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить список пользователей' });
+  }
+});
+
+// Keep portfolio deletion limited to the uploader or an administrator.
+app.delete('/api/portfolio/:id', auth, (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'Некорректный ID работы' });
+  }
+
+  const item = db.prepare('SELECT id, user_id FROM portfolio WHERE id = ?').get(id);
+  if (!item) return res.status(404).json({ error: 'Работа не найдена' });
+
+  const isAdmin = req.user.role === 'admin' || Number(req.user.is_root) === 1;
+  if (!isAdmin && item.user_id !== req.user.id) {
+    return res.status(403).json({ error: 'Нет прав удалить эту работу' });
+  }
+
+  try {
+    db.prepare('DELETE FROM portfolio WHERE id = ?').run(id);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Ошибка удаления работы:', err);
+    return res.status(500).json({ error: 'Не удалось удалить работу' });
+  }
 });
 
 app.get('/api/portfolio', (req, res) => {
