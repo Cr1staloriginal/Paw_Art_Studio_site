@@ -465,7 +465,7 @@ function renderContentEditor() {
                 const label = escapeHtml(f.label);
                 const key = escapeHtml(f.key);
                 if (f.type === 'textarea') return `<label class="content-label">${label}<textarea data-content-key="${key}" class="content-input">${escapeHtml(val)}</textarea></label>`;
-                if (f.type === 'image') return `<div class="content-label"><span>${label}</span><div class="content-image-row"><input type="text" data-content-key="${key}" class="content-input" value="${escapeHtml(val)}" placeholder="/uploads/content/..." /><input type="file" id="content-img-${key}" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" hidden onchange="uploadContentImage(event, '${key}')" /><button type="button" class="btn btn-outline" onclick="document.getElementById('content-img-${key}').click()" aria-label="Загрузить изображение"><i class="fas fa-camera"></i></button></div><img data-content-preview="${key}" src="${escapeHtml(val)}" alt="" ${val ? '' : 'hidden'} style="max-width:200px;max-height:140px;object-fit:contain;margin-top:8px;border-radius:8px;"></div>`;
+                if (f.type === 'image') return `<div class="content-label"><span>${label}</span><div class="content-image-row"><input type="text" data-content-key="${key}" class="content-input" value="${escapeHtml(val)}" placeholder="/uploads/content/..." /><input type="file" id="content-img-${key}" accept="image/png,image/jpeg,image/webp,image/gif" hidden onchange="uploadContentImage(event, '${key}')" /><button type="button" class="btn btn-outline" onclick="document.getElementById('content-img-${key}').click()" aria-label="Загрузить изображение"><i class="fas fa-camera"></i></button></div><img data-content-preview="${key}" src="${escapeHtml(val)}" alt="" ${val ? '' : 'hidden'} style="max-width:200px;max-height:140px;object-fit:contain;margin-top:8px;border-radius:8px;"></div>`;
                 return `<label class="content-label">${label}<input type="text" data-content-key="${key}" class="content-input" value="${escapeHtml(val)}" /></label>`;
             }).join('')}
         </section>
@@ -474,8 +474,8 @@ function renderContentEditor() {
 async function uploadContentImage(e, key) {
     const file = e.target.files?.[0];
     if (!file) return;
-    if (!/^image\\/(png|jpe?g|gif|webp|svg\\+xml)$/i.test(file.type) || file.size > 5 * 1024 * 1024) {
-        showToast('Выберите PNG, JPG, WEBP, GIF или SVG до 5 МБ', 'error');
+    if (!/^image\/(png|jpe?g|gif|webp)$/i.test(file.type) || file.size > 5 * 1024 * 1024) {
+        showToast('Выберите PNG, JPG, WEBP или GIF до 5 МБ', 'error');
         e.target.value = '';
         return;
     }
