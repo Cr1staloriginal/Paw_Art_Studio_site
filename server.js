@@ -937,15 +937,33 @@ app.post('/api/role/request', auth, (req, res) => {
 });
 
 /* ==================== PROJECTS ==================== */
-app.get('/api/projects', (req, res) => {
+app.get('/api/projects', auth, (req, res) => {
   try {
+    const role = req.user?.role;
+    const userId = Number(req.user?.id);
+    let where = '';
+    let params = [];
+
+    // Клиенты видят только собственные заказы.
+    if (role === 'client') {
+      where = 'WHERE p.client_id = ?';
+      params = [userId];
+    } else if (role === 'executor') {
+      // Исполнители видят открытые заказы и заказы, уже назначенные им.
+      where = "WHERE (p.status = 'open' AND p.executor_id IS NULL) OR p.executor_id = ?";
+      params = [userId];
+    } else if (role !== 'admin' && role !== 'manager') {
+      return res.status(403).json({ error: 'Нет доступа к заказам' });
+    }
+
     const rows = db.prepare(`SELECT p.*,
                                     u.name AS client_name, u.avatar AS client_avatar,
                                     e.name AS executor_name, e.avatar AS executor_avatar
                              FROM projects p
                              LEFT JOIN users u ON u.id = p.client_id
                              LEFT JOIN users e ON e.id = p.executor_id
-                             ORDER BY p.created_at DESC LIMIT 100`).all();
+                             ${where}
+                             ORDER BY p.created_at DESC LIMIT 100`).all(...params);
     const projects = rows.map(p => ({
       ...p,
       clientId: p.client_id ?? null,
