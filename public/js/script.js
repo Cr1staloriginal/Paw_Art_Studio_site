@@ -335,6 +335,8 @@ function updateUI() {
         loginBtn.classList.remove('hidden'); userBox.classList.add('hidden');
         adminBtn.classList.add('hidden'); adminMenuLink.classList.add('hidden'); msgrFab.classList.add('hidden');
         if (contentLink) contentLink.classList.add('hidden');
+        const editorAdminButton = document.getElementById('contentEditorAdminButton');
+        if (editorAdminButton) editorAdminButton.classList.add('hidden');
     }
 }
 function toggleUserMenu() { document.getElementById('userMenu').classList.toggle('hidden'); }
@@ -362,11 +364,23 @@ async function loadAndApplyContent() {
 function applyContent(c) {
     if (!c) return;
     ['hero_eyebrow','hero_title','hero_subtitle','hero_badge_1','hero_badge_2','hero_badge_3'].forEach(k => setText(`[data-content="${k}"]`, c[k]));
-    if (c.hero_image) { const heroBg = document.querySelector('.hero-bg'); if (heroBg) { heroBg.style.backgroundImage = `url(${c.hero_image})`; heroBg.style.backgroundSize = 'cover'; heroBg.style.backgroundPosition = 'center'; } }
+    if (c.hero_image) {
+        const heroBg = document.querySelector('.hero-bg');
+        if (heroBg) {
+            heroBg.style.backgroundImage = `url("${String(c.hero_image).replace(/["\\\\]/g, '')}")`;
+            heroBg.style.backgroundSize = 'cover';
+            heroBg.style.backgroundPosition = 'center';
+        }
+    }
     for (let i = 1; i <= 7; i++) {
         setText(`[data-content="service_${i}_name"]`, c[`service_${i}_name`]);
         setText(`[data-content="service_${i}_desc"]`, c[`service_${i}_desc`]);
         setText(`[data-content="service_${i}_price"]`, c[`service_${i}_price`]);
+        const image = document.querySelector(`[data-content="service_${i}_image"]`);
+        if (image && c[`service_${i}_image`]) {
+            if (image.matches('img')) image.src = c[`service_${i}_image`];
+            else image.style.backgroundImage = `url("${String(c[`service_${i}_image`]).replace(/["\\\\]/g, '')}")`;
+        }
     }
     for (let i = 1; i <= 5; i++) {
         setText(`[data-content="pricing_${i}_name"]`, c[`pricing_${i}_name`]);
@@ -396,7 +410,7 @@ const CONTENT_FIELDS = [
         { key: 'hero_image', label: 'Фоновое изображение', type: 'image' },
     ]},
     { section: '🛠 Услуги', fields: Array.from({ length: 7 }, (_, i) => { const n = i + 1; return [
-        { key: `service_${n}_name`, label: `Услуга ${n} — название` }, { key: `service_${n}_desc`, label: `Услуга ${n} — описание` }, { key: `service_${n}_price`, label: `Услуга ${n} — цена` },
+        { key: `service_${n}_name`, label: `Услуга ${n} — название` }, { key: `service_${n}_desc`, label: `Услуга ${n} — описание`, type: 'textarea' }, { key: `service_${n}_price`, label: `Услуга ${n} — цена` }, { key: `service_${n}_image`, label: `Услуга ${n} — изображение`, type: 'image' },
     ]; }).flat() },
     { section: '💰 Тарифы', fields: Array.from({ length: 5 }, (_, i) => { const n = i + 1; return [
         { key: `pricing_${n}_name`, label: `Тариф ${n} — название` }, { key: `pricing_${n}_price`, label: `Тариф ${n} — цена` }, { key: `pricing_${n}_features`, label: `Тариф ${n} — фичи (через |)`, type: 'textarea' },
@@ -421,14 +435,12 @@ async function openContentEditor() {
     const modal = document.getElementById('contentModal');
     if (!modal) return showToast('❌ Окно редактора не найдено', 'error');
 
-    if (!state.content) {
-        try {
-            const { content } = await api('/api/content');
-            state.content = content || {};
-        } catch (err) {
-            showToast('❌ Не удалось загрузить редактор: ' + err.message, 'error');
-            return;
-        }
+    try {
+        const { content } = await api('/api/content');
+        state.content = content || {};
+    } catch (err) {
+        showToast('❌ Не удалось загрузить редактор: ' + err.message, 'error');
+        return;
     }
 
     renderContentEditor();
@@ -436,37 +448,72 @@ async function openContentEditor() {
     document.body.style.overflow = 'hidden';
     document.getElementById('userMenu')?.classList.add('hidden');
 }
-function closeContentEditor() { document.getElementById('contentModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
+function closeContentEditor() {
+    document.getElementById('contentModal')?.classList.remove('open');
+    if (!isAnyModalOpen()) document.body.style.overflow = '';
+}
 
 function renderContentEditor() {
     const c = state.content || {};
     const wrap = document.getElementById('contentEditorWrap');
     if (!wrap) return;
     wrap.innerHTML = CONTENT_FIELDS.map(group => `
-        <div class="content-group">
-            <h4 class="content-group-title">${group.section}</h4>
+        <section class="content-group">
+            <h4 class="content-group-title">${escapeHtml(group.section)}</h4>
             ${group.fields.map(f => {
-                const val = c[f.key] || '';
-                if (f.type === 'textarea') return `<label class="content-label">${f.label}<textarea data-content-key="${f.key}" class="content-input">${escapeHtml(val)}</textarea></label>`;
-                if (f.type === 'image') return `<label class="content-label">${f.label}<div class="content-image-row"><input type="text" data-content-key="${f.key}" class="content-input" value="${escapeHtml(val)}" placeholder="/uploads/content/..." /><input type="file" id="content-img-${f.key}" accept="image/*" hidden onchange="uploadContentImage(event, '${f.key}')" /><button type="button" class="btn btn-outline" onclick="document.getElementById('content-img-${f.key}').click()"><i class="fas fa-camera"></i></button></div>${val ? `<img src="${escapeHtml(val)}" style="max-width:200px;margin-top:8px;border-radius:8px;">` : ''}</label>`;
-                return `<label class="content-label">${f.label}<input type="text" data-content-key="${f.key}" class="content-input" value="${escapeHtml(val)}" /></label>`;
+                const val = c[f.key] ?? '';
+                const label = escapeHtml(f.label);
+                const key = escapeHtml(f.key);
+                if (f.type === 'textarea') return `<label class="content-label">${label}<textarea data-content-key="${key}" class="content-input">${escapeHtml(val)}</textarea></label>`;
+                if (f.type === 'image') return `<div class="content-label"><span>${label}</span><div class="content-image-row"><input type="text" data-content-key="${key}" class="content-input" value="${escapeHtml(val)}" placeholder="/uploads/content/..." /><input type="file" id="content-img-${key}" accept="image/png,image/jpeg,image/webp,image/gif,image/svg+xml" hidden onchange="uploadContentImage(event, '${key}')" /><button type="button" class="btn btn-outline" onclick="document.getElementById('content-img-${key}').click()" aria-label="Загрузить изображение"><i class="fas fa-camera"></i></button></div><img data-content-preview="${key}" src="${escapeHtml(val)}" alt="" ${val ? '' : 'hidden'} style="max-width:200px;max-height:140px;object-fit:contain;margin-top:8px;border-radius:8px;"></div>`;
+                return `<label class="content-label">${label}<input type="text" data-content-key="${key}" class="content-input" value="${escapeHtml(val)}" /></label>`;
             }).join('')}
-        </div>
+        </section>
     `).join('');
 }
 async function uploadContentImage(e, key) {
-    const file = e.target.files?.[0]; if (!file) return;
-    const fd = new FormData(); fd.append('image', file);
-    try { const { url } = await api('/api/admin/content/upload', { method: 'POST', body: fd }); const input = document.querySelector(`[data-content-key="${key}"]`); if (input) input.value = url; showToast('✅ Картинка загружена'); }
-    catch (err) { showToast('❌ ' + err.message, 'error'); }
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (!/^image\\/(png|jpe?g|gif|webp|svg\\+xml)$/i.test(file.type) || file.size > 5 * 1024 * 1024) {
+        showToast('Выберите PNG, JPG, WEBP, GIF или SVG до 5 МБ', 'error');
+        e.target.value = '';
+        return;
+    }
+    const fd = new FormData();
+    fd.append('image', file);
+    const input = document.querySelector(`#contentEditorWrap [data-content-key="${key}"]`);
+    const preview = document.querySelector(`#contentEditorWrap [data-content-preview="${key}"]`);
+    try {
+        const { url } = await api('/api/admin/content/upload', { method: 'POST', body: fd });
+        if (input) input.value = url;
+        if (preview) { preview.src = url; preview.hidden = false; }
+        showToast('✅ Картинка загружена. Нажмите «Сохранить всё»');
+    } catch (err) {
+        showToast('❌ ' + err.message, 'error');
+    } finally {
+        e.target.value = '';
+    }
 }
 async function saveContent() {
     const inputs = document.querySelectorAll('#contentEditorWrap [data-content-key]');
-    const updates = {}; inputs.forEach(inp => { updates[inp.dataset.contentKey] = inp.value; });
-    const btn = document.getElementById('contentSaveBtn'); btn.disabled = true;
-    try { await api('/api/admin/content', { method: 'POST', body: { updates } }); state.content = { ...state.content, ...updates }; applyContent(state.content); showToast('✅ Контент сохранён'); }
-    catch (err) { showToast('❌ ' + err.message, 'error'); }
-    finally { btn.disabled = false; }
+    const updates = {};
+    inputs.forEach(input => { updates[input.dataset.contentKey] = input.value.trim(); });
+    const btn = document.getElementById('contentSaveBtn');
+    if (!btn) return;
+    btn.disabled = true;
+    const oldLabel = btn.innerHTML;
+    btn.innerHTML = '<i class="fas fa-spinner fa-spin"></i> Сохраняем…';
+    try {
+        const result = await api('/api/admin/content', { method: 'POST', body: { updates } });
+        state.content = { ...(state.content || {}), ...updates };
+        applyContent(state.content);
+        showToast(`✅ Контент сохранён (${result.count ?? Object.keys(updates).length} полей)`);
+    } catch (err) {
+        showToast('❌ ' + err.message, 'error');
+    } finally {
+        btn.disabled = false;
+        btn.innerHTML = oldLabel;
+    }
 }
 
 /* PACKAGE CONFIGURATOR */
