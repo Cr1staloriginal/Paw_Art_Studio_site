@@ -262,6 +262,22 @@ db.exec(`
   ON portfolio(user_id);
 `);
 
+// Backfill legacy entries: before author fields existed, the uploader
+// was the only available author reference. Preserve explicit authors.
+db.exec(`
+  UPDATE portfolio
+  SET author_user_id = user_id
+  WHERE author_user_id IS NULL
+    AND EXISTS (SELECT 1 FROM users WHERE users.id = portfolio.user_id);
+
+  UPDATE portfolio
+  SET author_name = (
+    SELECT users.name FROM users WHERE users.id = portfolio.user_id
+  )
+  WHERE (author_name IS NULL OR TRIM(author_name) = '')
+    AND EXISTS (SELECT 1 FROM users WHERE users.id = portfolio.user_id);
+`);
+
 try {
   db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ref_code ON users(referral_code) WHERE referral_code IS NOT NULL');
 } catch (e) { /* ignore */ }
@@ -1200,7 +1216,10 @@ app.delete('/api/portfolio/:id', auth, (req, res) => {
   if (!item) return res.status(404).json({ error: 'Работа не найдена' });
 
   const isAdmin = req.user.role === 'admin' || Number(req.user.is_root) === 1;
-  if (!isAdmin && item.user_id !== req.user.id) {
+  const isUploader = item.user_id === req.user.id;
+  const author = db.prepare('SELECT author_user_id FROM portfolio WHERE id = ?').get(id);
+  const isAuthor = author?.author_user_id === req.user.id;
+  if (!isAdmin && !isUploader && !isAuthor) {
     return res.status(403).json({ error: 'Нет прав удалить эту работу' });
   }
 
