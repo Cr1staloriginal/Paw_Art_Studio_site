@@ -571,6 +571,7 @@
     <div class="modal-box admin-box">
         <button class="modal-close" onclick="closeAdminPanel()">×</button>
         <div class="admin-head"><div class="admin-head-icon">🛡️</div><div><h3>Админ-панель</h3><p>Управление и статистика</p></div></div>
+        <button type="button" id="contentEditorAdminButton" class="btn btn-outline hidden" style="width:100%;margin:0 0 12px" onclick="openContentEditor()"><i class="fas fa-edit"></i> Редактор сайта 👑</button>
         <div class="admin-tabs">
             <button class="admin-tab active" data-atab="dashboard" onclick="switchAdminTab('dashboard')"><i class="fas fa-chart-line"></i> Статистика</button>
             <button class="admin-tab" data-atab="withdrawals" onclick="switchAdminTab('withdrawals')"><i class="fas fa-money-check-alt"></i> Выплаты <span class="admin-badge" id="wdCount">0</span></button>
