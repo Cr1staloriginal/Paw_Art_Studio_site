@@ -311,15 +311,24 @@ function updateUI() {
         if (u.role === 'admin') {
             adminBtn.classList.remove('hidden'); adminMenuLink.classList.remove('hidden');
             const isRoot = u.isRoot === true || Number(u.isRoot ?? u.is_root ?? 0) === 1;
+            const editorAdminButton = document.getElementById('contentEditorAdminButton');
             if (isRoot) {
                 adminBtn.style.background = 'linear-gradient(135deg, #fbbf24, #f59e0b)';
                 adminBtn.title = '👑 Главный админ';
                 if (contentLink) contentLink.classList.remove('hidden');
+                if (editorAdminButton) editorAdminButton.classList.remove('hidden');
             }
-            else { adminBtn.style.background = ''; adminBtn.title = 'Админ'; if (contentLink) contentLink.classList.add('hidden'); }
+            else {
+                adminBtn.style.background = '';
+                adminBtn.title = 'Админ';
+                if (contentLink) contentLink.classList.add('hidden');
+                if (editorAdminButton) editorAdminButton.classList.add('hidden');
+            }
         } else {
             adminBtn.classList.add('hidden'); adminMenuLink.classList.add('hidden');
             if (contentLink) contentLink.classList.add('hidden');
+            const editorAdminButton = document.getElementById('contentEditorAdminButton');
+            if (editorAdminButton) editorAdminButton.classList.add('hidden');
         }
         if (u.role === 'executor') createProjectBtn.classList.add('hidden'); else createProjectBtn.classList.remove('hidden');
     } else {
@@ -405,12 +414,27 @@ const CONTENT_FIELDS = [
 
 async function openContentEditor() {
     if (!state.user) return openAuth();
-    if (state.user.role !== 'admin' || !state.user.isRoot) return showToast('⛔ Только главный админ', 'error');
-    if (!state.content) { try { const { content } = await api('/api/content'); state.content = content; } catch (err) { showToast('❌ ' + err.message, 'error'); return; } }
+    const isRoot = state.user.role === 'admin' &&
+        (state.user.isRoot === true || Number(state.user.isRoot ?? state.user.is_root ?? 0) === 1);
+    if (!isRoot) return showToast('⛔ Только главный админ', 'error');
+
+    const modal = document.getElementById('contentModal');
+    if (!modal) return showToast('❌ Окно редактора не найдено', 'error');
+
+    if (!state.content) {
+        try {
+            const { content } = await api('/api/content');
+            state.content = content || {};
+        } catch (err) {
+            showToast('❌ Не удалось загрузить редактор: ' + err.message, 'error');
+            return;
+        }
+    }
+
     renderContentEditor();
-    document.getElementById('contentModal').classList.add('open');
+    modal.classList.add('open');
     document.body.style.overflow = 'hidden';
-    document.getElementById('userMenu').classList.add('hidden');
+    document.getElementById('userMenu')?.classList.add('hidden');
 }
 function closeContentEditor() { document.getElementById('contentModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
 
