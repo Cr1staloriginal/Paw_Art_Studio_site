@@ -926,6 +926,97 @@ app.get('/api/admin/users', auth, (req, res) => {
   }
 });
 
+
+// Admin statistics: all monetary values are stored and returned in kopecks.
+app.get('/api/admin/stats', auth, adminOnly, (req, res) => {
+  try {
+    const scalar = (sql, ...params) => Number(db.prepare(sql).get(...params)?.n || 0);
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const stats = {
+      money: {
+        totalBalance: scalar('SELECT COALESCE(SUM(balance), 0) AS n FROM users'),
+        totalIn: scalar("SELECT COALESCE(SUM(amount), 0) AS n FROM transactions WHERE type = 'in'"),
+        totalOut: scalar("SELECT COALESCE(SUM(amount), 0) AS n FROM transactions WHERE type = 'out'")
+      },
+      withdrawals: {
+        pendingCount: scalar("SELECT COUNT(*) AS n FROM withdrawals WHERE status = 'pending'"),
+        pendingSum: scalar("SELECT COALESCE(SUM(amount), 0) AS n FROM withdrawals WHERE status = 'pending'")
+      },
+      users: {
+        total: scalar('SELECT COUNT(*) AS n FROM users'),
+        new7: scalar('SELECT COUNT(*) AS n FROM users WHERE created_at >= ?', sevenDaysAgo),
+        clients: scalar("SELECT COUNT(*) AS n FROM users WHERE role = 'client'"),
+        executors: scalar("SELECT COUNT(*) AS n FROM users WHERE role = 'executor'"),
+        managers: scalar("SELECT COUNT(*) AS n FROM users WHERE role = 'manager'"),
+        admins: scalar("SELECT COUNT(*) AS n FROM users WHERE role = 'admin'")
+      },
+      projects: {
+        total: scalar('SELECT COUNT(*) AS n FROM projects'),
+        inProgress: scalar("SELECT COUNT(*) AS n FROM projects WHERE status = 'in_progress'"),
+        completed: scalar("SELECT COUNT(*) AS n FROM projects WHERE status = 'completed'"),
+        cancelled: scalar("SELECT COUNT(*) AS n FROM projects WHERE status = 'cancelled'")
+      },
+      messages: { total: scalar('SELECT COUNT(*) AS n FROM messages') },
+      portfolio: { total: scalar('SELECT COUNT(*) AS n FROM portfolio') },
+      payments: {
+        succeededSum: scalar("SELECT COALESCE(SUM(amount), 0) AS n FROM payments WHERE LOWER(status) IN ('succeeded', 'success', 'paid')")
+      }
+    };
+    return res.json(stats);
+  } catch (err) {
+    console.error('[admin/stats] Ошибка:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить статистику' });
+  }
+});
+
+app.get('/api/admin/requests', auth, adminOnly, (req, res) => {
+  try {
+    const requests = db.prepare(`
+      SELECT id, name, email, avatar, role, requested_role, created_at
+      FROM users
+      WHERE requested_role IS NOT NULL AND TRIM(requested_role) <> ''
+      ORDER BY created_at ASC, id ASC
+      LIMIT 1000
+    `).all().map(u => ({
+      id: Number(u.id),
+      name: String(u.name || 'Без имени'),
+      email: String(u.email || ''),
+      avatar: u.avatar || null,
+      role: String(u.role || 'client'),
+      requestedRole: String(u.requested_role),
+      createdAt: Number(u.created_at || 0)
+    }));
+    return res.json({ requests });
+  } catch (err) {
+    console.error('[admin/requests] Ошибка:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить заявки' });
+  }
+});
+
+app.post('/api/admin/approve', auth, adminOnly, (req, res) => {
+  const userId = Number(req.body?.userId);
+  if (!Number.isSafeInteger(userId) || userId <= 0)
+    return res.status(400).json({ error: 'Некорректный ID пользователя' });
+  const target = db.prepare('SELECT id, requested_role FROM users WHERE id = ?').get(userId);
+  if (!target) return res.status(404).json({ error: 'Заявка не найдена' });
+  if (!['executor', 'manager'].includes(target.requested_role))
+    return res.status(400).json({ error: 'У пользователя нет ожидающей заявки' });
+  db.prepare('UPDATE users SET role = requested_role, requested_role = NULL WHERE id = ?').run(userId);
+  return res.json({ ok: true, userId });
+});
+
+app.post('/api/admin/reject', auth, adminOnly, (req, res) => {
+  const userId = Number(req.body?.userId);
+  if (!Number.isSafeInteger(userId) || userId <= 0)
+    return res.status(400).json({ error: 'Некорректный ID пользователя' });
+  const target = db.prepare('SELECT id, requested_role FROM users WHERE id = ?').get(userId);
+  if (!target) return res.status(404).json({ error: 'Заявка не найдена' });
+  if (!target.requested_role)
+    return res.status(400).json({ error: 'У пользователя нет ожидающей заявки' });
+  db.prepare('UPDATE users SET requested_role = NULL WHERE id = ?').run(userId);
+  return res.json({ ok: true, userId });
+});
+
 app.post('/api/admin/balance', auth, (req, res) => {
   const isAdmin = req.user?.role === 'admin' || Number(req.user?.is_root) === 1;
   const isRoot = req.user?.role === 'admin' && Number(req.user?.is_root) === 1;
@@ -1002,7 +1093,7 @@ app.post('/api/admin/balance', auth, (req, res) => {
 
 /* ==================== ADMIN: withdrawals ==================== */
 app.get('/api/admin/withdrawals', auth, adminOnly, (req, res) => {
-  const items = db.prepare(`SELECT w.*, u.name AS user_name, u.email AS user_email,
+  const items = db.prepare(`SELECT w.*, u.name AS user_name, u.email AS user_email, u.avatar AS user_avatar,
                                    r.name AS reviewer_name
                             FROM withdrawals w
                             JOIN users u ON u.id = w.user_id
@@ -1011,6 +1102,8 @@ app.get('/api/admin/withdrawals', auth, adminOnly, (req, res) => {
   res.json({
     withdrawals: items.map(w => ({
       ...withdrawalRow(w),
+      // Keep nested user shape expected by the current frontend, plus legacy flat fields.
+      user: { id: Number(w.user_id), name: w.user_name || 'Без имени', email: w.user_email || '', avatar: w.user_avatar || null },
       userName: w.user_name,
       userEmail: w.user_email,
       reviewerName: w.reviewer_name,
