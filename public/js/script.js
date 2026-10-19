@@ -750,16 +750,84 @@ async function changeStatus(id, status) { try { await api(`/api/projects/${id}/s
 
 /* PORTFOLIO */
 async function loadAllPortfolio() {
-    const wrap = document.getElementById('portfolioGallery'); if (!wrap) return;
-    try { const { items } = await api('/api/portfolio/all'); state.allPortfolio = items; renderAllPortfolio(); }
-    catch { wrap.innerHTML = `<div class="empty-state"><i class="fas fa-image"></i><p>Не удалось загрузить</p></div>`; }
+    const wrap = document.getElementById('portfolioGallery');
+    if (!wrap) return;
+
+    try {
+        const data = await api('/api/portfolio/all');
+        state.allPortfolio = Array.isArray(data?.items)
+            ? data.items.filter(item => item && typeof item === 'object')
+            : [];
+        renderAllPortfolio();
+    } catch (err) {
+        console.error('Не удалось загрузить портфолио:', err);
+        state.allPortfolio = [];
+        wrap.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-image"></i>
+                <p>Работы появятся здесь</p>
+            </div>`;
+    }
 }
+
 function renderAllPortfolio() {
-    const wrap = document.getElementById('portfolioGallery'); if (!wrap) return;
-    let items = state.allPortfolio;
-    if (state.portfolioFilter !== 'all') items = items.filter(i => i.category === state.portfolioFilter);
-    if (!items.length) { wrap.innerHTML = `<div class="empty-state"><i class="fas fa-image"></i><p>Работы появятся здесь</p></div>`; return; }
-    wrap.innerHTML = items.map((it, i) => `<div class="portfolio-item" onclick="openLightbox(${i})"><span class="portfolio-tag">${escapeHtml(it.category)}</span><img src="${escapeHtml(it.filename)}" alt="${escapeHtml(it.title)}" loading="lazy"><div class="portfolio-info"><div class="portfolio-title">${escapeHtml(it.title)}</div><div class="portfolio-author"><span class="project-client-avatar">${it.authorAvatar ? `<img src="${escapeHtml(it.authorAvatar)}" alt="">` : escapeHtml((it.authorName || '?').charAt(0).toUpperCase())}</span>${escapeHtml(it.authorName || '—')}</div></div></div>`).join('');
+    const wrap = document.getElementById('portfolioGallery');
+    if (!wrap) return;
+
+    const allItems = Array.isArray(state.allPortfolio) ? state.allPortfolio : [];
+    let items = allItems.filter(it => it && typeof it === 'object');
+
+    if (state.portfolioFilter !== 'all') {
+        items = items.filter(it => it.category === state.portfolioFilter);
+    }
+
+    if (!items.length) {
+        wrap.innerHTML = `
+            <div class="empty-state">
+                <i class="fas fa-image"></i>
+                <p>Работы появятся здесь</p>
+            </div>`;
+        return;
+    }
+
+    wrap.innerHTML = items.map((it, i) => {
+        const title = String(it.title || 'Без названия');
+        const category = String(it.category || 'Другое');
+        const authorName = String(it.authorName || 'Аноним');
+        const avatar = String(it.authorAvatar || '').trim();
+        const filename = String(it.filename || '').trim();
+        const initial = escapeHtml(authorName.charAt(0).toUpperCase());
+
+        const avatarHtml = avatar
+            ? `<img src="${escapeHtml(avatar)}" alt="" loading="lazy"
+                   onerror="this.style.display='none';this.nextElementSibling.classList.remove('hidden')">
+               <span class="portfolio-author-initial hidden">${initial}</span>`
+            : `<span class="portfolio-author-initial">${initial}</span>`;
+
+        const imageHtml = filename
+            ? `<img src="${escapeHtml(filename)}" alt="${escapeHtml(title)}"
+                    loading="lazy"
+                    onerror="this.style.display='none';this.nextElementSibling.style.display='flex'">
+               <div class="portfolio-image-placeholder" style="display:none">
+                   <i class="fas fa-image"></i><span>Изображение недоступно</span>
+               </div>`
+            : `<div class="portfolio-image-placeholder">
+                   <i class="fas fa-image"></i><span>Изображение недоступно</span>
+               </div>`;
+
+        return `
+            <div class="portfolio-item" onclick="openLightbox(${i})">
+                <span class="portfolio-tag">${escapeHtml(category)}</span>
+                ${imageHtml}
+                <div class="portfolio-info">
+                    <div class="portfolio-title">${escapeHtml(title)}</div>
+                    <div class="portfolio-author">
+                        <span class="project-client-avatar">${avatarHtml}</span>
+                        <span>${escapeHtml(authorName)}</span>
+                    </div>
+                </div>
+            </div>`;
+    }).join('');
 }
 function openLightbox(index) {
     let items = state.allPortfolio;
@@ -771,7 +839,66 @@ function openLightbox(index) {
     document.getElementById('lightbox').classList.add('open'); document.body.style.overflow = 'hidden';
 }
 function closeLightbox() { document.getElementById('lightbox').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
-function openMyPortfolio() { if (!state.user) return openAuth(); if (!['executor', 'admin', 'manager'].includes(state.user.role)) return showToast('⚠️ Только для исполнителей', 'error'); document.getElementById('myPortfolioModal').classList.add('open'); document.body.style.overflow = 'hidden'; document.getElementById('userMenu').classList.add('hidden'); loadMyPortfolio(); }
+async function openMyPortfolio() {
+    if (!state.user) return openAuth();
+
+    const user = state.user;
+    const isAdmin = user.role === 'admin' || user.isRoot === true || Number(user.is_root) === 1;
+    const isExecutor = user.role === 'executor';
+
+    if (!isAdmin && !isExecutor) {
+        return showToast('⚠️ Портфолио доступно исполнителям и администраторам', 'error');
+    }
+
+    const modal = document.getElementById('myPortfolioModal');
+    const authorBlock = document.getElementById('adminAuthorBlock');
+    if (authorBlock) authorBlock.classList.toggle('hidden', !isAdmin);
+
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    document.getElementById('userMenu')?.classList.add('hidden');
+
+    if (isAdmin) await loadPortfolioAuthors();
+    await loadMyPortfolio();
+}
+
+async function loadPortfolioAuthors() {
+    const select = document.getElementById('portAuthorUser');
+    if (!select) return;
+
+    select.innerHTML = '<option value="">Без привязки к аккаунту</option>';
+    try {
+        const data = await api('/api/users/list');
+        const users = Array.isArray(data?.users) ? data.users : [];
+        for (const user of users) {
+            const option = document.createElement('option');
+            option.value = String(user.id);
+            option.textContent = user.name || `Пользователь ${user.id}`;
+            select.appendChild(option);
+        }
+    } catch (err) {
+        console.error('Не удалось загрузить авторов:', err);
+        showToast('❌ Не удалось загрузить список авторов', 'error');
+    }
+
+    select.onchange = syncPortfolioAuthor;
+    syncPortfolioAuthor();
+}
+
+function syncPortfolioAuthor() {
+    const select = document.getElementById('portAuthorUser');
+    const input = document.getElementById('portAuthorName');
+    if (!select || !input) return;
+
+    const selected = select.options[select.selectedIndex];
+    if (select.value) {
+        input.value = selected?.textContent || '';
+        input.readOnly = true;
+    } else {
+        input.readOnly = false;
+        input.value = '';
+    }
+}
 function closeMyPortfolio() { document.getElementById('myPortfolioModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
 async function loadMyPortfolio() { try { const { items } = await api('/api/portfolio/me'); state.myPortfolio = items; renderMyPortfolio(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 function renderMyPortfolio() {
@@ -782,16 +909,60 @@ function renderMyPortfolio() {
 function previewPortfolioFile(e) { const f = e.target.files?.[0]; if (!f) return; if (f.size > 5 * 1024 * 1024) { showToast('❌ Максимум 5 МБ', 'error'); e.target.value = ''; return; } document.getElementById('uploadZoneText').textContent = f.name; }
 async function handlePortfolioUpload(e) {
     e.preventDefault();
-    const file = document.getElementById('portfolioInput').files?.[0]; if (!file) return showToast('⚠️ Выберите файл', 'error');
+
+    const user = state.user;
+    if (!user) return showToast('⚠️ Сначала войдите в аккаунт', 'error');
+
+    const isAdmin = user.role === 'admin' || user.isRoot === true || Number(user.is_root) === 1;
+    const isExecutor = user.role === 'executor';
+    if (!isAdmin && !isExecutor) return showToast('❌ Недостаточно прав', 'error');
+
+    const form = e.currentTarget;
+    const fileInput = document.getElementById('portfolioInput');
+    const file = fileInput?.files?.[0];
+    if (!file) return showToast('⚠️ Выберите изображение', 'error');
+    if (file.size > 5 * 1024 * 1024) return showToast('⚠️ Максимальный размер — 5 МБ', 'error');
+
     const title = document.getElementById('portTitle').value.trim();
     const description = document.getElementById('portDescription').value.trim();
     const category = document.getElementById('portCategory').value;
-    if (!title) return showToast('⚠️ Укажите название', 'error');
-    const fd = new FormData(); fd.append('image', file); fd.append('title', title); fd.append('description', description); fd.append('category', category);
-    const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
-    try { await api('/api/portfolio', { method: 'POST', body: fd }); e.target.reset(); document.getElementById('uploadZoneText').textContent = 'Нажмите, чтобы выбрать изображение'; await loadMyPortfolio(); await loadAllPortfolio(); showToast('✅ Загружено'); }
-    catch (err) { showToast('❌ ' + err.message, 'error'); }
-    finally { btn.disabled = false; }
+    if (!title) return showToast('⚠️ Укажите название работы', 'error');
+
+    const fd = new FormData();
+    fd.append('image', file);
+    fd.append('title', title);
+    fd.append('description', description);
+    fd.append('category', category);
+
+    if (isAdmin) {
+        const authorName = document.getElementById('portAuthorName')?.value.trim() || '';
+        const authorUserId = document.getElementById('portAuthorUser')?.value || '';
+        if (!authorUserId && !authorName) return showToast('⚠️ Укажите имя автора', 'error');
+        fd.append('authorName', authorName);
+        if (authorUserId) fd.append('authorUserId', authorUserId);
+    }
+
+    const button = form.querySelector('button[type="submit"]');
+    if (button) button.disabled = true;
+
+    try {
+        await api('/api/portfolio', { method: 'POST', body: fd });
+        form.reset();
+
+        const uploadZoneText = document.getElementById('uploadZoneText');
+        if (uploadZoneText) uploadZoneText.textContent = 'Нажмите, чтобы выбрать изображение';
+
+        const authorNameInput = document.getElementById('portAuthorName');
+        if (authorNameInput) authorNameInput.readOnly = false;
+
+        await Promise.all([loadMyPortfolio(), loadAllPortfolio()]);
+        showToast('✅ Работа успешно загружена');
+    } catch (err) {
+        console.error('Ошибка загрузки работы:', err);
+        showToast('❌ ' + err.message, 'error');
+    } finally {
+        if (button) button.disabled = false;
+    }
 }
 async function deletePortfolioItem(id) { if (!confirm('Удалить работу?')) return; try { await api(`/api/portfolio/${id}`, { method: 'DELETE' }); await loadMyPortfolio(); await loadAllPortfolio(); showToast('🗑️ Удалено'); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 
