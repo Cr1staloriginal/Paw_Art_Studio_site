@@ -598,3 +598,28 @@ textarea.content-input { min-height: 70px; resize: vertical; }
 #verifyCode { width: 100%; max-width: 100%; box-sizing: border-box; font-variant-numeric: tabular-nums; }
 #verifyForm button { width: 100%; max-width: 100%; white-space: normal; }
 @media (max-width: 480px) { .verify-intro { margin-bottom: 16px; } .verify-hint { font-size: 0.82rem; } }
+
+
+/* Portfolio author avatar fallback and missing-image placeholder */
+.portfolio-author-initial {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    border-radius: 50%;
+    background: rgba(150, 130, 210, 0.2);
+    color: inherit;
+    font-weight: 700;
+}
+
+.portfolio-image-placeholder {
+    min-height: 180px;
+    width: 100%;
+    align-items: center;
+    justify-content: center;
+    flex-direction: column;
+    gap: 10px;
+    color: var(--text-secondary, #aaa);
+    background: rgba(120, 120, 140, 0.08);
+}
