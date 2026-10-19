@@ -897,6 +897,109 @@ app.get('/api/referrals/click/:code', (req, res) => {
   res.json({ ok: true, code });
 });
 
+/* ==================== ADMIN: users and balance ==================== */
+app.get('/api/admin/users', auth, (req, res) => {
+  const isAdmin = req.user?.role === 'admin' || Number(req.user?.is_root) === 1;
+  if (!isAdmin) return res.status(403).json({ error: 'Недостаточно прав' });
+
+  try {
+    // Only expose fields required by the UI, never password hashes.
+    const users = db.prepare(`
+      SELECT id, name, email, role, balance, avatar, is_root, created_at
+      FROM users
+      ORDER BY id DESC
+      LIMIT 5000
+    `).all().map(u => ({
+      id: Number(u.id),
+      name: String(u.name || 'Без имени'),
+      email: String(u.email || ''),
+      role: String(u.role || 'client'),
+      balance: Number(u.balance ?? 0),
+      avatar: u.avatar || null,
+      isRoot: Number(u.is_root) === 1,
+      createdAt: Number(u.created_at || 0)
+    }));
+    return res.json({ users });
+  } catch (err) {
+    console.error('[admin/users] Ошибка:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить пользователей' });
+  }
+});
+
+app.post('/api/admin/balance', auth, (req, res) => {
+  const isAdmin = req.user?.role === 'admin' || Number(req.user?.is_root) === 1;
+  const isRoot = req.user?.role === 'admin' && Number(req.user?.is_root) === 1;
+  if (!isAdmin) return res.status(403).json({ error: 'Недостаточно прав' });
+
+  const userId = Number(req.body?.userId);
+  const amountRubles = req.body?.amount;
+  if (!Number.isSafeInteger(userId) || userId <= 0 ||
+      typeof amountRubles !== 'number' || !Number.isFinite(amountRubles) ||
+      amountRubles === 0 || Math.abs(amountRubles) > 1_000_000) {
+    return res.status(400).json({ error: 'Некорректная сумма или ID пользователя' });
+  }
+
+  const amountKopecks = Math.round(amountRubles * 100);
+  if (!Number.isSafeInteger(amountKopecks) || amountKopecks === 0) {
+    return res.status(400).json({ error: 'Сумма превышает допустимый диапазон' });
+  }
+
+  try {
+    const adjustBalance = db.transaction(() => {
+      const target = db.prepare(
+        'SELECT id, role, balance FROM users WHERE id = ?'
+      ).get(userId);
+
+      if (!target) {
+        const error = new Error('Пользователь не найден');
+        error.status = 404;
+        throw error;
+      }
+      if (target.role === 'admin' && !isRoot && userId !== Number(req.user.id)) {
+        const error = new Error('Изменять баланс другого администратора может только главный администратор');
+        error.status = 403;
+        throw error;
+      }
+
+      const current = Number(target.balance ?? 0);
+      if (!Number.isSafeInteger(current) || current < 0) {
+        const error = new Error('Текущий баланс некорректен; требуется проверка БД');
+        error.status = 409;
+        throw error;
+      }
+
+      const nextBig = BigInt(current) + BigInt(amountKopecks);
+      const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
+      const sqliteMax = 9223372036854775807n;
+      if (nextBig < 0n || nextBig > maxSafe || nextBig > sqliteMax) {
+        const error = new Error('Итоговый баланс вне допустимого диапазона');
+        error.status = 400;
+        throw error;
+      }
+
+      const next = Number(nextBig);
+      db.prepare('UPDATE users SET balance = ? WHERE id = ?').run(next, userId);
+      db.prepare(`
+        INSERT INTO transactions (user_id, title, amount, type, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(
+        userId,
+        amountKopecks > 0 ? 'Корректировка баланса администратором' : 'Списание администратором',
+        Math.abs(amountKopecks),
+        amountKopecks > 0 ? 'in' : 'out',
+        Date.now()
+      );
+      return next;
+    });
+
+    return res.json({ ok: true, userId, balance: adjustBalance() });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error('[admin/balance] Ошибка:', err);
+    return res.status(500).json({ error: 'Не удалось изменить баланс' });
+  }
+});
+
 /* ==================== ADMIN: withdrawals ==================== */
 app.get('/api/admin/withdrawals', auth, adminOnly, (req, res) => {
   const items = db.prepare(`SELECT w.*, u.name AS user_name, u.email AS user_email,
