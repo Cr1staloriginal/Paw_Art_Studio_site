@@ -678,8 +678,14 @@ function renderProjects() {
     if (state.projectFilter !== 'all') items = items.filter(p => p.status === state.projectFilter);
     if (!items.length) { list.innerHTML = `<div class="empty-state"><i class="fas fa-folder-open"></i><p>${state.projects.length ? 'Пусто' : 'Нет заказов'}</p></div>`; return; }
     list.innerHTML = items.map(p => {
-        const canTake = state.user.role === 'executor' && p.status === 'open';
-        const canOpen = p.clientId === state.user.id || (p.executor && p.executor.id === state.user.id) || state.user.role === 'admin' || state.user.role === 'manager' || state.user.role === 'executor';
+        const userId = Number(state.user?.id);
+        const clientId = Number(p.clientId ?? p.client_id);
+        const executorId = Number(p.executor?.id ?? p.executorId ?? p.executor_id);
+        const isClient = state.user?.role === 'client';
+        const isExecutor = state.user?.role === 'executor';
+        const isPrivileged = state.user?.role === 'admin' || state.user?.role === 'manager';
+        const canTake = isExecutor && p.status === 'open' && !p.executor;
+        const canOpen = isPrivileged || (isClient && clientId === userId) || (isExecutor && (p.status === 'open' || executorId === userId));
         // Старые/неполные записи могут не содержать объект client — карточка всё равно должна отображаться.
         const client = p.client && typeof p.client === 'object' ? p.client : {};
         const clientName = typeof (client.name || p.client_name) === 'string' && (client.name || p.client_name).trim()
