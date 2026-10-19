@@ -537,7 +537,27 @@ function orderCustomPackage() {
 /* DASHBOARD */
 function openDashboard() { if (!state.user) return openAuth(); document.getElementById('dashboardModal').classList.add('open'); document.body.style.overflow = 'hidden'; document.getElementById('userMenu').classList.add('hidden'); loadDashboardData(); }
 function closeDashboard() { document.getElementById('dashboardModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
-function switchDashTab(tab) { document.querySelectorAll('.dash-tab').forEach(t => t.classList.toggle('active', t.dataset.dtab === tab)); document.getElementById('dashWallet').classList.toggle('hidden', tab !== 'wallet'); document.getElementById('dashWithdrawals').classList.toggle('hidden', tab !== 'withdrawals'); document.getElementById('dashHistory').classList.toggle('hidden', tab !== 'history'); document.getElementById('dashRolePanel').classList.toggle('hidden', tab !== 'role'); }
+function switchDashTab(tab) {
+    document.querySelectorAll('.dash-tab').forEach(t => {
+        t.classList.toggle('active', t.dataset.dtab === tab);
+    });
+
+    const panels = {
+        wallet: document.getElementById('dashWallet'),
+        withdrawals: document.getElementById('dashWithdrawals'),
+        history: document.getElementById('dashHistory'),
+        role: document.getElementById('dashRolePanel')
+    };
+    Object.entries(panels).forEach(([name, panel]) => {
+        if (panel) panel.classList.toggle('hidden', name !== tab);
+    });
+
+    const showWalletExtras = tab === 'wallet';
+    ['pawUpgradeTabs', 'pawUpgradePanels'].forEach(id => {
+        const element = document.getElementById(id);
+        if (element) element.classList.toggle('hidden', !showWalletExtras);
+    });
+}
 async function loadDashboardData() {
     updateUI();
     try { const [txRes, wdRes] = await Promise.all([api('/api/wallet/transactions'), api('/api/wallet/withdrawals')]); state.transactions = txRes.transactions; state.userWithdrawals = wdRes.withdrawals; renderTransactions(); renderWalletStats(); renderUserWithdrawals(); }
@@ -1035,11 +1055,56 @@ function closeAdminPanel() { document.getElementById('adminModal').classList.rem
 function switchAdminTab(tab) { document.querySelectorAll('.admin-tab').forEach(t => t.classList.toggle('active', t.dataset.atab === tab)); document.getElementById('adminDashboard').classList.toggle('hidden', tab !== 'dashboard'); document.getElementById('adminWithdrawals').classList.toggle('hidden', tab !== 'withdrawals'); document.getElementById('adminRequests').classList.toggle('hidden', tab !== 'requests'); document.getElementById('adminUsers').classList.toggle('hidden', tab !== 'users'); }
 
 async function loadAdminData() {
-    try {
-        const [uR, rR, sR, wR] = await Promise.all([api('/api/admin/users'), api('/api/admin/requests'), api('/api/admin/stats'), api('/api/admin/withdrawals')]);
-        state.adminUsers = uR.users; state.adminRequests = rR.requests; state.adminStats = sR; state.adminWithdrawals = wR.withdrawals;
-        renderAdminDashboard(); renderAdminWithdrawals(); renderAdminRequests(); renderAdminUsers();
-    } catch (err) { showToast('❌ ' + err.message, 'error'); }
+    const usersList = document.getElementById('usersList');
+    if (usersList) usersList.innerHTML = '<div class="admin-empty">Загружаем пользователей…</div>';
+
+    // Load sections independently so one unavailable endpoint cannot block users.
+    const results = await Promise.allSettled([
+        api('/api/admin/users'),
+        api('/api/admin/requests'),
+        api('/api/admin/stats'),
+        api('/api/admin/withdrawals')
+    ]);
+    const [usersResult, requestsResult, statsResult, withdrawalsResult] = results;
+
+    if (usersResult.status === 'fulfilled') {
+        const data = usersResult.value;
+        state.adminUsers = Array.isArray(data?.users) ? data.users.map(u => ({
+            ...u,
+            id: Number(u.id),
+            name: String(u.name || 'Без имени'),
+            email: String(u.email || ''),
+            role: String(u.role || 'client'),
+            balance: Number(u.balance ?? 0),
+            isRoot: u.isRoot === true || Number(u.isRoot ?? u.is_root ?? 0) === 1,
+            createdAt: Number(u.createdAt ?? u.created_at ?? 0)
+        })) : [];
+        renderAdminUsers();
+    } else {
+        state.adminUsers = [];
+        if (usersList) usersList.innerHTML =
+            '<div class="admin-empty">Не удалось загрузить пользователей. Проверьте авторизацию и Network.</div>';
+        console.error('[Admin] Не удалось загрузить пользователей:', usersResult.reason);
+        showToast('❌ Не удалось загрузить пользователей: ' +
+            (usersResult.reason?.message || 'ошибка запроса'), 'error');
+    }
+
+    if (requestsResult.status === 'fulfilled') {
+        state.adminRequests = Array.isArray(requestsResult.value?.requests)
+            ? requestsResult.value.requests : [];
+        renderAdminRequests();
+    } else console.error('[Admin] Ошибка загрузки заявок:', requestsResult.reason);
+
+    if (statsResult.status === 'fulfilled') {
+        state.adminStats = statsResult.value;
+        renderAdminDashboard();
+    } else console.error('[Admin] Ошибка загрузки статистики:', statsResult.reason);
+
+    if (withdrawalsResult.status === 'fulfilled') {
+        state.adminWithdrawals = Array.isArray(withdrawalsResult.value?.withdrawals)
+            ? withdrawalsResult.value.withdrawals : [];
+        renderAdminWithdrawals();
+    } else console.error('[Admin] Ошибка загрузки выплат:', withdrawalsResult.reason);
 }
 function renderAdminDashboard() {
     const wrap = document.getElementById('dashboardStats'); if (!wrap || !state.adminStats) return;
@@ -1084,38 +1149,106 @@ function renderAdminRequests() {
     list.innerHTML = state.adminRequests.map(u => { const dateStr = new Date(u.createdAt).toLocaleDateString('ru-RU'); const av = u.avatar ? `<img src="${escapeHtml(u.avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : escapeHtml(u.name.charAt(0).toUpperCase()); return `<div class="request-card"><div class="request-head"><div class="admin-user-avatar">${av}</div><div class="request-info"><div class="request-name">${escapeHtml(u.name)}</div><div class="request-role">→ ${ROLE_LABELS[u.requestedRole] || u.requestedRole}</div><div class="request-date">${escapeHtml(u.email)} · с ${dateStr}</div></div></div><div class="request-actions"><button class="admin-act-btn primary" onclick="approveRequest(${u.id})"><i class="fas fa-check"></i> Одобрить</button><button class="admin-act-btn danger" onclick="rejectRequest(${u.id})"><i class="fas fa-times"></i> Отклонить</button></div></div>`; }).join('');
 }
 function renderAdminUsers() {
-    const list = document.getElementById('usersList'); if (!list) return;
+    const list = document.getElementById('usersList');
+    if (!list) return;
+
+    const allUsers = Array.isArray(state.adminUsers) ? state.adminUsers : [];
+    if (!allUsers.length) {
+        list.innerHTML = '<div class="admin-empty">В системе пока нет пользователей</div>';
+        return;
+    }
+
     const search = (document.getElementById('userSearch')?.value || '').trim().toLowerCase();
-    let users = state.adminUsers.slice();
-    if (search) users = users.filter(u => u.name.toLowerCase().includes(search) || u.email.toLowerCase().includes(search));
-    users.sort((a, b) => { if (a.isRoot && !b.isRoot) return -1; if (b.isRoot && !a.isRoot) return 1; if (a.role === 'admin' && b.role !== 'admin') return -1; if (b.role === 'admin' && a.role !== 'admin') return 1; return b.createdAt - a.createdAt; });
-    if (!users.length) { list.innerHTML = '<div class="admin-empty">Ничего не найдено</div>'; return; }
-    const me = state.user; const iAmRoot = me && me.isRoot;
+    let users = allUsers.filter(u => {
+        const name = String(u.name || '').toLowerCase();
+        const email = String(u.email || '').toLowerCase();
+        return !search || name.includes(search) || email.includes(search) ||
+            String(u.id ?? '').includes(search);
+    });
+
+    users.sort((a, b) => {
+        const aRoot = a.isRoot === true || Number(a.isRoot ?? a.is_root ?? 0) === 1;
+        const bRoot = b.isRoot === true || Number(b.isRoot ?? b.is_root ?? 0) === 1;
+        if (aRoot !== bRoot) return aRoot ? -1 : 1;
+        if ((a.role === 'admin') !== (b.role === 'admin')) return a.role === 'admin' ? -1 : 1;
+        return Number(b.createdAt ?? b.created_at ?? 0) -
+            Number(a.createdAt ?? a.created_at ?? 0);
+    });
+
+    if (!users.length) {
+        list.innerHTML = '<div class="admin-empty">По вашему запросу ничего не найдено</div>';
+        return;
+    }
+
+    const me = state.user;
+    const myId = Number(me?.id);
+    const iAmRoot = me?.role === 'admin' &&
+        (me?.isRoot === true || Number(me?.is_root ?? 0) === 1);
+
     list.innerHTML = users.map(u => {
-        const isSelf = me && u.id === me.id;
-        const isRootUser = u.isRoot;
-        const isAdminUser = u.role === 'admin';
-        const selfTag = isSelf ? ' <span style="color:var(--text-mute);font-weight:500">(вы)</span>' : '';
-        const rootTag = isRootUser ? ' <span style="color:#fbbf24;font-weight:700">👑</span>' : '';
-        const av = u.avatar ? `<img src="${escapeHtml(u.avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : escapeHtml(u.name.charAt(0).toUpperCase());
+        const id = Number(u.id);
+        const name = String(u.name || 'Без имени');
+        const email = String(u.email || '');
+        const role = String(u.role || 'client');
+        const isSelf = Number.isFinite(myId) && id === myId;
+        const isRootUser = u.isRoot === true || Number(u.isRoot ?? u.is_root ?? 0) === 1;
+        const isAdminUser = role === 'admin';
+        const avatar = u.avatar
+            ? `<img src="${escapeHtml(u.avatar)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">`
+            : escapeHtml(name.charAt(0).toUpperCase() || '?');
+
         const canChangeRole = iAmRoot ? !isSelf : (!isAdminUser && !isSelf);
         const canAdjustBalance = iAmRoot ? true : (!isAdminUser || isSelf);
         const canSetAdmin = iAmRoot && !isSelf;
-        const roleButtons = canChangeRole ? `<button class="admin-act-btn" onclick="adminSetRole(${u.id},'client')">Клиент</button><button class="admin-act-btn" onclick="adminSetRole(${u.id},'executor')">Исполнитель</button><button class="admin-act-btn" onclick="adminSetRole(${u.id},'manager')">Менеджер</button>${canSetAdmin ? `<button class="admin-act-btn" onclick="adminSetRole(${u.id},'admin')">Админ</button>` : ''}` : `<span style="color:var(--text-mute);font-size:0.78rem;padding:6px 12px">${isRootUser ? '👑 Главный админ' : '🔒 Недоступно'}</span>`;
-        const balanceButton = canAdjustBalance ? `<button class="admin-act-btn" onclick="adminAdjustBalance(${u.id})"><i class="fas fa-coins"></i> Баланс</button>` : '';
-        return `<div class="admin-user-row"><div class="admin-user-avatar" ${isRootUser ? 'style="box-shadow:0 0 0 2px #fbbf24;"' : ''}>${av}</div><div class="admin-user-info"><div class="admin-user-name">${escapeHtml(u.name)}${rootTag}${selfTag}</div><div class="admin-user-email">${escapeHtml(u.email)}</div></div><span class="admin-user-role role-badge-${u.role}">${ROLE_LABELS[u.role] || u.role}</span><span class="admin-user-balance">${formatMoney(u.balance)}</span><div class="admin-user-actions"><button class="admin-act-btn primary" onclick="openUserFull(${u.id})"><i class="fas fa-eye"></i> История</button>${roleButtons}${balanceButton}</div></div>`;
+        const roleButtons = canChangeRole
+            ? `<button class="admin-act-btn" onclick="adminSetRole(${id},'client')">Клиент</button><button class="admin-act-btn" onclick="adminSetRole(${id},'executor')">Исполнитель</button><button class="admin-act-btn" onclick="adminSetRole(${id},'manager')">Менеджер</button>${canSetAdmin ? `<button class="admin-act-btn" onclick="adminSetRole(${id},'admin')">Админ</button>` : ''}`
+            : `<span style="color:var(--text-mute);font-size:0.78rem;padding:6px 12px">${isRootUser ? '👑 Главный админ' : '🔒 Недоступно'}</span>`;
+        const balanceButton = canAdjustBalance
+            ? `<button class="admin-act-btn" onclick="adminAdjustBalance(${id})"><i class="fas fa-coins"></i> Баланс</button>`
+            : '';
+
+        return `<div class="admin-user-row"><div class="admin-user-avatar" ${isRootUser ? 'style="box-shadow:0 0 0 2px #fbbf24;"' : ''}>${avatar}</div><div class="admin-user-info"><div class="admin-user-name">${escapeHtml(name)}${isRootUser ? ' <span style="color:#fbbf24;font-weight:700">👑</span>' : ''}${isSelf ? ' <span style="color:var(--text-mute);font-weight:500">(вы)</span>' : ''}</div><div class="admin-user-email">${escapeHtml(email)}</div></div><span class="admin-user-role role-badge-${escapeHtml(role)}">${escapeHtml(ROLE_LABELS[role] || role)}</span><span class="admin-user-balance">${escapeHtml(formatMoney(Number(u.balance) || 0))}</span><div class="admin-user-actions"><button class="admin-act-btn primary" onclick="openUserFull(${id})"><i class="fas fa-eye"></i> История</button>${roleButtons}${balanceButton}</div></div>`;
     }).join('');
 }
 async function approveRequest(userId) { try { await api('/api/admin/approve', { method: 'POST', body: { userId } }); showToast('✅ Одобрено'); await loadAdminData(); await fetchMe(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 async function rejectRequest(userId) { try { await api('/api/admin/reject', { method: 'POST', body: { userId } }); showToast('❌ Отклонено'); await loadAdminData(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 async function adminSetRole(userId, role) { try { await api('/api/admin/role', { method: 'POST', body: { userId, role } }); showToast(`✅ Роль → ${ROLE_LABELS[role]}`); await loadAdminData(); await fetchMe(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 async function adminAdjustBalance(userId) {
-    const u = state.adminUsers.find(x => x.id === userId); if (!u) return;
-    const input = prompt(`Изменить баланс ${u.name}\nТекущий: ${formatMoney(u.balance)}\nВведите число:`, '0');
+    const u = state.adminUsers.find(x => Number(x.id) === Number(userId));
+    if (!u) return showToast('❌ Пользователь не найден', 'error');
+
+    const input = prompt(
+        `Изменить баланс ${u.name}\\nТекущий: ${formatMoney(u.balance)}\\nВведите сумму в рублях (положительная — добавить, отрицательная — списать):`,
+        '0'
+    );
     if (input === null) return;
-    const amount = Number(input);
-    if (!amount || isNaN(amount)) return showToast('⚠️ Некорректная сумма', 'error');
-    try { await api('/api/admin/balance', { method: 'POST', body: { userId, amount } }); showToast('✅ Баланс обновлён'); await loadAdminData(); await fetchMe(); } catch (err) { showToast('❌ ' + err.message, 'error'); }
+
+    const normalized = input.trim().replace(',', '.');
+    if (!/^-?\d+(?:\.\d{1,2})?$/.test(normalized)) {
+        return showToast('⚠️ Введите сумму с точностью до копеек', 'error');
+    }
+
+    const amount = Number(normalized);
+    if (!Number.isFinite(amount) || amount === 0 || Math.abs(amount) > 1_000_000) {
+        return showToast('⚠️ Сумма должна быть в пределах ±1 000 000 ₽ и не равна нулю', 'error');
+    }
+
+    const amountKopecks = Math.round(amount * 100);
+    if (!Number.isSafeInteger(amountKopecks)) {
+        return showToast('⚠️ Сумма слишком большая', 'error');
+    }
+
+    try {
+        await api('/api/admin/balance', {
+            method: 'POST',
+            body: { userId: Number(userId), amount }
+        });
+        showToast('✅ Баланс обновлён');
+        await loadAdminData();
+        await fetchMe();
+    } catch (err) {
+        showToast('❌ ' + err.message, 'error');
+    }
 }
 async function openUserFull(userId) {
     try { const data = await api(`/api/admin/users/${userId}/full`); renderUserFull(data); document.getElementById('userFullModal').classList.add('open'); document.body.style.overflow = 'hidden'; } catch (err) { showToast('❌ ' + err.message, 'error'); }
