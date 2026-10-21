@@ -295,22 +295,27 @@
                     <h3 style="margin-bottom:6px;">Оставить заявку</h3>
                     <p style="color:var(--text-mute); font-size:0.9rem;">Мы ответим в течение 24 часов</p>
                     <form id="contactForm" onsubmit="handleSubmit(event)">
-                        <label>Имя</label><input type="text" id="formName" placeholder="Как к вам обращаться?" required />
-                        <label>Проект</label><input type="text" id="formProject" placeholder="Название проекта" />
-                        <label>Что нужно</label>
-                        <select id="formService">
-                            <option value="Артики">Артики</option>
-                            <option value="Премиум арт">Премиум арт</option>
-                            <option value="Чибики">Чибики</option>
-                            <option value="Стикеры">Стикеры</option>
-                            <option value="Ава">Ава</option>
-                            <option value="3D модель">3D модель</option>
-                            <option value="3D арт">3D арт</option>
-                            <option value="Другое">Другое</option>
+                        <label for="formName">Имя</label><input type="text" id="formName" name="name" placeholder="Как к вам обращаться?" maxlength="100" required />
+                        <label for="formProject">Проект</label><input type="text" id="formProject" name="project" placeholder="Название проекта" maxlength="200" />
+                        <label for="formService">Что нужно</label>
+                        <select id="formService" name="service" required>
+                            <option value="Артики">Артики</option><option value="Премиум арт">Премиум арт</option>
+                            <option value="Чибики">Чибики</option><option value="Стикеры">Стикеры</option>
+                            <option value="Ава">Ава</option><option value="3D модель">3D модель</option>
+                            <option value="3D арт">3D арт</option><option value="Другое">Другое</option>
                         </select>
-                        <label>Бюджет</label><input type="text" id="formBudget" placeholder="Ориентировочная сумма" />
-                        <label>Ссылка на референсы</label><textarea id="formMessage" placeholder="Стиль, примеры, идеи..."></textarea>
-                        <button type="submit" class="btn">Отправить заявку</button>
+                        <label for="formBudget">Бюджет</label><input type="text" id="formBudget" name="budget" placeholder="Ориентировочная сумма" maxlength="100" />
+                        <label for="formMessage">Ссылка на референсы</label><textarea id="formMessage" name="reference" placeholder="Стиль, примеры, идеи..." maxlength="5000"></textarea>
+                        <label for="formContactMethod">Способ связи</label>
+                        <select id="formContactMethod" name="contactMethod" required>
+                            <option value="Сайт" selected>Сайт</option><option value="Discord">Discord</option>
+                            <option value="Telegram">Telegram</option><option value="VK">VK</option><option value="Телефон">Телефон</option>
+                        </select>
+                        <div id="contactDetailBlock" hidden>
+                            <label id="contactDetailLabel" for="formContactDetail">Контакт для связи</label>
+                            <input type="text" id="formContactDetail" name="contactDetail" maxlength="300" placeholder="Укажите контакт" />
+                        </div>
+                        <button type="submit" class="btn" id="contactSubmitBtn">Отправить заявку</button>
                     </form>
                 </div>
             </div>
