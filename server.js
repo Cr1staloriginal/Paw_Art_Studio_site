@@ -190,6 +190,22 @@ db.exec(`
     updated_at INTEGER NOT NULL
   );
 
+  CREATE TABLE IF NOT EXISTS requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    name TEXT NOT NULL,
+    project TEXT,
+    service TEXT NOT NULL,
+    budget TEXT,
+    reference TEXT,
+    contact_method TEXT NOT NULL DEFAULT 'Сайт',
+    contact_detail TEXT,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_requests_created ON requests(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_requests_user ON requests(user_id);
+
   CREATE TABLE IF NOT EXISTS payments (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     user_id INTEGER NOT NULL,
@@ -316,9 +332,18 @@ const DEFAULT_CONTENT = {
   hero_subtitle: 'Маскоты, стикеры и визуал с характером',
   about_title: 'О студии',
   about_text: 'Мы создаём уникальный визуал для брендов.',
+  about_stat_1_desc: 'проектов',
+  about_stat_2_desc: 'клиентов',
+  about_stat_3_desc: 'срок',
   support_email: 'support@pawartstudio.store',
   support_telegram: '',
 };
+// Fill missing defaults without overwriting values configured in the editor.
+{
+  const insertDefault = db.prepare('INSERT OR IGNORE INTO site_content (key, value, updated_at) VALUES (?, ?, ?)');
+  const now = Date.now();
+  for (const [key, value] of Object.entries(DEFAULT_CONTENT)) insertDefault.run(key, String(value), now);
+}
 const contentCount = db.prepare('SELECT COUNT(*) AS n FROM site_content').get().n;
 if (contentCount === 0) {
   const now = Date.now();
@@ -933,6 +958,106 @@ app.get('/api/referrals/click/:code', (req, res) => {
   res.json({ ok: true, code });
 });
 
+/* ==================== CONTACT REQUESTS ==================== */
+function optionalRequestUser(req) {
+  const header = req.headers.authorization || '';
+  if (!header.startsWith('Bearer ')) return null;
+  try {
+    const payload = jwt.verify(header.slice(7), JWT_SECRET);
+    return db.prepare('SELECT id FROM users WHERE id = ?').get(payload.id) || null;
+  } catch { return null; }
+}
+
+app.post('/api/requests', (req, res) => {
+  try {
+    const b = req.body || {};
+    const v = {
+      name: String(b.name || '').trim(), project: String(b.project || '').trim(),
+      service: String(b.service || '').trim(), budget: String(b.budget || '').trim(),
+      reference: String(b.reference || '').trim(),
+      contactMethod: String(b.contactMethod || 'Сайт').trim(),
+      contactDetail: String(b.contactDetail || '').trim()
+    };
+    if (!v.name || !v.service) return res.status(400).json({ error: 'Укажите имя и услугу' });
+    const limits = { name: 100, project: 200, service: 100, budget: 100, reference: 5000, contactDetail: 300 };
+    for (const [key, max] of Object.entries(limits)) {
+      if (v[key].length > max) return res.status(400).json({ error: 'Поле превышает допустимую длину: ' + key });
+    }
+    if (!['Сайт', 'Discord', 'Telegram', 'VK', 'Телефон'].includes(v.contactMethod))
+      return res.status(400).json({ error: 'Неизвестный способ связи' });
+    if (v.contactMethod !== 'Сайт' && !v.contactDetail)
+      return res.status(400).json({ error: 'Укажите контакт для связи' });
+    const user = optionalRequestUser(req);
+    const result = db.prepare(`
+      INSERT INTO requests (user_id, name, project, service, budget, reference, contact_method, contact_detail, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(user ? user.id : null, v.name, v.project || null, v.service, v.budget || null,
+      v.reference || null, v.contactMethod, v.contactDetail || null, Date.now());
+    return res.status(201).json({ ok: true, id: Number(result.lastInsertRowid), message: 'Заявка успешно сохранена' });
+  } catch (err) {
+    console.error('[requests] Ошибка сохранения:', err);
+    return res.status(500).json({ error: 'Не удалось сохранить заявку' });
+  }
+});
+
+app.get('/api/admin/requests/:id', auth, adminOnly, (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: 'Некорректный ID заявки' });
+  try {
+    const r = db.prepare(`
+      SELECT r.*, u.name AS account_name, u.email AS account_email, u.role AS account_role
+      FROM requests r LEFT JOIN users u ON u.id = r.user_id WHERE r.id = ?
+    `).get(id);
+    if (!r) return res.status(404).json({ error: 'Заявка не найдена' });
+    return res.json({ request: {
+      id: Number(r.id), userId: r.user_id == null ? null : Number(r.user_id),
+      name: r.name || '', project: r.project || '', service: r.service || '',
+      budget: r.budget || '', reference: r.reference || '',
+      contactMethod: r.contact_method || 'Сайт', contactDetail: r.contact_detail || '',
+      createdAt: Number(r.created_at || 0),
+      account: r.user_id == null ? null : {
+        id: Number(r.user_id), name: r.account_name || '',
+        email: r.account_email || '', role: r.account_role || 'client'
+      }
+    }});
+  } catch (err) {
+    console.error('[admin/requests/:id] Ошибка:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить заявку' });
+  }
+});
+
+app.get('/api/admin/users/:id/full', auth, adminOnly, (req, res) => {
+  const userId = Number(req.params.id);
+  if (!Number.isSafeInteger(userId) || userId <= 0) return res.status(400).json({ error: 'Некорректный ID пользователя' });
+  try {
+    const user = db.prepare('SELECT id, name, email, role, balance, avatar, bio, created_at, is_root FROM users WHERE id = ?').get(userId);
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+    const transactions = db.prepare('SELECT id, title, amount, type, created_at FROM transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT 200').all(userId).map(t => ({
+      id: Number(t.id), title: t.title || '', amount: Number(t.amount || 0), type: t.type, date: Number(t.created_at || 0)
+    }));
+    const withdrawals = db.prepare('SELECT id, amount, status, comment, card_number, admin_comment, created_at, reviewed_at FROM withdrawals WHERE user_id = ? ORDER BY created_at DESC LIMIT 100').all(userId).map(w => ({
+      id: Number(w.id), amount: Number(w.amount || 0), status: w.status, comment: w.comment || '',
+      cardNumber: w.card_number || '', adminComment: w.admin_comment || '', createdAt: Number(w.created_at || 0),
+      reviewedAt: w.reviewed_at == null ? null : Number(w.reviewed_at)
+    }));
+    const stats = db.prepare(`
+      SELECT COALESCE(SUM(CASE WHEN type = 'in' THEN amount ELSE 0 END), 0) AS totalIn,
+             COALESCE(SUM(CASE WHEN type = 'out' THEN amount ELSE 0 END), 0) AS totalOut
+      FROM transactions WHERE user_id = ?
+    `).get(userId);
+    return res.json({
+      user: { id: Number(user.id), name: user.name || '', email: user.email || '', role: user.role || 'client',
+        balance: Number(user.balance || 0), avatar: user.avatar || null, bio: user.bio || '',
+        createdAt: Number(user.created_at || 0), isRoot: Number(user.is_root || 0) === 1 },
+      transactions, withdrawals,
+      stats: { totalIn: Number(stats.totalIn || 0), totalOut: Number(stats.totalOut || 0) }
+    });
+  } catch (err) {
+    console.error('[admin/users/:id/full] Ошибка:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить историю пользователя' });
+  }
+});
+
 /* ==================== ADMIN: users and balance ==================== */
 app.get('/api/admin/users', auth, (req, res) => {
   const isAdmin = req.user?.role === 'admin' || Number(req.user?.is_root) === 1;
@@ -1022,7 +1147,20 @@ app.get('/api/admin/requests', auth, adminOnly, (req, res) => {
       requestedRole: String(u.requested_role),
       createdAt: Number(u.created_at || 0)
     }));
-    return res.json({ requests });
+    const contactRequests = db.prepare(`
+      SELECT r.id, r.user_id, r.name, r.project, r.service, r.budget, r.reference,
+             r.contact_method, r.contact_detail, r.created_at, u.email AS user_email
+      FROM requests r LEFT JOIN users u ON u.id = r.user_id
+      ORDER BY r.created_at DESC, r.id DESC LIMIT 1000
+    `).all().map(r => ({
+      id: Number(r.id), userId: r.user_id == null ? null : Number(r.user_id),
+      name: String(r.name || ''), project: String(r.project || ''),
+      service: String(r.service || ''), budget: String(r.budget || ''),
+      reference: String(r.reference || ''), contactMethod: String(r.contact_method || 'Сайт'),
+      contactDetail: String(r.contact_detail || ''), createdAt: Number(r.created_at || 0),
+      userEmail: String(r.user_email || '')
+    }));
+    return res.json({ requests, contactRequests });
   } catch (err) {
     console.error('[admin/requests] Ошибка:', err);
     return res.status(500).json({ error: 'Не удалось загрузить заявки' });
