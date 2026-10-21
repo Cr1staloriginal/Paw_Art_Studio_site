@@ -9,7 +9,7 @@ const WD_STATUS_CLASS = { pending: 'status-review', approved: 'status-completed'
 
 const state = {
     user: null, transactions: [], userWithdrawals: [],
-    adminUsers: [], adminRequests: [], adminStats: null, adminWithdrawals: [],
+    adminUsers: [], adminRequests: [], adminContactRequests: [], adminStats: null, adminWithdrawals: [],
     projects: [], projectFilter: 'all', currentProject: null,
     chats: [], chatMessages: {}, currentChatId: null, chatPeer: null,
     socket: null, onlineUsers: new Set(),
@@ -1168,6 +1168,8 @@ async function loadAdminData() {
     if (requestsResult.status === 'fulfilled') {
         state.adminRequests = Array.isArray(requestsResult.value?.requests)
             ? requestsResult.value.requests : [];
+        state.adminContactRequests = Array.isArray(requestsResult.value?.contactRequests)
+            ? requestsResult.value.contactRequests : [];
         renderAdminRequests();
     } else {
         state.adminRequests = [];
@@ -1238,11 +1240,42 @@ function renderAdminWithdrawals() {
 async function approveWithdrawal(id) { if (!confirm('Подтвердить выплату?')) return; try { await api(`/api/admin/withdrawals/${id}/approve`, { method: 'POST' }); showToast('✅ Одобрено'); await loadAdminData(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 async function rejectWithdrawal(id) { const comment = prompt('Причина отклонения:', ''); if (comment === null) return; try { await api(`/api/admin/withdrawals/${id}/reject`, { method: 'POST', body: { comment } }); showToast('↩️ Отклонено'); await loadAdminData(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 function renderAdminRequests() {
-    const list = document.getElementById('requestsList'); const badge = document.getElementById('reqCount'); if (!list) return;
-    badge.textContent = state.adminRequests.length;
-    if (!state.adminRequests.length) { list.innerHTML = '<div class="admin-empty">🎉 Нет заявок</div>'; return; }
-    list.innerHTML = state.adminRequests.map(u => { const dateStr = new Date(u.createdAt).toLocaleDateString('ru-RU'); const av = u.avatar ? `<img src="${escapeHtml(u.avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : escapeHtml(u.name.charAt(0).toUpperCase()); return `<div class="request-card"><div class="request-head"><div class="admin-user-avatar">${av}</div><div class="request-info"><div class="request-name">${escapeHtml(u.name)}</div><div class="request-role">→ ${ROLE_LABELS[u.requestedRole] || u.requestedRole}</div><div class="request-date">${escapeHtml(u.email)} · с ${dateStr}</div></div></div><div class="request-actions"><button class="admin-act-btn primary" onclick="approveRequest(${u.id})"><i class="fas fa-check"></i> Одобрить</button><button class="admin-act-btn danger" onclick="rejectRequest(${u.id})"><i class="fas fa-times"></i> Отклонить</button></div></div>`; }).join('');
+    const list = document.getElementById('requestsList');
+    const badge = document.getElementById('reqCount');
+    if (!list) return;
+    const roleRequests = Array.isArray(state.adminRequests) ? state.adminRequests : [];
+    const contactRequests = Array.isArray(state.adminContactRequests) ? state.adminContactRequests : [];
+    if (badge) badge.textContent = roleRequests.length + contactRequests.length;
+    const roleHtml = roleRequests.map(u => {
+        const dateStr = new Date(Number(u.createdAt) || 0).toLocaleDateString('ru-RU');
+        const name = String(u.name || 'Без имени');
+        const avatar = u.avatar ? `<img src="${escapeHtml(u.avatar)}" alt="" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : escapeHtml(name.charAt(0).toUpperCase());
+        return `<div class="request-card"><div class="request-head"><div class="admin-user-avatar">${avatar}</div><div class="request-info"><div class="request-name">${escapeHtml(name)}</div><div class="request-role">→ ${escapeHtml(ROLE_LABELS[u.requestedRole] || u.requestedRole || '')}</div><div class="request-date">${escapeHtml(u.email || '')} · с ${escapeHtml(dateStr)}</div></div></div><div class="request-actions"><button class="admin-act-btn primary" onclick="approveRequest(${Number(u.id)})"><i class="fas fa-check"></i> Одобрить</button><button class="admin-act-btn danger" onclick="rejectRequest(${Number(u.id)})"><i class="fas fa-times"></i> Отклонить</button></div></div>`;
+    }).join('');
+    const contactHtml = contactRequests.map(r => {
+        const dateStr = new Date(Number(r.createdAt) || 0).toLocaleString('ru-RU');
+        const details = [['Проект',r.project],['Услуга',r.service],['Бюджет',r.budget],['Способ связи',r.contactMethod],['Контакт',r.contactDetail],['Референсы',r.reference],['Email аккаунта',r.userEmail]].filter(([,v]) => String(v || '').trim());
+        return `<div class="request-card"><div class="request-head"><div class="admin-user-avatar">✉</div><div class="request-info"><div class="request-name">${escapeHtml(r.name || 'Без имени')}</div><div class="request-role">Заявка с сайта #${Number(r.id)}</div><div class="request-date">${escapeHtml(dateStr)}</div></div></div><div style="display:grid;gap:6px;margin-top:12px">${details.map(([label,value]) => `<div><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</div>`).join('')}</div><div class="request-actions"><button class="admin-act-btn" onclick="openContactRequest(${Number(r.id)})"><i class="fas fa-eye"></i> Подробности</button></div></div>`;
+    }).join('');
+    list.innerHTML = (roleHtml ? '<h3 style="margin:16px 0 10px">Заявки на роли</h3>' + roleHtml : '') +
+        (contactHtml ? '<h3 style="margin:24px 0 10px">Заявки с сайта</h3>' + contactHtml : '') ||
+        '<div class="admin-empty">🎉 Нет заявок</div>';
 }
+async function openContactRequest(id) {
+    try {
+        const r = (await api(`/api/admin/requests/${Number(id)}`)).request;
+        const lines = [
+            `Заявка #${r.id}`, `Имя: ${r.name}`, `Проект: ${r.project || '—'}`,
+            `Услуга: ${r.service}`, `Бюджет: ${r.budget || '—'}`,
+            `Способ связи: ${r.contactMethod}`, `Контакт: ${r.contactDetail || '—'}`,
+            `Референсы: ${r.reference || '—'}`,
+            `Дата: ${new Date(r.createdAt).toLocaleString('ru-RU')}`,
+            r.account ? `Аккаунт: ${r.account.name} (${r.account.email})` : 'Гость без аккаунта'
+        ];
+        window.alert(lines.join('\\n'));
+    } catch (err) { showToast('❌ ' + err.message, 'error'); }
+}
+
 function renderAdminUsers() {
     const list = document.getElementById('usersList');
     if (!list) return;
@@ -1372,7 +1405,56 @@ function switchUserTab(tab) { document.querySelectorAll('.user-modal-tab').forEa
 /* SERVICE / PLAN / CONTACT */
 function selectService(name, price) { showToast(`✨ ${name} — ${price}`); const select = document.getElementById('formService'); if (select) { const found = Array.from(select.options).find(o => o.value === name || o.text === name); if (found) select.value = found.value; } scrollToSection('contact'); }
 function selectPlan(name, price) { document.getElementById('planDisplay').textContent = `${name} — ${price}`; document.getElementById('selectedPlan').style.display = 'block'; const msg = document.getElementById('formMessage'); if (!msg.value.includes('Пакет:')) msg.value = msg.value ? `${msg.value}\nПакет: ${name} (${price})` : `Пакет: ${name} (${price})`; showToast(`✅ ${name}`); scrollToSection('contact'); }
-function handleSubmit(e) { e.preventDefault(); const name = document.getElementById('formName').value || 'Клиент'; showToast(`🎉 ${name}, заявка отправлена!`); e.target.reset(); document.getElementById('selectedPlan').style.display = 'none'; }
+const contactLabels = {
+    Discord: { label: 'Ваш ник в Discord', placeholder: 'Например, username' },
+    Telegram: { label: 'Ваш ник в Telegram', placeholder: '@username' },
+    VK: { label: 'Ссылка на профиль VK', placeholder: 'https://vk.com/...' },
+    Телефон: { label: 'Ваш номер телефона', placeholder: '+7 ...' }
+};
+function updateContactDetailField() {
+    const method = document.getElementById('formContactMethod');
+    const block = document.getElementById('contactDetailBlock');
+    const input = document.getElementById('formContactDetail');
+    const label = document.getElementById('contactDetailLabel');
+    if (!method || !block || !input || !label) return;
+    const config = contactLabels[method.value];
+    block.hidden = !config;
+    input.required = Boolean(config);
+    if (config) { label.textContent = config.label; input.placeholder = config.placeholder; }
+    else { input.value = ''; input.placeholder = 'Укажите контакт'; }
+}
+document.getElementById('formContactMethod')?.addEventListener('change', updateContactDetailField);
+updateContactDetailField();
+
+async function handleSubmit(e) {
+    e.preventDefault();
+    const form = e.currentTarget;
+    if (!form.reportValidity()) return;
+    const button = document.getElementById('contactSubmitBtn');
+    const payload = {
+        name: document.getElementById('formName').value.trim(),
+        project: document.getElementById('formProject').value.trim(),
+        service: document.getElementById('formService').value,
+        budget: document.getElementById('formBudget').value.trim(),
+        reference: document.getElementById('formMessage').value.trim(),
+        contactMethod: document.getElementById('formContactMethod').value,
+        contactDetail: document.getElementById('formContactDetail').value.trim()
+    };
+    if (button) { button.disabled = true; button.textContent = 'Отправляем...'; }
+    try {
+        await api('/api/requests', { method: 'POST', body: payload });
+        showToast(`🎉 ${payload.name}, заявка успешно отправлена!`);
+        form.reset();
+        updateContactDetailField();
+        const selectedPlan = document.getElementById('selectedPlan');
+        if (selectedPlan) selectedPlan.style.display = 'none';
+    } catch (err) {
+        console.error('[Contact form] Ошибка:', err);
+        showToast('❌ Не удалось отправить заявку. Попробуйте ещё раз.', 'error');
+    } finally {
+        if (button) { button.disabled = false; button.textContent = 'Отправить заявку'; }
+    }
+}
 
 /* FILTERS */
 document.querySelectorAll('#projectFilters .filter').forEach(btn => { btn.addEventListener('click', () => filterProjects(btn.dataset.status)); });
