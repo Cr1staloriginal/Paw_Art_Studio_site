@@ -1406,10 +1406,12 @@ function switchUserTab(tab) { document.querySelectorAll('.user-modal-tab').forEa
 function selectService(name, price) { showToast(`✨ ${name} — ${price}`); const select = document.getElementById('formService'); if (select) { const found = Array.from(select.options).find(o => o.value === name || o.text === name); if (found) select.value = found.value; } scrollToSection('contact'); }
 function selectPlan(name, price) { document.getElementById('planDisplay').textContent = `${name} — ${price}`; document.getElementById('selectedPlan').style.display = 'block'; const msg = document.getElementById('formMessage'); if (!msg.value.includes('Пакет:')) msg.value = msg.value ? `${msg.value}\nПакет: ${name} (${price})` : `Пакет: ${name} (${price})`; showToast(`✅ ${name}`); scrollToSection('contact'); }
 const contactLabels = {
+    Сайт: { label: 'Ваш контакт на сайте', placeholder: 'Имя пользователя или ссылка на профиль' },
     Discord: { label: 'Ваш ник в Discord', placeholder: 'Например, username' },
     Telegram: { label: 'Ваш ник в Telegram', placeholder: '@username' },
     VK: { label: 'Ссылка на профиль VK', placeholder: 'https://vk.com/...' },
-    Телефон: { label: 'Ваш номер телефона', placeholder: '+7 ...' }
+    Телефон: { label: 'Ваш номер телефона', placeholder: '+7 ...' },
+    Email: { label: 'Ваша электронная почта', placeholder: 'name@example.com' }
 };
 function updateContactDetailField() {
     const method = document.getElementById('formContactMethod');
@@ -1435,7 +1437,6 @@ async function handleSubmit(e) {
         name: document.getElementById('formName').value.trim(),
         project: document.getElementById('formProject').value.trim(),
         service: document.getElementById('formService').value,
-        budget: document.getElementById('formBudget').value.trim(),
         reference: document.getElementById('formMessage').value.trim(),
         contactMethod: document.getElementById('formContactMethod').value,
         contactDetail: document.getElementById('formContactDetail').value.trim()
