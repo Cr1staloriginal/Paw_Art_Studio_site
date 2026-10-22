@@ -499,6 +499,13 @@
     </div>
 </div>
 
+<div class="modal" id="publicProfileModal" onclick="if(event.target===this) closePublicProfile()">
+    <div class="modal-box user-modal-box" style="max-width:760px">
+        <button class="modal-close" onclick="closePublicProfile()">×</button>
+        <div id="publicProfileContent"><div class="empty-state small"><i class="fas fa-spinner fa-spin"></i><p>Загрузка профиля…</p></div></div>
+    </div>
+</div>
+
 <div class="modal" id="myPortfolioModal" onclick="if(event.target===this) closeMyPortfolio()">
     <div class="modal-box portfolio-box">
         <button class="modal-close" onclick="closeMyPortfolio()">×</button>
@@ -526,12 +533,11 @@
 
                 <label for="portAuthorUser">Привязать к зарегистрированному пользователю</label>
                 <select id="portAuthorUser">
-                    <option value="">Без привязки к аккаунту</option>
+                    <option value="">Указать автора вручную</option>
                 </select>
 
                 <p class="form-hint">
-                    Выберите пользователя, чтобы использовать его имя и аватар из профиля.
-                    Если аккаунт не выбран, будет использовано введённое имя.
+                    По умолчанию выбран ваш аккаунт. Можно выбрать другого пользователя или указать автора вручную.
                 </p>
             </div>
 
