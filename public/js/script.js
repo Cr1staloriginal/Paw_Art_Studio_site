@@ -866,6 +866,52 @@ async function loadAllPortfolio() {
     }
 }
 
+async function openPublicProfile(userId) {
+    const id = Number(userId);
+    if (!Number.isSafeInteger(id) || id <= 0) return;
+    const modal = document.getElementById('publicProfileModal');
+    const content = document.getElementById('publicProfileContent');
+    if (!modal || !content) return;
+    content.innerHTML = '<div class="empty-state small"><i class="fas fa-spinner fa-spin"></i><p>Загрузка профиля…</p></div>';
+    modal.classList.add('open');
+    document.body.style.overflow = 'hidden';
+    try {
+        const data = await api('/api/users/' + id + '/public');
+        const user = data?.user;
+        const items = Array.isArray(data?.items) ? data.items : [];
+        if (!user) throw new Error('Пользователь не найден');
+        const name = String(user.name || 'Пользователь');
+        const avatar = String(user.avatar || '').trim();
+        const bio = String(user.bio || '').trim();
+        const avatarHtml = avatar
+            ? '<img src="' + escapeHtml(avatar) + '" alt="" style="width:84px;height:84px;object-fit:cover;border-radius:50%">'
+            : '<div class="avatar-preview" style="width:84px;height:84px;font-size:2rem">' + escapeHtml(name.charAt(0).toUpperCase()) + '</div>';
+        const worksHtml = items.length
+            ? '<div class="public-profile-works">' + items.map(item => {
+                const title = escapeHtml(item.title || 'Без названия');
+                const image = String(item.filename || '');
+                return '<article class="my-portfolio-item" style="position:relative">' +
+                    (image ? '<img src="' + escapeHtml(image) + '" alt="' + title + '" loading="lazy">' : '<div class="portfolio-image-placeholder">Изображение недоступно</div>') +
+                    '<div style="padding:8px"><strong>' + title + '</strong>' +
+                    (item.description ? '<p>' + escapeHtml(item.description) + '</p>' : '') +
+                    '<small>' + escapeHtml(item.category || 'Другое') + '</small></div></article>';
+            }).join('') + '</div>'
+            : '<div class="empty-state small"><i class="fas fa-image"></i><p>У этого автора пока нет опубликованных работ</p></div>';
+        content.innerHTML = '<div class="auth-head" style="display:flex;align-items:center;gap:16px;text-align:left">' +
+            avatarHtml + '<div><h3 style="margin:0">' + escapeHtml(name) + '</h3>' +
+            '<p style="margin:6px 0 0;color:var(--text-mute)">' + (bio ? escapeHtml(bio) : 'Публичный профиль автора') + '</p></div></div>' +
+            '<h4 style="margin:22px 0 12px">Работы автора</h4>' + worksHtml;
+    } catch (err) {
+        content.innerHTML = '<div class="empty-state small"><i class="fas fa-user-slash"></i><p>' +
+            escapeHtml(err.message || 'Не удалось загрузить профиль') + '</p></div>';
+    }
+}
+function closePublicProfile() {
+    const modal = document.getElementById('publicProfileModal');
+    if (modal) modal.classList.remove('open');
+    if (!isAnyModalOpen()) document.body.style.overflow = '';
+}
+
 function renderAllPortfolio() {
     const wrap = document.getElementById('portfolioGallery');
     if (!wrap) return;
@@ -919,7 +965,9 @@ function renderAllPortfolio() {
                     <div class="portfolio-title">${escapeHtml(title)}</div>
                     <div class="portfolio-author">
                         <span class="project-client-avatar">${avatarHtml}</span>
-                        <span>${escapeHtml(authorName)}</span>
+                        ${Number.isSafeInteger(Number(it.authorUserId)) && Number(it.authorUserId) > 0
+                            ? `<button type="button" class="portfolio-author-link" onclick="event.stopPropagation(); openPublicProfile(${Number(it.authorUserId)})" title="Открыть профиль автора">${escapeHtml(authorName)}</button>`
+                            : `<span>${escapeHtml(authorName)}</span>`}
                     </div>
                 </div>
             </div>`;
@@ -962,21 +1010,30 @@ async function loadPortfolioAuthors() {
     const select = document.getElementById('portAuthorUser');
     if (!select) return;
 
-    select.innerHTML = '<option value="">Без привязки к аккаунту</option>';
+    select.innerHTML = '<option value="">Указать автора вручную</option>';
     try {
         const data = await api('/api/users/list');
         const users = Array.isArray(data?.users) ? data.users : [];
+        const currentUserId = Number(state.user?.id);
+        let hasCurrentUser = false;
         for (const user of users) {
             const option = document.createElement('option');
             option.value = String(user.id);
             option.textContent = user.name || `Пользователь ${user.id}`;
+            if (Number(user.id) === currentUserId) hasCurrentUser = true;
             select.appendChild(option);
         }
+        if (currentUserId > 0 && !hasCurrentUser) {
+            const option = document.createElement('option');
+            option.value = String(currentUserId);
+            option.textContent = state.user.name || 'Мой профиль';
+            select.appendChild(option);
+        }
+        if (currentUserId > 0) select.value = String(currentUserId);
     } catch (err) {
         console.error('Не удалось загрузить авторов:', err);
         showToast('❌ Не удалось загрузить список авторов', 'error');
     }
-
     select.onchange = syncPortfolioAuthor;
     syncPortfolioAuthor();
 }
