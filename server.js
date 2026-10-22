@@ -1494,7 +1494,7 @@ app.get('/api/portfolio/all', (req, res) => {
     const rows = db.prepare(`
       SELECT
         p.id, p.filename, p.title, p.description, p.category,
-        p.created_at AS createdAt,
+        p.created_at AS createdAt, p.author_user_id AS authorUserId,
         COALESCE(
           NULLIF(TRIM(u.name), ''),
           NULLIF(TRIM(p.author_name), ''),
@@ -1553,6 +1553,22 @@ app.get('/api/portfolio/me', auth, (req, res) => {
   } catch (err) {
     console.error('Ошибка загрузки личного портфолио:', err);
     return res.status(500).json({ error: 'Не удалось загрузить ваши работы' });
+  }
+});
+
+// Public profile endpoint exposes only fields intended for visitors.
+app.get('/api/users/:id/public', (req, res) => {
+  const userId = Number(req.params.id);
+  if (!Number.isSafeInteger(userId) || userId <= 0) return res.status(400).json({ error: 'Некорректный ID пользователя' });
+  try {
+    const user = db.prepare('SELECT id, name, avatar, bio, created_at AS createdAt FROM users WHERE id = ?').get(userId);
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+    const rows = db.prepare('SELECT id, filename, title, description, category, created_at AS createdAt FROM portfolio WHERE author_user_id = ? ORDER BY created_at DESC, id DESC LIMIT 100').all(userId);
+    const items = rows.map(row => ({ ...row, filename: row.filename ? (row.filename.startsWith('/uploads/') ? row.filename : '/uploads/portfolio/' + encodeURIComponent(row.filename)) : null }));
+    return res.json({ user: { id: user.id, name: user.name, avatar: user.avatar || null, bio: user.bio || '', createdAt: user.createdAt }, items });
+  } catch (err) {
+    console.error('Ошибка загрузки публичного профиля:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить профиль' });
   }
 });
 
