@@ -623,3 +623,10 @@ textarea.content-input { min-height: 70px; resize: vertical; }
     color: var(--text-secondary, #aaa);
     background: rgba(120, 120, 140, 0.08);
 }
+
+/* Public portfolio author links and profile gallery */
+.portfolio-author-link { appearance:none; border:0; padding:0; margin:0; background:transparent; color:inherit; font:inherit; text-align:left; cursor:pointer; text-decoration:underline; text-decoration-color:transparent; text-underline-offset:3px; }
+.portfolio-author-link:hover,.portfolio-author-link:focus-visible { color:var(--accent,#b89aff); text-decoration-color:currentColor; }
+.public-profile-works { display:grid; grid-template-columns:repeat(auto-fill,minmax(150px,1fr)); gap:12px; }
+.public-profile-works .my-portfolio-item { min-width:0; overflow:hidden; border-radius:12px; background:var(--card,rgba(255,255,255,.04)); }
+.public-profile-works .my-portfolio-item img { display:block; width:100%; aspect-ratio:1/1; object-fit:cover; }
