@@ -306,7 +306,7 @@
                         </select>
                         <label for="formMessage">Ссылка на референсы</label><textarea id="formMessage" name="reference" placeholder="Стиль, примеры, идеи..." maxlength="5000"></textarea>
                         <label for="formContactMethod">Способ связи</label>
-                        <select id="formContactMethod" name="contactMethod" required>
+                        <select id="formContactMethod" name="contactMethod" required onchange="updateContactDetailField()">
                             <option value="Сайт" selected>Сайт</option><option value="Discord">Discord</option>
                             <option value="Telegram">Telegram</option><option value="VK">VK</option><option value="Телефон">Телефон</option><option value="Email">Email</option>
                         </select>
