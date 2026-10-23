@@ -983,7 +983,7 @@ app.post('/api/requests', (req, res) => {
     for (const [key, max] of Object.entries(limits)) {
       if (v[key].length > max) return res.status(400).json({ error: 'Поле превышает допустимую длину: ' + key });
     }
-    if (!['Сайт', 'Discord', 'Telegram', 'VK', 'Телефон'].includes(v.contactMethod))
+    if (!['Сайт', 'Discord', 'Telegram', 'VK', 'Телефон', 'Email'].includes(v.contactMethod))
       return res.status(400).json({ error: 'Неизвестный способ связи' });
     if (v.contactMethod !== 'Сайт' && !v.contactDetail)
       return res.status(400).json({ error: 'Укажите контакт для связи' });
