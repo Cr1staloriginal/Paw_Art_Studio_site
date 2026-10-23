@@ -145,7 +145,7 @@
       } else {
         const projectModal = document.getElementById('projectModal');
         if (projectModal) projectModal.classList.add('active');
-        document.getElementById('projects')?.scrollIntoView({ behavior: 'smooth' });
+        if (typeof window.scrollToSection === 'function') window.scrollToSection('services'); else document.getElementById('services')?.scrollIntoView({ behavior: 'smooth', block: 'start' });
       }
     }
   }, true);
