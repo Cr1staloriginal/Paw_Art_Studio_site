@@ -132,7 +132,7 @@
       const description = document.getElementById('projDescription');
 
       if (category && Array.from(category.options).some((item) => item.value === title)) category.value = title;
-      if (titleInput) titleInput.value = title + (kind === 'quote' ? '' : (kind === 'fixed' ? '' : ' — ' + qty + ' шт.'));
+      if (titleInput) titleInput.value = title + (kind === 'quote' ? '' : ' — ' + qty + ' шт.');
       if (description) {
         description.value = (activeCard.dataset.detail || '') +
           (kind === 'quote' ? '' : '\nКоличество: ' + qty + '. Предварительная стоимость: ' + price + '.');
