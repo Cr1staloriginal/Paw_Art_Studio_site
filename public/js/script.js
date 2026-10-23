@@ -41,7 +41,7 @@ function formatTime(ts) { const d = new Date(ts), now = new Date(), diff = (now 
 function formatDateTime(ts) { const d = new Date(ts); return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' }) + ' · ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); }
 function userAvatarHtml(u) { if (u?.avatar) return `<img src="${escapeHtml(u.avatar)}" alt="">`; return `<span>${(u?.name || '?').charAt(0).toUpperCase()}</span>`; }
 
-function scrollToSection(id) { const el = document.getElementById(id); if (!el) return; const top = el.getBoundingClientRect().top + window.pageYOffset - 70; window.scrollTo({ top, behavior: 'smooth' }); closeMenu(); }
+function scrollToSection(id) { const el = document.getElementById(id); if (!el) { console.warn(`Раздел не найден: #${id}`); showToast('Раздел временно недоступен', 'error'); return; } const header = document.querySelector('header'); const offset = (header?.getBoundingClientRect().height || 70) + 12; const top = el.getBoundingClientRect().top + window.pageYOffset - offset; window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); if (location.hash !== `#${id}`) history.replaceState(null, '', `#${id}`); closeMenu(); }
 function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); closeMenu(); }
 function toggleMenu() { document.getElementById('navLinks').classList.toggle('open'); document.getElementById('burger').classList.toggle('active'); }
 function closeMenu() { document.getElementById('navLinks').classList.remove('open'); document.getElementById('burger').classList.remove('active'); }
