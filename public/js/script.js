@@ -42,6 +42,10 @@ function formatDateTime(ts) { const d = new Date(ts); return d.toLocaleDateStrin
 function userAvatarHtml(u) { if (u?.avatar) return `<img src="${escapeHtml(u.avatar)}" alt="">`; return `<span>${(u?.name || '?').charAt(0).toUpperCase()}</span>`; }
 
 function scrollToSection(id) { const el = document.getElementById(id); if (!el) { console.warn(`Раздел не найден: #${id}`); showToast('Раздел временно недоступен', 'error'); return; } const header = document.querySelector('header'); const offset = (header?.getBoundingClientRect().height || 70) + 12; const top = el.getBoundingClientRect().top + window.pageYOffset - offset; window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); if (location.hash !== `#${id}`) history.replaceState(null, '', `#${id}`); closeMenu(); }
+function dismissInquiryBar() {
+    const bar = document.getElementById('pawInquiryBar');
+    if (bar) bar.classList.add('is-dismissed');
+}
 function scrollToTop() { window.scrollTo({ top: 0, behavior: 'smooth' }); closeMenu(); }
 function toggleMenu() { document.getElementById('navLinks').classList.toggle('open'); document.getElementById('burger').classList.toggle('active'); }
 function closeMenu() { document.getElementById('navLinks').classList.remove('open'); document.getElementById('burger').classList.remove('active'); }
