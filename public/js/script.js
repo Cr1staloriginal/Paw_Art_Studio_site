@@ -1480,13 +1480,34 @@ function updateContactDetailField() {
     const input = document.getElementById('formContactDetail');
     const label = document.getElementById('contactDetailLabel');
     if (!method || !block || !input || !label) return;
+
     const config = contactLabels[method.value];
-    block.hidden = !config;
-    input.required = Boolean(config);
-    if (config) { label.textContent = config.label; input.placeholder = config.placeholder; }
-    else { input.value = ''; input.placeholder = 'Укажите контакт'; }
+    const visible = Boolean(config);
+    block.hidden = !visible;
+    block.style.display = visible ? 'grid' : 'none';
+    if (visible) block.removeAttribute('hidden');
+    else block.setAttribute('hidden', '');
+
+    input.required = visible;
+    input.autocomplete = method.value === 'Телефон' ? 'tel' : method.value === 'Email' ? 'email' : 'off';
+    input.inputMode = method.value === 'Телефон' ? 'tel' : method.value === 'Email' ? 'email' : 'text';
+    if (config) {
+        label.textContent = config.label;
+        input.placeholder = config.placeholder;
+        input.setAttribute('aria-label', config.label);
+    } else {
+        input.value = '';
+        input.placeholder = 'Укажите контакт';
+        input.removeAttribute('aria-label');
+    }
 }
-document.getElementById('formContactMethod')?.addEventListener('change', updateContactDetailField);
+window.updateContactDetailField = updateContactDetailField;
+const contactMethodSelect = document.getElementById('formContactMethod');
+contactMethodSelect?.addEventListener('change', updateContactDetailField);
+contactMethodSelect?.addEventListener('input', updateContactDetailField);
+if (contactMethodSelect) {
+    contactMethodSelect.dispatchEvent(new Event('change', { bubbles: true }));
+}
 updateContactDetailField();
 
 async function handleSubmit(e) {
