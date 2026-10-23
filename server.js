@@ -1641,6 +1641,12 @@ io.on('connection', (socket) => {
   });
 });
 
+// Explicit 404 handlers for unknown API endpoints and page URLs.
+app.use('/api', (req, res) => res.status(404).json({ error: 'API_ENDPOINT_NOT_FOUND', message: 'Такой API-маршрут не существует.' }));
+app.use((req, res) => {
+  res.status(404).type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Страница не найдена — Paw Art Studio</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0d0810;color:#f8effa;font:16px system-ui,sans-serif;text-align:center;padding:24px;box-sizing:border-box}.box{max-width:520px}.code{font-size:clamp(4rem,15vw,7rem);font-weight:800;line-height:1;color:#ec4899}p{color:#c4b5c5;line-height:1.6}a{display:inline-block;margin-top:12px;padding:12px 18px;border-radius:12px;background:#ec4899;color:white;text-decoration:none;font-weight:700}</style></head><body><main class="box"><div class="code">404</div><h1>Такой страницы нет</h1><p>Возможно, ссылка устарела или адрес введён с ошибкой. Вернитесь на главную и продолжите знакомство с Paw Art Studio.</p><a href="/">На главную</a></main></body></html>`);
+});
+
 /* ==================== SERVER ==================== */
 server.listen(PORT, HOST, () => {
   console.log(`🚀 Paw Art Studio запущен на http://${HOST}:${PORT}`);
