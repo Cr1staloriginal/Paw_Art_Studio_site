@@ -1692,6 +1692,86 @@ app.get('/api/portfolio', (req, res) => {
   res.json({ portfolio: items });
 });
 
+
+/* Chat API endpoints used by the messenger UI. */
+app.get('/api/chats', auth, (req, res) => {
+  try {
+    const uid = Number(req.user.id);
+    const rows = db.prepare(`
+      SELECT c.id, c.user_a, c.user_b,
+        CASE WHEN c.user_a = ? THEN b.id ELSE a.id END AS peer_id,
+        CASE WHEN c.user_a = ? THEN b.name ELSE a.name END AS peer_name,
+        CASE WHEN c.user_a = ? THEN b.avatar ELSE a.avatar END AS peer_avatar,
+        (SELECT m.text FROM messages m WHERE m.chat_id = c.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_text,
+        (SELECT m.created_at FROM messages m WHERE m.chat_id = c.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_created,
+        (SELECT COUNT(*) FROM messages m WHERE m.chat_id = c.id AND m.sender_id != ? AND m.read_at IS NULL) AS unread
+      FROM chats c
+      JOIN users a ON a.id = c.user_a
+      JOIN users b ON b.id = c.user_b
+      WHERE c.user_a = ? OR c.user_b = ?
+      ORDER BY COALESCE(last_created, c.created_at) DESC
+    `).all(uid, uid, uid, uid, uid, uid);
+    return res.json({ chats: rows.map(r => ({
+      id: Number(r.id),
+      peer: { id: Number(r.peer_id), name: r.peer_name || 'Пользователь', avatar: r.peer_avatar || null },
+      lastMessage: r.last_text == null ? null : { text: r.last_text, createdAt: Number(r.last_created || 0) },
+      unread: Number(r.unread || 0)
+    })) });
+  } catch (err) {
+    console.error('Ошибка загрузки чатов:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить чаты' });
+  }
+});
+
+app.post('/api/chats', auth, (req, res) => {
+  const uid = Number(req.user.id);
+  const peerId = Number(req.body?.peerId);
+  if (!Number.isSafeInteger(peerId) || peerId <= 0 || peerId === uid)
+    return res.status(400).json({ error: 'Некорректный собеседник' });
+  try {
+    const peer = db.prepare('SELECT id FROM users WHERE id = ?').get(peerId);
+    if (!peer) return res.status(404).json({ error: 'Пользователь не найден' });
+    const userA = Math.min(uid, peerId);
+    const userB = Math.max(uid, peerId);
+    let chat = db.prepare('SELECT id FROM chats WHERE user_a = ? AND user_b = ?').get(userA, userB);
+    if (!chat) {
+      try {
+        const info = db.prepare('INSERT INTO chats (user_a, user_b, created_at) VALUES (?, ?, ?)').run(userA, userB, Date.now());
+        chat = { id: Number(info.lastInsertRowid) };
+      } catch (err) {
+        // Handle simultaneous attempts to create the same conversation.
+        chat = db.prepare('SELECT id FROM chats WHERE user_a = ? AND user_b = ?').get(userA, userB);
+        if (!chat) throw err;
+      }
+    }
+    return res.json({ chatId: Number(chat.id) });
+  } catch (err) {
+    console.error('Ошибка создания чата:', err);
+    return res.status(500).json({ error: 'Не удалось открыть чат' });
+  }
+});
+
+app.get('/api/chats/:chatId/messages', auth, (req, res) => {
+  const chatId = Number(req.params.chatId);
+  if (!Number.isSafeInteger(chatId) || chatId <= 0) return res.status(400).json({ error: 'Некорректный ID чата' });
+  try {
+    const chat = db.prepare('SELECT user_a, user_b FROM chats WHERE id = ?').get(chatId);
+    if (!chat) return res.status(404).json({ error: 'Чат не найден' });
+    if (![Number(chat.user_a), Number(chat.user_b)].includes(Number(req.user.id)))
+      return res.status(403).json({ error: 'Нет доступа к этому чату' });
+    db.prepare('UPDATE messages SET read_at = ? WHERE chat_id = ? AND sender_id != ? AND read_at IS NULL')
+      .run(Date.now(), chatId, req.user.id);
+    const messages = db.prepare(`
+      SELECT m.id, m.chat_id AS chatId, m.sender_id AS senderId, m.text, m.created_at AS createdAt, m.read_at AS readAt
+      FROM messages m WHERE m.chat_id = ? ORDER BY m.created_at ASC, m.id ASC LIMIT 500
+    `).all(chatId).map(m => ({ ...m, id: Number(m.id), chatId: Number(m.chatId), senderId: Number(m.senderId), createdAt: Number(m.createdAt), readAt: m.readAt == null ? null : Number(m.readAt) }));
+    return res.json({ messages });
+  } catch (err) {
+    console.error('Ошибка загрузки сообщений:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить сообщения' });
+  }
+});
+
 /* ==================== CHATS ==================== */
 io.on('connection', (socket) => {
   socket.on('chat:join', ({ chatId }) => {
