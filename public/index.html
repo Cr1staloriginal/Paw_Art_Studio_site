@@ -297,22 +297,25 @@
                     <form id="contactForm" onsubmit="handleSubmit(event)">
                         <label for="formName">Имя</label><input type="text" id="formName" name="name" placeholder="Как к вам обращаться?" maxlength="100" required />
                         <label for="formProject">Проект</label><input type="text" id="formProject" name="project" placeholder="Название проекта" maxlength="200" />
-                        <label for="formService">Что нужно</label>
-                        <select id="formService" name="service" required>
+                        <label for="formService" class="inquiry-field-label">Что нужно <span class="inquiry-field-required">обязательно</span></label>
+                        <p class="inquiry-field-hint">Выберите услугу из списка — нажмите на поле, чтобы увидеть варианты.</p>
+                        <select id="formService" name="service" class="inquiry-select" required>
                             <option value="Артики">Артики</option><option value="Премиум арт">Премиум арт</option>
                             <option value="Чибики">Чибики</option><option value="Стикеры">Стикеры</option>
                             <option value="Ава">Ава</option><option value="3D модель">3D модель</option>
                             <option value="3D арт">3D арт</option><option value="Другое">Другое</option>
                         </select>
                         <label for="formMessage">Ссылка на референсы</label><textarea id="formMessage" name="reference" placeholder="Стиль, примеры, идеи..." maxlength="5000"></textarea>
-                        <label for="formContactMethod">Способ связи</label>
-                        <select id="formContactMethod" name="contactMethod" required onchange="updateContactDetailField()">
+                        <label for="formContactMethod" class="inquiry-field-label">Способ связи <span class="inquiry-field-required">обязательно</span></label>
+                        <p class="inquiry-field-hint">Это тоже список. Выберите, где вам удобнее получить ответ.</p>
+                        <select id="formContactMethod" name="contactMethod" class="inquiry-select" required onchange="updateContactDetailField()">
                             <option value="Сайт" selected>Сайт</option><option value="Discord">Discord</option>
                             <option value="Telegram">Telegram</option><option value="VK">VK</option><option value="Телефон">Телефон</option><option value="Email">Email</option>
                         </select>
-                        <div id="contactDetailBlock" hidden>
+                        <div id="contactDetailBlock" class="inquiry-contact-detail" hidden>
                             <label id="contactDetailLabel" for="formContactDetail">Контакт для связи</label>
                             <input type="text" id="formContactDetail" name="contactDetail" maxlength="300" placeholder="Укажите контакт" />
+                            <p class="inquiry-field-hint">Укажите ник, номер или ссылку — в зависимости от выбранного способа.</p>
                         </div>
                         <button type="submit" class="btn" id="contactSubmitBtn">Отправить заявку</button>
                     </form>
@@ -673,7 +676,7 @@
 </aside>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/js/script.js?v=20261023-contact-field-fix"></script>
+<script src="/js/script.js?v=20261025-chat-form-fix"></script>
 <script src="/js/paw-upgrade.js?v=20261023-contact-field-fix"></script>
 <script src="/js/service-details.js?v=20261023-service-configurator"></script>
 </body>
