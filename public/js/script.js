@@ -1464,8 +1464,8 @@ function renderUserFull(data) {
 function switchUserTab(tab) { document.querySelectorAll('.user-modal-tab').forEach(t => t.classList.toggle('active', t.dataset.utab === tab)); document.getElementById('userFullTx').classList.toggle('hidden', tab !== 'tx'); document.getElementById('userFullWd').classList.toggle('hidden', tab !== 'wd'); }
 
 /* SERVICE / PLAN / CONTACT */
-function selectService(name, price) { showToast(`✨ ${name} — ${price}`); const select = document.getElementById('formService'); if (select) { const found = Array.from(select.options).find(o => o.value === name || o.text === name); if (found) select.value = found.value; } scrollToSection('contact'); }
-function selectPlan(name, price) { document.getElementById('planDisplay').textContent = `${name} — ${price}`; document.getElementById('selectedPlan').style.display = 'block'; const msg = document.getElementById('formMessage'); if (!msg.value.includes('Пакет:')) msg.value = msg.value ? `${msg.value}\nПакет: ${name} (${price})` : `Пакет: ${name} (${price})`; showToast(`✅ ${name}`); scrollToSection('contact'); }
+function selectService(name, price) { showToast(`✨ ${name} — ${price}`); const select = document.getElementById('formService'); if (select) { const found = Array.from(select.options).find(o => o.value === name || o.text === name); if (found) select.value = found.value; } scrollToSection('services'); }
+function selectPlan(name, price) { document.getElementById('planDisplay').textContent = `${name} — ${price}`; document.getElementById('selectedPlan').style.display = 'block'; const msg = document.getElementById('formMessage'); if (!msg.value.includes('Пакет:')) msg.value = msg.value ? `${msg.value}\nПакет: ${name} (${price})` : `Пакет: ${name} (${price})`; showToast(`✅ ${name}`); scrollToSection('services'); }
 const contactLabels = {
     Сайт: { label: 'Ваш контакт на сайте', placeholder: 'Имя пользователя или ссылка на профиль' },
     Discord: { label: 'Ваш ник в Discord', placeholder: 'Например, username' },
