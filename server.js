@@ -1389,6 +1389,72 @@ app.post('/api/projects', auth, (req, res) => {
   res.json({ project });
 });
 
+
+/* Project detail/actions used by the client-side project cards. */
+app.get('/api/projects/:id', auth, (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: 'Некорректный ID заказа' });
+  try {
+    const p = db.prepare(`SELECT p.*, u.name AS client_name, u.avatar AS client_avatar,
+                                e.name AS executor_name, e.avatar AS executor_avatar
+                         FROM projects p
+                         LEFT JOIN users u ON u.id = p.client_id
+                         LEFT JOIN users e ON e.id = p.executor_id
+                         WHERE p.id = ?`).get(id);
+    if (!p) return res.status(404).json({ error: 'Заказ не найден' });
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'manager' || Number(req.user.is_root) === 1;
+    const canView = isAdmin || Number(p.client_id) === Number(req.user.id) ||
+      (req.user.role === 'executor' && (p.status === 'open' || Number(p.executor_id) === Number(req.user.id)));
+    if (!canView) return res.status(403).json({ error: 'Нет доступа к этому заказу' });
+    return res.json({ project: {
+      ...p, clientId: p.client_id, executorId: p.executor_id,
+      client: { id: p.client_id, name: p.client_name || 'Пользователь', avatar: p.client_avatar || null },
+      executor: p.executor_id ? { id: p.executor_id, name: p.executor_name || 'Исполнитель', avatar: p.executor_avatar || null } : null
+    }});
+  } catch (err) {
+    console.error('Ошибка загрузки заказа:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить заказ' });
+  }
+});
+
+app.post('/api/projects/:id/accept', auth, (req, res) => {
+  if (req.user.role !== 'executor') return res.status(403).json({ error: 'Только исполнитель может взять заказ' });
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: 'Некорректный ID заказа' });
+  try {
+    const result = db.prepare(`UPDATE projects SET executor_id = ?, status = 'in_progress', updated_at = ?
+      WHERE id = ? AND status = 'open' AND executor_id IS NULL`).run(req.user.id, Date.now(), id);
+    if (!result.changes) {
+      const exists = db.prepare('SELECT id FROM projects WHERE id = ?').get(id);
+      return res.status(exists ? 409 : 404).json({ error: exists ? 'Заказ уже взят или закрыт' : 'Заказ не найден' });
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Ошибка принятия заказа:', err);
+    return res.status(500).json({ error: 'Не удалось взять заказ' });
+  }
+});
+
+app.post('/api/projects/:id/status', auth, (req, res) => {
+  const id = Number(req.params.id);
+  const { status } = req.body || {};
+  const allowed = ['open', 'in_progress', 'review', 'completed', 'cancelled'];
+  if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: 'Некорректный ID заказа' });
+  if (!allowed.includes(status)) return res.status(400).json({ error: 'Некорректный статус заказа' });
+  try {
+    const p = db.prepare('SELECT id, client_id, executor_id FROM projects WHERE id = ?').get(id);
+    if (!p) return res.status(404).json({ error: 'Заказ не найден' });
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'manager' || Number(req.user.is_root) === 1;
+    if (!isAdmin && Number(p.client_id) !== Number(req.user.id) && Number(p.executor_id) !== Number(req.user.id))
+      return res.status(403).json({ error: 'Нет доступа к изменению этого заказа' });
+    db.prepare('UPDATE projects SET status = ?, updated_at = ? WHERE id = ?').run(status, Date.now(), id);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Ошибка изменения статуса заказа:', err);
+    return res.status(500).json({ error: 'Не удалось изменить статус заказа' });
+  }
+});
+
 /* ==================== PORTFOLIO ==================== */
 
 // Authorize before Multer writes an uploaded file.
