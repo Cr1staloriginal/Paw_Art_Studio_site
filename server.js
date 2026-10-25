@@ -1773,17 +1773,59 @@ app.get('/api/chats/:chatId/messages', auth, (req, res) => {
 });
 
 /* ==================== CHATS ==================== */
+// Authenticate sockets with the same JWT used by the REST API.
+io.use((socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token;
+    if (!token) return next(new Error('Требуется авторизация'));
+    const payload = jwt.verify(token, JWT_SECRET);
+    const user = db.prepare('SELECT id, name FROM users WHERE id = ?').get(payload.id);
+    if (!user) return next(new Error('Пользователь не найден'));
+    socket.data.user = { id: Number(user.id), name: user.name || 'Пользователь' };
+    next();
+  } catch {
+    next(new Error('Сессия истекла. Войдите снова.'));
+  }
+});
+
 io.on('connection', (socket) => {
-  socket.on('chat:join', ({ chatId }) => {
-    if (chatId) socket.join('chat:' + chatId);
+  const uid = Number(socket.data.user.id);
+  socket.on('chat:join', ({ chatId } = {}) => {
+    const id = Number(chatId);
+    if (!Number.isSafeInteger(id) || id <= 0) return;
+    const chat = db.prepare('SELECT user_a, user_b FROM chats WHERE id = ?').get(id);
+    if (chat && [Number(chat.user_a), Number(chat.user_b)].includes(uid)) socket.join('chat:' + id);
   });
-  socket.on('chat:message', ({ chatId, senderId, text }) => {
-    if (!chatId || !senderId || !text) return;
-    const now = Date.now();
-    const info = db.prepare(`INSERT INTO messages (chat_id, sender_id, text, created_at)
-                             VALUES (?, ?, ?, ?)`).run(chatId, senderId, String(text).slice(0, 2000), now);
-    const msg = db.prepare('SELECT * FROM messages WHERE id = ?').get(info.lastInsertRowid);
-    io.to('chat:' + chatId).emit('chat:message', msg);
+  socket.on('chat:leave', ({ chatId } = {}) => {
+    const id = Number(chatId);
+    if (Number.isSafeInteger(id) && id > 0) socket.leave('chat:' + id);
+  });
+  socket.on('chat:send', ({ chatId, text } = {}) => {
+    const id = Number(chatId);
+    const cleanText = String(text || '').trim().slice(0, 2000);
+    if (!Number.isSafeInteger(id) || id <= 0 || !cleanText) return;
+    const chat = db.prepare('SELECT user_a, user_b FROM chats WHERE id = ?').get(id);
+    if (!chat || ![Number(chat.user_a), Number(chat.user_b)].includes(uid)) {
+      socket.emit('chat:error', { message: 'Нет доступа к этому чату' });
+      return;
+    }
+    try {
+      const now = Date.now();
+      const info = db.prepare('INSERT INTO messages (chat_id, sender_id, text, created_at) VALUES (?, ?, ?, ?)')
+        .run(id, uid, cleanText, now);
+      const msg = { id: Number(info.lastInsertRowid), chatId: id, senderId: uid, text: cleanText, createdAt: now, readAt: null };
+      io.to('chat:' + id).emit('chat:new', msg);
+      io.to('chat:' + id).emit('chat:notify', { chatId: id, message: { senderName: socket.data.user.name, text: cleanText } });
+    } catch (err) {
+      console.error('Ошибка отправки сообщения:', err);
+      socket.emit('chat:error', { message: 'Не удалось отправить сообщение' });
+    }
+  });
+  socket.on('chat:typing', ({ chatId } = {}) => {
+    const id = Number(chatId);
+    if (!Number.isSafeInteger(id) || id <= 0) return;
+    const chat = db.prepare('SELECT user_a, user_b FROM chats WHERE id = ?').get(id);
+    if (chat && [Number(chat.user_a), Number(chat.user_b)].includes(uid)) socket.to('chat:' + id).emit('chat:typing', { name: socket.data.user.name });
   });
 });
 
