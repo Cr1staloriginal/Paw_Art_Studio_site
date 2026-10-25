@@ -1129,6 +1129,8 @@ function connectSocket() {
     if (state.socket) state.socket.disconnect();
     state.socket = io({ auth: { token: getToken() } });
     state.socket.on('connect', () => { if (state.currentChatId) state.socket.emit('chat:join', { chatId: state.currentChatId }); });
+    state.socket.on('connect_error', (err) => showToast('❌ Чат: ' + (err.message || 'ошибка соединения'), 'error'));
+    state.socket.on('chat:error', (data) => showToast('❌ ' + (data?.message || 'Сообщение не отправлено'), 'error'));
     state.socket.on('chat:new', (msg) => { const arr = state.chatMessages[msg.chatId] || []; if (!arr.find(m => m.id === msg.id)) { arr.push(msg); state.chatMessages[msg.chatId] = arr; } if (state.currentChatId === msg.chatId) appendMessageToWindow(msg); loadChats(); });
     state.socket.on('chat:notify', ({ chatId, message }) => { if (state.currentChatId !== chatId) { incrementUnreadBadge(); showToast(`💬 ${message.senderName}: ${message.text.slice(0, 40)}`); } });
     state.socket.on('presence', ({ userId, online }) => { if (online) state.onlineUsers.add(userId); else state.onlineUsers.delete(userId); renderChatList(); });
@@ -1183,7 +1185,15 @@ function closeChat() {
 function renderChatMessages(messages) { const wrap = document.getElementById('chatMessages'); if (!wrap) return; if (!messages.length) { wrap.innerHTML = `<div class="empty-state small"><i class="fas fa-comment"></i><p>Начните переписку</p></div>`; return; } wrap.innerHTML = messages.map(m => msgHtml(m)).join(''); wrap.scrollTop = wrap.scrollHeight; }
 function msgHtml(m) { const isOut = m.senderId === state.user.id; return `<div class="msg ${isOut ? 'msg-out' : 'msg-in'}">${escapeHtml(m.text)}<span class="msg-time">${formatTime(m.createdAt)}</span></div>`; }
 function appendMessageToWindow(m) { const wrap = document.getElementById('chatMessages'); if (!wrap) return; const empty = wrap.querySelector('.empty-state'); if (empty) empty.remove(); wrap.insertAdjacentHTML('beforeend', msgHtml(m)); wrap.scrollTop = wrap.scrollHeight; }
-function sendMessage(e) { e.preventDefault(); const input = document.getElementById('chatInput'); const text = input.value.trim(); if (!text || !state.currentChatId) return; if (!state.socket || !state.socket.connected) return showToast('⚠️ Нет соединения', 'error'); state.socket.emit('chat:send', { chatId: state.currentChatId, text }); input.value = ''; }
+function sendMessage(e) {
+    e.preventDefault();
+    const input = document.getElementById('chatInput');
+    const text = input.value.trim();
+    if (!text || !state.currentChatId) return;
+    if (!state.socket || !state.socket.connected) return showToast('⚠️ Нет соединения с чатом. Обновите страницу и войдите снова.', 'error');
+    state.socket.emit('chat:send', { chatId: state.currentChatId, text });
+    input.value = '';
+}
 document.addEventListener('input', (e) => { if (e.target.id === 'chatInput' && state.currentChatId && state.socket) { clearTimeout(window._typingTimer); window._typingTimer = setTimeout(() => { state.socket.emit('chat:typing', { chatId: state.currentChatId }); }, 300); } });
 
 /* ADMIN */
