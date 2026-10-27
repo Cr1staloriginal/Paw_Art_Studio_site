@@ -1286,7 +1286,7 @@ function renderAdminDashboard() {
             <div class="stat-card" style="border-color:rgba(250,204,21,0.35)"><span class="stat-card-icon"><i class="fas fa-hourglass-half"></i></span><div class="stat-card-value">${s.withdrawals.pendingCount}</div><div class="stat-card-label">Заявок на вывод</div></div>
             <div class="stat-card" style="border-color:rgba(250,204,21,0.35)"><span class="stat-card-icon"><i class="fas fa-clock"></i></span><div class="stat-card-value" style="font-size:1.1rem">${formatMoney(s.withdrawals.pendingSum)}</div><div class="stat-card-label">Заморожено</div></div>
             <div class="stat-card stat-card-clickable" role="button" tabindex="0" onclick="openAdminUsersFromStats('all')" title="Открыть список аккаунтов"><span class="stat-card-icon"><i class="fas fa-users"></i></span><div class="stat-card-value">${s.users.total}</div><div class="stat-card-label">Пользователей · открыть список ↗</div></div>
-            <div class="stat-card"><span class="stat-card-icon"><i class="fas fa-user-plus"></i></span><div class="stat-card-value">+${s.users.new7}</div><div class="stat-card-label">Новых за 7 дней</div></div>
+            <div class="stat-card stat-card-clickable" role="button" tabindex="0" onclick="openAdminUsersFromStats('recent')" title="Посмотреть новые регистрации"><span class="stat-card-icon"><i class="fas fa-user-plus"></i></span><div class="stat-card-value">+${s.users.new7}</div><div class="stat-card-label">Новых за 7 дней · посмотреть ↗</div></div>
             <div class="stat-card"><span class="stat-card-icon"><i class="fas fa-folder-open"></i></span><div class="stat-card-value">${s.projects.total}</div><div class="stat-card-label">Заказов</div></div>
             <div class="stat-card"><span class="stat-card-icon"><i class="fas fa-spinner"></i></span><div class="stat-card-value">${s.projects.inProgress}</div><div class="stat-card-label">В работе</div></div>
             <div class="stat-card"><span class="stat-card-icon"><i class="fas fa-check-circle"></i></span><div class="stat-card-value">${s.projects.completed}</div><div class="stat-card-label">Завершено</div></div>
@@ -1369,11 +1369,14 @@ function renderAdminUsers() {
     }
 
     const search = (document.getElementById('userSearch')?.value || '').trim().toLowerCase();
+    const statsFilter = state.adminUserStatsFilter || 'all';
+    const recentCutoff = Date.now() - 7 * 24 * 60 * 60 * 1000;
     let users = allUsers.filter(u => {
         const name = String(u.name || '').toLowerCase();
         const email = String(u.email || '').toLowerCase();
-        return !search || name.includes(search) || email.includes(search) ||
-            String(u.id ?? '').includes(search);
+        const createdAt = Number(u.createdAt ?? u.created_at ?? 0);
+        const matchesSearch = !search || name.includes(search) || email.includes(search) || String(u.id ?? '').includes(search);
+        return matchesSearch && (statsFilter !== 'recent' || createdAt >= recentCutoff);
     });
 
     users.sort((a, b) => {
@@ -1395,7 +1398,8 @@ function renderAdminUsers() {
     const iAmRoot = me?.role === 'admin' &&
         (me?.isRoot === true || Number(me?.is_root ?? 0) === 1);
 
-    list.innerHTML = users.map(u => {
+    const filterBanner = statsFilter === 'recent' ? '<div style="margin:0 0 14px;padding:12px;border:1px solid var(--accent);border-radius:12px">🆕 Регистрации за последние 7 дней <button class="admin-act-btn" onclick="openAdminUsersFromStats(\'all\')">Показать всех</button></div>' : '<div style="margin-bottom:12px;color:var(--text-mute);font-size:.88rem">Аккаунты · сначала последние регистрации</div>';
+    list.innerHTML = filterBanner + users.map(u => {
         const id = Number(u.id);
         const name = String(u.name || 'Без имени');
         const email = String(u.email || '');
@@ -1417,7 +1421,7 @@ function renderAdminUsers() {
             ? `<button class="admin-act-btn" onclick="adminAdjustBalance(${id})"><i class="fas fa-coins"></i> Баланс</button>`
             : '';
 
-        return `<div class="admin-user-row"><div class="admin-user-avatar" ${isRootUser ? 'style="box-shadow:0 0 0 2px #fbbf24;"' : ''}>${avatar}</div><div class="admin-user-info"><div class="admin-user-name">${escapeHtml(name)}${isRootUser ? ' <span style="color:#fbbf24;font-weight:700">👑</span>' : ''}${isSelf ? ' <span style="color:var(--text-mute);font-weight:500">(вы)</span>' : ''}</div><div class="admin-user-email">${escapeHtml(email)}</div></div><span class="admin-user-role role-badge-${escapeHtml(role)}">${escapeHtml(ROLE_LABELS[role] || role)}</span><span class="admin-user-balance">${escapeHtml(formatMoney(Number(u.balance) || 0))}</span><div class="admin-user-actions"><button class="admin-act-btn primary" onclick="openUserFull(${id})"><i class="fas fa-eye"></i> История</button>${roleButtons}${balanceButton}</div></div>`;
+        return `<div class="admin-user-row"><div class="admin-user-avatar" ${isRootUser ? 'style="box-shadow:0 0 0 2px #fbbf24;"' : ''}>${avatar}</div><div class="admin-user-info"><div class="admin-user-name">${escapeHtml(name)}${isRootUser ? ' <span style="color:#fbbf24;font-weight:700">👑</span>' : ''}${isSelf ? ' <span style="color:var(--text-mute);font-weight:500">(вы)</span>' : ''}</div><div class="admin-user-email">${escapeHtml(email)}<br><span style="opacity:.72;font-size:.78rem">Регистрация: ${Number(u.createdAt ?? u.created_at ?? 0) ? new Date(Number(u.createdAt ?? u.created_at ?? 0)).toLocaleString("ru-RU") : "дата неизвестна"} · ID #${id}</span></div></div><span class="admin-user-role role-badge-${escapeHtml(role)}">${escapeHtml(ROLE_LABELS[role] || role)}</span><span class="admin-user-balance">${escapeHtml(formatMoney(Number(u.balance) || 0))}</span><div class="admin-user-actions"><button class="admin-act-btn primary" onclick="openUserFull(${id})"><i class="fas fa-eye"></i> История</button>${roleButtons}${balanceButton}</div></div>`;
     }).join('');
 }
 async function approveRequest(userId) { try { await api('/api/admin/approve', { method: 'POST', body: { userId } }); showToast('✅ Одобрено'); await loadAdminData(); await fetchMe(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
