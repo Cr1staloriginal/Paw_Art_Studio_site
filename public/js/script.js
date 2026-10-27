@@ -373,6 +373,18 @@ function applyContent(c) {
         setText(`[data-content="service_${i}_name"]`, c[`service_${i}_name`]);
         setText(`[data-content="service_${i}_desc"]`, c[`service_${i}_desc`]);
         setText(`[data-content="service_${i}_price"]`, c[`service_${i}_price`]);
+        const servicePrice = String(c[`service_${i}_price`] ?? '').trim();
+        const priceNode = document.querySelector(`[data-content="service_${i}_price"]`);
+        const serviceCard = priceNode?.closest('.service-card');
+        if (serviceCard && servicePrice) {
+            serviceCard.dataset.price = servicePrice;
+            const numericPrice = Number(servicePrice.replace(/[^0-9,\.]/g, '').replace(',', '.'));
+            if (Number.isFinite(numericPrice) && numericPrice > 0) serviceCard.dataset.unitPrice = String(numericPrice);
+        }
+        const serviceName = c[`service_${i}_name`];
+        const serviceDesc = c[`service_${i}_desc`];
+        if (serviceCard && serviceName) serviceCard.dataset.service = serviceName;
+        if (serviceCard && serviceDesc) serviceCard.dataset.detail = serviceDesc;
         const image = document.querySelector(`[data-content="service_${i}_image"]`);
         if (image && c[`service_${i}_image`]) {
             if (image.matches('img')) image.src = c[`service_${i}_image`];
