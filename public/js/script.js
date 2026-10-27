@@ -1285,7 +1285,7 @@ function renderAdminDashboard() {
             <div class="stat-card stat-money stats-wide"><span class="stat-card-icon"><i class="fas fa-coins"></i></span><div class="stat-card-value">${formatMoney(s.money.totalBalance)}</div><div class="stat-card-label">Всего на счетах</div></div>
             <div class="stat-card" style="border-color:rgba(250,204,21,0.35)"><span class="stat-card-icon"><i class="fas fa-hourglass-half"></i></span><div class="stat-card-value">${s.withdrawals.pendingCount}</div><div class="stat-card-label">Заявок на вывод</div></div>
             <div class="stat-card" style="border-color:rgba(250,204,21,0.35)"><span class="stat-card-icon"><i class="fas fa-clock"></i></span><div class="stat-card-value" style="font-size:1.1rem">${formatMoney(s.withdrawals.pendingSum)}</div><div class="stat-card-label">Заморожено</div></div>
-            <div class="stat-card"><span class="stat-card-icon"><i class="fas fa-users"></i></span><div class="stat-card-value">${s.users.total}</div><div class="stat-card-label">Пользователей</div></div>
+            <div class="stat-card stat-card-clickable" role="button" tabindex="0" onclick="openAdminUsersFromStats('all')" title="Открыть список аккаунтов"><span class="stat-card-icon"><i class="fas fa-users"></i></span><div class="stat-card-value">${s.users.total}</div><div class="stat-card-label">Пользователей · открыть список ↗</div></div>
             <div class="stat-card"><span class="stat-card-icon"><i class="fas fa-user-plus"></i></span><div class="stat-card-value">+${s.users.new7}</div><div class="stat-card-label">Новых за 7 дней</div></div>
             <div class="stat-card"><span class="stat-card-icon"><i class="fas fa-folder-open"></i></span><div class="stat-card-value">${s.projects.total}</div><div class="stat-card-label">Заказов</div></div>
             <div class="stat-card"><span class="stat-card-icon"><i class="fas fa-spinner"></i></span><div class="stat-card-value">${s.projects.inProgress}</div><div class="stat-card-label">В работе</div></div>
@@ -1348,6 +1348,14 @@ async function openContactRequest(id) {
         ];
         window.alert(lines.join('\\n'));
     } catch (err) { showToast('❌ ' + err.message, 'error'); }
+}
+
+function openAdminUsersFromStats(filter) {
+    state.adminUserStatsFilter = filter === 'recent' ? 'recent' : 'all';
+    switchAdminTab('users');
+    const search = document.getElementById('userSearch');
+    if (search) search.value = '';
+    renderAdminUsers();
 }
 
 function renderAdminUsers() {
