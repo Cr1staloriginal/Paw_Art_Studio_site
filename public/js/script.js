@@ -316,18 +316,11 @@ function updateUI() {
             adminBtn.classList.remove('hidden'); adminMenuLink.classList.remove('hidden');
             const isRoot = u.isRoot === true || Number(u.isRoot ?? u.is_root ?? 0) === 1;
             const editorAdminButton = document.getElementById('contentEditorAdminButton');
-            if (isRoot) {
-                adminBtn.style.background = 'linear-gradient(135deg, #fbbf24, #f59e0b)';
-                adminBtn.title = '👑 Главный админ';
-                if (contentLink) contentLink.classList.remove('hidden');
-                if (editorAdminButton) editorAdminButton.classList.remove('hidden');
-            }
-            else {
-                adminBtn.style.background = '';
-                adminBtn.title = 'Админ';
-                if (contentLink) contentLink.classList.add('hidden');
-                if (editorAdminButton) editorAdminButton.classList.add('hidden');
-            }
+            adminBtn.style.background = isRoot ? 'linear-gradient(135deg, #fbbf24, #f59e0b)' : '';
+            adminBtn.title = isRoot ? '👑 Главный админ' : 'Админ';
+            // Управление контентом и ценами доступно всем администраторам.
+            if (contentLink) contentLink.classList.remove('hidden');
+            if (editorAdminButton) editorAdminButton.classList.remove('hidden');
         } else {
             adminBtn.classList.add('hidden'); adminMenuLink.classList.add('hidden');
             if (contentLink) contentLink.classList.add('hidden');
@@ -380,6 +373,18 @@ function applyContent(c) {
         setText(`[data-content="service_${i}_name"]`, c[`service_${i}_name`]);
         setText(`[data-content="service_${i}_desc"]`, c[`service_${i}_desc`]);
         setText(`[data-content="service_${i}_price"]`, c[`service_${i}_price`]);
+        const servicePrice = String(c[`service_${i}_price`] ?? '').trim();
+        const priceNode = document.querySelector(`[data-content="service_${i}_price"]`);
+        const serviceCard = priceNode?.closest('.service-card');
+        if (serviceCard && servicePrice) {
+            serviceCard.dataset.price = servicePrice;
+            const numericPrice = Number(servicePrice.replace(/[^0-9,\.]/g, '').replace(',', '.'));
+            if (Number.isFinite(numericPrice) && numericPrice > 0) serviceCard.dataset.unitPrice = String(numericPrice);
+        }
+        const serviceName = c[`service_${i}_name`];
+        const serviceDesc = c[`service_${i}_desc`];
+        if (serviceCard && serviceName) serviceCard.dataset.service = serviceName;
+        if (serviceCard && serviceDesc) serviceCard.dataset.detail = serviceDesc;
         const image = document.querySelector(`[data-content="service_${i}_image"]`);
         if (image && c[`service_${i}_image`]) {
             if (image.matches('img')) image.src = c[`service_${i}_image`];
@@ -432,9 +437,7 @@ const CONTENT_FIELDS = [
 
 async function openContentEditor() {
     if (!state.user) return openAuth();
-    const isRoot = state.user.role === 'admin' &&
-        (state.user.isRoot === true || Number(state.user.isRoot ?? state.user.is_root ?? 0) === 1);
-    if (!isRoot) return showToast('⛔ Только главный админ', 'error');
+    if (state.user.role !== 'admin') return showToast('⛔ Только администраторы могут изменять сайт', 'error');
 
     const modal = document.getElementById('contentModal');
     if (!modal) return showToast('❌ Окно редактора не найдено', 'error');
