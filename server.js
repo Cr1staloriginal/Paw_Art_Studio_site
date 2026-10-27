@@ -665,7 +665,7 @@ const CONTENT_KEY_ALLOWLIST = new Set([
   ])
 ]);
 
-app.post('/api/admin/content', auth, rootOnly, (req, res) => {
+app.post('/api/admin/content', auth, adminOnly, (req, res) => {
   const updates = req.body?.updates;
   if (!updates || typeof updates !== 'object' || Array.isArray(updates))
     return res.status(400).json({ error: 'Ожидается объект updates' });
@@ -696,7 +696,7 @@ app.post('/api/admin/content', auth, rootOnly, (req, res) => {
   }
 });
 
-app.post('/api/admin/content/upload', auth, rootOnly, (req, res, next) => {
+app.post('/api/admin/content/upload', auth, adminOnly, (req, res, next) => {
   contentUpload.single('image')(req, res, err => {
     if (err) {
       if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Файл больше 5 МБ' });
