@@ -695,6 +695,11 @@ app.post('/api/admin/content', auth, siteEditorOnly, (req, res) => {
       return res.status(400).json({ error: `Недопустимое значение для ${key}` });
     if (String(value ?? '').length > 20000)
       return res.status(400).json({ error: `Поле ${key} слишком длинное` });
+    if (key.startsWith('package_') && key.endsWith('_price')) {
+      const price = Number(value);
+      if (String(value ?? '').trim() === '' || !Number.isFinite(price) || price < 0 || price > 10000000)
+        return res.status(400).json({ error: `Цена ${key} должна быть числом от 0 до 10 000 000 ₽` });
+    }
   }
 
   const now = Date.now();
@@ -1684,10 +1689,11 @@ app.delete('/api/portfolio/:id', auth, (req, res) => {
   if (!item) return res.status(404).json({ error: 'Работа не найдена' });
 
   const isAdmin = req.user.role === 'admin' || Number(req.user.is_root) === 1;
+  const isSiteEditor = req.user.role === 'manager';
   const isUploader = item.user_id === req.user.id;
   const author = db.prepare('SELECT author_user_id FROM portfolio WHERE id = ?').get(id);
   const isAuthor = author?.author_user_id === req.user.id;
-  if (!isAdmin && !isUploader && !isAuthor) {
+  if (!isAdmin && !isSiteEditor && !isUploader && !isAuthor) {
     return res.status(403).json({ error: 'Нет прав удалить эту работу' });
   }
 
