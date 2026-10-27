@@ -358,8 +358,22 @@ async function loadAndApplyContent() {
     try { const { content } = await api('/api/content'); state.content = content; applyContent(content); }
     catch (err) { console.warn('Контент не загружен:', err.message); }
 }
+function applyPackagePrices(content) {
+    if (!content || typeof PACKAGES === 'undefined') return;
+    Object.entries(PACKAGES).forEach(([packageId, pkg]) => {
+        pkg.items.forEach(item => {
+            const key = `package_${packageId}_${item.id.replace(/-/g, '_')}_price`;
+            const saved = content[key];
+            if (saved === undefined || saved === null || String(saved).trim() === '') return;
+            const price = Number(saved);
+            if (Number.isFinite(price) && price >= 0) item.price = price;
+        });
+    });
+}
+
 function applyContent(c) {
     if (!c) return;
+    applyPackagePrices(c);
     ['hero_eyebrow','hero_title','hero_subtitle','hero_badge_1','hero_badge_2','hero_badge_3'].forEach(k => setText(`[data-content="${k}"]`, c[k]));
     if (c.hero_image) {
         const heroBg = document.querySelector('.hero-bg');
@@ -424,6 +438,26 @@ const CONTENT_FIELDS = [
     { section: '💰 Тарифы', fields: Array.from({ length: 5 }, (_, i) => { const n = i + 1; return [
         { key: `pricing_${n}_name`, label: `Тариф ${n} — название` }, { key: `pricing_${n}_price`, label: `Тариф ${n} — цена` }, { key: `pricing_${n}_features`, label: `Тариф ${n} — фичи (через |)`, type: 'textarea' },
     ]; }).flat() },
+    { section: '📦 Цены элементов пакетов (₽ за штуку)', fields: [
+        { key: 'package_ds_avatar_price', label: 'Пак DS — Ава', type: 'number' },
+        { key: 'package_ds_banner_price', label: 'Пак DS — Баннер сезонный', type: 'number' },
+        { key: 'package_ds_sticker_price', label: 'Пак DS — Стикер', type: 'number' },
+        { key: 'package_ds_mascot_price', label: 'Пак DS — Маскот', type: 'number' },
+        { key: 'package_ds_roles_price', label: 'Пак DS — Настройка ролей и каналов', type: 'number' },
+        { key: 'package_ds_boost_price', label: 'Пак DS — Буст', type: 'number' },
+        { key: 'package_streamer_model2d_price', label: 'Пак стримера — 2D моделька', type: 'number' },
+        { key: 'package_streamer_emoji_price', label: 'Пак стримера — Эмодзи', type: 'number' },
+        { key: 'package_streamer_art_price', label: 'Пак стримера — Арт', type: 'number' },
+        { key: 'package_streamer_overlay_price', label: 'Пак стримера — Оверлей', type: 'number' },
+        { key: 'package_brand_brand_mascot_price', label: 'Пак «Бренд» — Маскот', type: 'number' },
+        { key: 'package_brand_brand_sticker_price', label: 'Пак «Бренд» — Стикер', type: 'number' },
+        { key: 'package_brand_brand_overlay_price', label: 'Пак «Бренд» — Оверлей', type: 'number' },
+        { key: 'package_full_full_mascot_price', label: 'Пак «Под ключ» — Маскот', type: 'number' },
+        { key: 'package_full_full_sticker_price', label: 'Пак «Под ключ» — Стикер', type: 'number' },
+        { key: 'package_full_full_overlay_price', label: 'Пак «Под ключ» — Оверлей', type: 'number' },
+        { key: 'package_full_full_banner_price', label: 'Пак «Под ключ» — Баннер', type: 'number' },
+        { key: 'package_full_full_animation_price', label: 'Пак «Под ключ» — Анимация', type: 'number' },
+    ]},
     { section: '👥 О нас', fields: [
         { key: 'about_text', label: 'Текст', type: 'textarea' }, { key: 'about_quote', label: 'Цитата', type: 'textarea' },
         { key: 'about_stat_1', label: 'Цифра 1' }, { key: 'about_stat_1_desc', label: 'Подпись 1' },
@@ -462,6 +496,7 @@ function closeContentEditor() {
 
 function renderContentEditor() {
     const c = state.content || {};
+    applyPackagePrices(c);
     const wrap = document.getElementById('contentEditorWrap');
     if (!wrap) return;
     wrap.innerHTML = CONTENT_FIELDS.map(group => `
@@ -471,6 +506,7 @@ function renderContentEditor() {
                 const val = c[f.key] ?? '';
                 const label = escapeHtml(f.label);
                 const key = escapeHtml(f.key);
+                if (f.type === 'number') return `<label class="content-label">${label}<input type="number" min="0" step="1" data-content-key="${key}" class="content-input" value="${escapeHtml(val)}" /></label>`;
                 if (f.type === 'textarea') return `<label class="content-label">${label}<textarea data-content-key="${key}" class="content-input">${escapeHtml(val)}</textarea></label>`;
                 if (f.type === 'image') return `<div class="content-label"><span>${label}</span><div class="content-image-row"><input type="text" data-content-key="${key}" class="content-input" value="${escapeHtml(val)}" placeholder="/uploads/content/..." /><input type="file" id="content-img-${key}" accept="image/png,image/jpeg,image/webp,image/gif" hidden onchange="uploadContentImage(event, '${key}')" /><button type="button" class="btn btn-outline" onclick="document.getElementById('content-img-${key}').click()" aria-label="Загрузить изображение"><i class="fas fa-camera"></i></button></div><img data-content-preview="${key}" src="${escapeHtml(val)}" alt="" ${val ? '' : 'hidden'} style="max-width:200px;max-height:140px;object-fit:contain;margin-top:8px;border-radius:8px;"></div>`;
                 return `<label class="content-label">${label}<input type="text" data-content-key="${key}" class="content-input" value="${escapeHtml(val)}" /></label>`;
