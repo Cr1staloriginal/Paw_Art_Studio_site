@@ -1,683 +1,1850 @@
-<!DOCTYPE html>
-<html lang="ru">
-<head>
-    <meta charset="UTF-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover"/>
-    <title>Paw Art Studio — Визуал для твоего проекта</title>
-    <meta name="description" content="Маскоты, стикеры, оверлеи и арт для стримеров, серверов и брендов." />
-    <link rel="preconnect" href="https://fonts.googleapis.com" />
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
-    <link href="https://fonts.googleapis.com/css2?family=Inter:opsz,wght@14..32,400;14..32,600;14..32,700;14..32,800&display=swap" rel="stylesheet" />
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.7.2/css/all.min.css" />
-    <link rel="stylesheet" href="/css/style.css" />
-    <link rel="stylesheet" href="/css/paw-upgrade.css?v=20261025-inquiry-dropdowns" />
-    <link rel="stylesheet" href="/css/mobile.css" />
-</head>
-<body>
+require('dotenv').config();
+const express = require('express');
+const path = require('path');
+const fs = require('fs');
+const http = require('http');
+const { Server: SocketServer } = require('socket.io');
+const Database = require('better-sqlite3');
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
+const cors = require('cors');
+const multer = require('multer');
+const nodemailer = require('nodemailer');
+const { YooKassa } = require('yookassa-api-sdk');
+const crypto = require('crypto');
 
-<header id="header">
-    <div class="container nav">
-        <div class="logo" onclick="scrollToTop()"><span class="logo-paw">🐾</span> PAW <span>ART</span></div>
-        <button class="burger" id="burger" onclick="toggleMenu()"><span></span><span></span><span></span></button>
-        <nav class="nav-links" id="navLinks">
-            <a onclick="scrollToSection('services')">Услуги</a>
-            <a onclick="scrollToSection('projects')">Заказы</a>
-            <a onclick="scrollToSection('portfolio')">Портфолио</a>
-            <a onclick="scrollToSection('about')">О нас</a>
-            <a onclick="scrollToSection('faq')">FAQ</a>
-            <a onclick="scrollToSection('contact')">Контакты</a>
-        </nav>
-        <div class="nav-user">
-            <button class="btn-login" id="loginBtn" onclick="openAuth()"><i class="fas fa-user"></i> Войти</button>
-            <div class="user-box hidden" id="userBox">
-                <button class="chat-chip" onclick="openMessenger()" title="Сообщения"><i class="fas fa-comments"></i><span class="chat-chip-badge hidden" id="chatBadge">0</span></button>
-                <button class="balance-chip" onclick="openDashboard()" title="Кабинет"><i class="fas fa-wallet"></i> <span id="balanceChip">0 ₽</span></button>
-                <button class="admin-btn hidden" id="adminBtn" onclick="openAdminPanel()" title="Админ"><i class="fas fa-shield-alt"></i></button>
-                <button class="avatar" id="userAvatar" onclick="toggleUserMenu()"><span id="userInitial">U</span></button>
-                <div class="user-menu hidden" id="userMenu">
-                    <div class="user-menu-head">
-                        <div class="user-menu-name" id="userName">User</div>
-                        <div class="user-menu-role" id="userRole">Клиент</div>
-                    </div>
-                    <a onclick="openDashboard()"><i class="fas fa-wallet"></i> Кабинет и баланс</a>
-                    <a onclick="openProfileEditor()"><i class="fas fa-user-edit"></i> Редактировать профиль</a>
-                    <a onclick="openMessenger()"><i class="fas fa-comments"></i> Сообщения (панель)</a>
-                    <a href="/messenger.html" target="_blank"><i class="fas fa-external-link-alt"></i> Мессенджер (страница)</a>
-                    <a onclick="openMyPortfolio()"><i class="fas fa-images"></i> Моё портфолио</a>
-                    <a onclick="openAdminPanel()" id="adminMenuLink" class="hidden"><i class="fas fa-shield-alt"></i> Админ-панель</a>
-                    <a onclick="openContentEditor()" id="contentMenuLink" class="hidden"><i class="fas fa-edit"></i> Редактор сайта 👑</a>
-                    <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</a>
-                </div>
-            </div>
-        </div>
-    </div>
-</header>
+const app = express();
+const server = http.createServer(app);
+const PORT = process.env.PORT || 3000;
+const HOST = process.env.HOST || '0.0.0.0';
+const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
+const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@example.com').toLowerCase();
+const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'change_me';
+const IS_PROD = process.env.NODE_ENV === 'production';
+const DATABASE_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'paw.db');
+const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
+const AVATAR_DIR = path.join(UPLOAD_DIR, 'avatars');
+const PORTFOLIO_DIR = path.join(UPLOAD_DIR, 'portfolio');
+const CONTENT_DIR = path.join(UPLOAD_DIR, 'content');
+const SITE_URL = process.env.SITE_URL || 'https://pawartstudio.store';
 
-<main>
-    <section class="hero" id="hero">
-        <div class="hero-bg"><div class="orb orb-1"></div><div class="orb orb-2"></div><div class="orb orb-3"></div></div>
-        <div class="container hero-inner">
-            <div class="hero-content">
-                <div class="hero-eyebrow" data-content="hero_eyebrow">🐾 Студия визуала Paw Art Studio</div>
-                <h1 data-content="hero_title">Визуал, который работает на вас</h1>
-                <p data-content="hero_subtitle">Маскоты, стикеры, оформление для стримеров, серверов и брендов.</p>
-                <div class="hero-actions">
-                    <a onclick="scrollToSection('services')" class="btn">Заказать проект</a>
-                    <a onclick="scrollToSection('portfolio')" class="btn btn-ghost">Смотреть работы</a>
-                </div>
-                <div class="hero-badges">
-                    <span data-content="hero_badge_1">⭐ 4.9 из 5</span>
-                    <span data-content="hero_badge_2">⚡ Срок от 3 дней</span>
-                    <span data-content="hero_badge_3">🎨 50+ работ</span>
-                </div>
-            </div>
-            <div class="hero-gallery paw-mascot-card">
-                <img class="paw-mascot-image" src="/uploads/mascot.png" alt="Маскот Paw Art Studio — Paw">
-                <div class="paw-mascot-copy">
-                    <strong>Твой творческий напарник — Paw!</strong>
-                    <span>Маскоты, стикеры и визуал с характером ✨</span>
-                </div>
-            </div>
+[DATABASE_PATH].forEach(p => {
+  const dir = path.dirname(p);
+  if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
+});
+[UPLOAD_DIR, AVATAR_DIR, PORTFOLIO_DIR, CONTENT_DIR].forEach(d => {
+  if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
+});
 
-        </div>
-    </section>
+// --- Почта ---
+const mailer = nodemailer.createTransport({
+  host: process.env.SMTP_HOST,
+  port: Number(process.env.SMTP_PORT) || 587,
+  secure: Number(process.env.SMTP_PORT) === 465,
+  auth: { user: process.env.SMTP_USER, pass: process.env.SMTP_PASS },
+});
 
-    <section class="section services" id="services">
-        <div class="container">
-            <div class="section-header">
-                <h2>Услуги</h2>
-                <p>Создаём уникальный визуальный стиль для тебя, твоего проекта и сообщества.</p>
-            </div>
+// --- ЮKassa ---
+let yookassa = null;
+if (process.env.YOOKASSA_SHOP_ID && process.env.YOOKASSA_SECRET_KEY) {
+  yookassa = YooKassa({
+    shop_id: process.env.YOOKASSA_SHOP_ID,
+    secret_key: process.env.YOOKASSA_SECRET_KEY,
+  });
+  console.log('✅ ЮKassa инициализирована');
+} else {
+  console.log('⚠️ ЮKassa не настроена');
+}
 
-            <div class="services-grid paw-services-grid">
-                <article class="service-card paw-service-card" role="button" tabindex="0"
-                    data-service="Маскот" data-price="от 4 000 ₽" data-min="1" data-max="1"
-                    data-unit-price="4000" data-unit="за маскота" data-kind="fixed"
-                    data-detail="Персонаж-талисман, который олицетворяет бренд, компанию, команду или сообщество. Обсуждается лично с заказчиком, высылается модельным листом.">
-                    <div class="service-image"><img src="/uploads/mascot-service.webp" alt="Услуга создания маскота" loading="lazy" data-content="service_1_image"></div>
-                    <div class="service-content">
-                        <h3 data-content="service_1_name">Маскот</h3>
-                        <p data-content="service_1_desc">Персонаж-талисман, который олицетворяет бренд, компанию, команду или сообщество. Обсуждается лично с заказчиком, высылается модельным листом.</p>
-                        <span class="price" data-content="service_1_price">от 4 000 ₽</span>
-                    </div>
-                </article>
+const io = new SocketServer(server, {
+  cors: { origin: '*', methods: ['GET', 'POST'] },
+  transports: ['websocket', 'polling'],
+});
 
-                <article class="service-card paw-service-card" role="button" tabindex="0"
-                    data-service="Стикеры" data-price="от 1 800 ₽" data-min="5" data-max="15"
-                    data-unit-price="360" data-unit="за стикер" data-kind="fixed"
-                    data-detail="Небольшие изображения или надписи в цифровом виде. Наборы эмоций для Discord, Telegram, VK — от 5 до 15 штук.">
-                    <div class="service-image"><img src="/uploads/stickers.webp" alt="Услуга создания стикеров" loading="lazy" data-content="service_2_image"></div>
-                    <div class="service-content">
-                        <h3 data-content="service_2_name">Стикеры</h3>
-                        <p data-content="service_2_desc">Небольшие изображения или надписи в цифровом виде. Наборы эмоций для Discord, Telegram, VK — от 5 до 15 штук.</p>
-                        <span class="price" data-content="service_2_price">от 1 800 ₽</span>
-                    </div>
-                </article>
+// --- Multer ---
+const storage = multer.diskStorage({
+  destination: (req, file, cb) =>
+    cb(null, file.fieldname === 'avatar' ? AVATAR_DIR : PORTFOLIO_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.jpg';
+    cb(null, 'f_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + ext);
+  },
+});
+const upload = multer({
+  storage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, /^image\/(png|jpe?g|gif|webp)$/i.test(file.mimetype)),
+});
 
-                <article class="service-card paw-service-card" role="button" tabindex="0"
-                    data-service="Баннер Discord" data-price="от 2 500 ₽" data-min="1" data-max="5"
-                    data-unit-price="2500" data-unit="за баннер" data-kind="fixed"
-                    data-detail="Графическое изображение в верхней части списка каналов вашего сервера. Делает визуальный стиль узнаваемым и помогает участникам быстрее понять тематику группы.">
-                    <div class="service-image"><img src="/uploads/banner.webp" alt="Услуга создания баннера Discord" loading="lazy" data-content="service_3_image"></div>
-                    <div class="service-content">
-                        <h3 data-content="service_3_name">Баннер Discord</h3>
-                        <p data-content="service_3_desc">Графическое изображение в верхней части списка каналов вашего сервера. Делает визуальный стиль узнаваемым и помогает участникам быстрее понять тематику группы.</p>
-                        <span class="price" data-content="service_3_price">от 2 500 ₽</span>
-                    </div>
-                </article>
+const contentStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, CONTENT_DIR),
+  filename: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase() || '.png';
+    cb(null, 'c_' + Date.now() + '_' + Math.random().toString(36).slice(2, 8) + ext);
+  },
+});
+const contentUpload = multer({
+  storage: contentStorage,
+  limits: { fileSize: 5 * 1024 * 1024 },
+  fileFilter: (req, file, cb) => cb(null, /^image\/(png|jpe?g|gif|webp)$/i.test(file.mimetype)),
+});
 
-                <article class="service-card service-card--text paw-service-card" role="button" tabindex="0"
-                    data-service="Аватарка" data-price="от 1 200 ₽" data-min="1" data-max="3"
-                    data-unit-price="1200" data-unit="за аватарку" data-kind="fixed"
-                    data-detail="Графическое изображение, фотография или картинка, которая представляет пользователя, бренд или сообщество в интернете.">
-                    <div class="service-content">
-                        <h3 data-content="service_4_name">Аватарка</h3>
-                        <p data-content="service_4_desc">Графическое изображение, фотография или картинка, которая представляет пользователя, бренд или сообщество в интернете.</p>
-                        <span class="price" data-content="service_4_price">от 1 200 ₽</span>
-                    </div>
-                </article>
+// --- БД ---
+const db = new Database(DATABASE_PATH);
+db.pragma('journal_mode = WAL');
+db.pragma('foreign_keys = ON');
 
-                <article class="service-card service-card--text paw-service-card" role="button" tabindex="0"
-                    data-service="Арт" data-price="от 3 000 ₽" data-min="1" data-max="5"
-                    data-unit-price="3000" data-unit="за проект" data-kind="fixed"
-                    data-detail="Полноценное художественное произведение, созданное для выражения определённой идеи, эмоции, образа или авторского стиля.">
-                    <div class="service-content">
-                        <h3 data-content="service_5_name">Арт</h3>
-                        <p data-content="service_5_desc">Полноценное художественное произведение, созданное для выражения определённой идеи, эмоции, образа или авторского стиля.</p>
-                        <span class="price" data-content="service_5_price">от 3 000 ₽</span>
-                    </div>
-                </article>
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    name TEXT NOT NULL,
+    email TEXT UNIQUE NOT NULL COLLATE NOCASE,
+    password TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'client',
+    requested_role TEXT,
+    balance INTEGER NOT NULL DEFAULT 0,
+    avatar TEXT,
+    bio TEXT,
+    is_root INTEGER NOT NULL DEFAULT 0,
+    email_verified INTEGER NOT NULL DEFAULT 0,
+    verification_code TEXT,
+    verification_expires INTEGER,
+    created_at INTEGER NOT NULL
+  );
 
-                <article class="service-card service-card--text paw-service-card" role="button" tabindex="0"
-                    data-service="ИИ-арт" data-price="от 800 ₽" data-min="1" data-max="5"
-                    data-unit-price="800" data-unit="за проект" data-kind="fixed"
-                    data-detail="Изображение, созданное искусственным интеллектом (нейросетью) на основе текстового описания (промпта), эскиза или фотографии. Доступно более 20 правок.">
-                    <div class="service-content">
-                        <h3 data-content="service_6_name">ИИ-арт</h3>
-                        <p data-content="service_6_desc">Изображение, созданное искусственным интеллектом (нейросетью) на основе текстового описания (промпта), эскиза или фотографии. Доступно более 20 правок.</p>
-                        <span class="price" data-content="service_6_price">от 800 ₽</span>
-                    </div>
-                </article>
-            </div>
-        </div>
-    </section>
+  CREATE TABLE IF NOT EXISTS transactions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    title TEXT NOT NULL,
+    amount INTEGER NOT NULL,
+    type TEXT NOT NULL CHECK (type IN ('in','out')),
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
 
-    <section class="section packages-section" id="packages">
-        <div class="container">
-            <div class="package-offers">
-                <div class="package-offers-heading">
-                    <h3>Готовые паки</h3>
-                    <p>Собери комплект под свой проект — меняй количество каждого элемента и сразу смотри итоговую стоимость.</p>
-                </div>
-                <div class="package-offers-grid">
-                    <article class="package-offer-card">
-                        <div class="package-offer-icon">💬</div>
-                        <h4>Пак DS</h4>
-                        <p>Аватарки, сезонные баннеры, стикеры, маскот и оформление Discord-сервера.</p>
-                        <button class="btn" type="button" onclick="openPackageConfigurator('ds')">Настроить пак</button>
-                    </article>
-                    <article class="package-offer-card">
-                        <div class="package-offer-icon">🎥</div>
-                        <h4>Пак стримера</h4>
-                        <p>2D-модель, эмодзи, арт и оверлеи для оформления стрима.</p>
-                        <button class="btn" type="button" onclick="openPackageConfigurator('streamer')">Настроить пак</button>
-                    </article>
-                    <article class="package-offer-card">
-                        <div class="package-offer-icon">✨</div>
-                        <h4>Пак «Бренд»</h4>
-                        <p>Комплект из маскота, 10 стикеров и оверлея. Настройте состав и посмотрите предварительную цену.</p>
-                        <div class="package-offer-price">Ориентир: 10 000–12 000 ₽</div>
-                        <button class="btn" type="button" onclick="openPackageConfigurator('brand')">Настроить пак</button>
-                    </article>
-                    <article class="package-offer-card">
-                        <div class="package-offer-icon">🚀</div>
-                        <h4>Пак «Под ключ»</h4>
-                        <p>Расширенное оформление: маскот, стикеры, оверлей, баннеры и анимация.</p>
-                        <div class="package-offer-price">Ориентир: 15 000–20 000 ₽</div>
-                        <button class="btn" type="button" onclick="openPackageConfigurator('full')">Настроить пак</button>
-                    </article>
-                </div>
-            </div>
-        </div>
-    </section>
+  CREATE TABLE IF NOT EXISTS withdrawals (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    amount INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending' CHECK (status IN ('pending','approved','rejected')),
+    comment TEXT,
+    card_number TEXT,
+    admin_comment TEXT,
+    created_at INTEGER NOT NULL,
+    reviewed_at INTEGER,
+    reviewed_by INTEGER,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (reviewed_by) REFERENCES users(id) ON DELETE SET NULL
+  );
 
-    <section class="section projects-section" id="projects">
-        <div class="container">
-            <h2>Заказы</h2>
-            <p class="section-subtitle">Создайте заказ или возьмите в работу</p>
-            <div class="projects-toolbar">
-                <div class="projects-filters" id="projectFilters">
-                    <button class="filter active" data-status="all">Все</button>
-                    <button class="filter" data-status="open">Открытые</button>
-                    <button class="filter" data-status="in_progress">В работе</button>
-                    <button class="filter" data-status="completed">Завершённые</button>
-                    <button class="filter" data-status="cancelled">Отменённые</button>
-                </div>
-                <button class="btn" id="createProjectBtn" onclick="openProjectCreator()"><i class="fas fa-plus"></i> Создать заказ</button>
-            </div>
-            <div class="projects-list" id="projectsList"></div>
-        </div>
-    </section>
+  CREATE TABLE IF NOT EXISTS projects (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    title TEXT NOT NULL,
+    description TEXT NOT NULL,
+    category TEXT NOT NULL,
+    budget INTEGER NOT NULL DEFAULT 0,
+    status TEXT NOT NULL DEFAULT 'open',
+    client_id INTEGER NOT NULL,
+    executor_id INTEGER,
+    created_at INTEGER NOT NULL,
+    updated_at INTEGER NOT NULL,
+    FOREIGN KEY (client_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (executor_id) REFERENCES users(id) ON DELETE SET NULL
+  );
 
-    <section class="section portfolio-preview" id="portfolio">
-        <div class="container">
-            <h2>Портфолио</h2>
-            <p class="section-subtitle">Готовые работы мастеров студии</p>
-            <div class="port-filters">
-                <button class="filter active" data-filter="all">Все</button>
-                <button class="filter" data-filter="Маскот">Маскот</button>
-                <button class="filter" data-filter="Стикеры">Стикеры</button>
-                <button class="filter" data-filter="Баннеры">Баннеры</button>
-                <button class="filter" data-filter="Аватарки">Аватарки</button>
-                <button class="filter" data-filter="Арт">Арт</button>
-                <button class="filter" data-filter="Анимация">Анимация</button>
-                <button class="filter" data-filter="3D арт">3D арт</button>
-            </div>
-            <div class="portfolio-gallery" id="portfolioGallery"></div>
-        </div>
-    </section>
+  CREATE TABLE IF NOT EXISTS chats (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_a INTEGER NOT NULL,
+    user_b INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    UNIQUE (user_a, user_b),
+    FOREIGN KEY (user_a) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_b) REFERENCES users(id) ON DELETE CASCADE
+  );
 
-    <section class="section about" id="about">
-        <div class="container">
-            <h2>О нас</h2>
-            <p class="section-subtitle">Команда, которая делает визуал осмысленным</p>
-            <div class="about-layout">
-                <div class="about-text">
-                    <p data-content="about_text"><strong>Paw Art Studio</strong> — команда художников и менеджеров.</p>
-                    <blockquote data-content="about_quote">«Мы не просто рисуем»</blockquote>
-                </div>
-                <div class="about-grid">
-                    <div class="about-stat"><div class="num" data-content="about_stat_1">0</div><div class="desc" data-content="about_stat_1_desc">проектов</div></div>
-                    <div class="about-stat"><div class="num" data-content="about_stat_2">0</div><div class="desc" data-content="about_stat_2_desc">клиентов</div></div>
-                    <div class="about-stat"><div class="num" data-content="about_stat_3">0</div><div class="desc" data-content="about_stat_3_desc">срок</div></div>
-                </div>
-            </div>
-        </div>
-    </section>
+  CREATE TABLE IF NOT EXISTS messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    chat_id INTEGER NOT NULL,
+    sender_id INTEGER NOT NULL,
+    text TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    read_at INTEGER,
+    FOREIGN KEY (chat_id) REFERENCES chats(id) ON DELETE CASCADE,
+    FOREIGN KEY (sender_id) REFERENCES users(id) ON DELETE CASCADE
+  );
 
-    <section class="section faq" id="faq">
-        <div class="container">
-            <h2>Частые вопросы</h2>
-            <p class="section-subtitle">Коротко о главном</p>
-            <div class="faq-list">
-                <details class="faq-item"><summary data-content="faq_1_q">Вопрос 1</summary><p data-content="faq_1_a">Ответ</p></details>
-                <details class="faq-item"><summary data-content="faq_2_q">Вопрос 2</summary><p data-content="faq_2_a">Ответ</p></details>
-                <details class="faq-item"><summary data-content="faq_3_q">Вопрос 3</summary><p data-content="faq_3_a">Ответ</p></details>
-                <details class="faq-item"><summary data-content="faq_4_q">Вопрос 4</summary><p data-content="faq_4_a">Ответ</p></details>
-                <details class="faq-item"><summary data-content="faq_5_q">Вопрос 5</summary><p data-content="faq_5_a">Ответ</p></details>
-            </div>
-        </div>
-    </section>
+  CREATE TABLE IF NOT EXISTS portfolio (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    filename TEXT NOT NULL,
+    title TEXT NOT NULL,
+    description TEXT,
+    category TEXT NOT NULL,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
 
-    <section class="section contact" id="contact">
-        <div class="container">
-            <h2>Контакты</h2>
-            <p class="section-subtitle">Свяжитесь с нами удобным способом</p>
-            <div class="contact-wrapper">
-                <div class="contact-links">
-                    <a href="javascript:void(0)" onclick="openSocial('discord', state.content?.contact_discord || 'discord.gg/pawartstudio')">
-                        <i class="fab fa-discord"></i>
-                        <span data-content="contact_discord">discord.gg/pawartstudio</span>
-                    </a>
-                    <a href="javascript:void(0)" onclick="openSocial('telegram', state.content?.contact_telegram || '@pawartstudio')">
-                        <i class="fab fa-telegram-plane"></i>
-                        <span data-content="contact_telegram">@pawartstudio</span>
-                    </a>
-                    <a href="javascript:void(0)" onclick="openEmail()" class="contact-email-link">
-                        <i class="fas fa-envelope"></i>
-                        <span data-content="contact_email">pawartstudioofficial@gmail.com</span>
-                        <button class="copy-btn" onclick="event.stopPropagation(); copyEmail()" title="Скопировать email">
-                            <i class="fas fa-copy"></i>
-                        </button>
-                    </a>
-                </div>
-                <div class="contact-form">
-                    <h3 style="margin-bottom:6px;">Оставить заявку</h3>
-                    <p style="color:var(--text-mute); font-size:0.9rem;">Мы ответим в течение 24 часов</p>
-                    <form id="contactForm" onsubmit="handleSubmit(event)">
-                        <label for="formName">Имя</label><input type="text" id="formName" name="name" placeholder="Как к вам обращаться?" maxlength="100" required />
-                        <label for="formProject">Проект</label><input type="text" id="formProject" name="project" placeholder="Название проекта" maxlength="200" />
-                        <label for="formService" class="inquiry-field-label">Что нужно <span class="inquiry-field-required">обязательно</span></label>
-                        <p class="inquiry-field-hint">Выберите услугу из списка — нажмите на поле, чтобы увидеть варианты.</p>
-                        <select id="formService" name="service" class="inquiry-select" required>
-                            <option value="Артики">Артики</option><option value="Премиум арт">Премиум арт</option>
-                            <option value="Чибики">Чибики</option><option value="Стикеры">Стикеры</option>
-                            <option value="Ава">Ава</option><option value="3D модель">3D модель</option>
-                            <option value="3D арт">3D арт</option><option value="Другое">Другое</option>
-                        </select>
-                        <label for="formMessage">Ссылка на референсы</label><textarea id="formMessage" name="reference" placeholder="Стиль, примеры, идеи..." maxlength="5000"></textarea>
-                        <label for="formContactMethod" class="inquiry-field-label">Способ связи <span class="inquiry-field-required">обязательно</span></label>
-                        <p class="inquiry-field-hint">Это тоже список. Выберите, где вам удобнее получить ответ.</p>
-                        <select id="formContactMethod" name="contactMethod" class="inquiry-select" required onchange="updateContactDetailField()">
-                            <option value="Сайт" selected>Сайт</option><option value="Discord">Discord</option>
-                            <option value="Telegram">Telegram</option><option value="VK">VK</option><option value="Телефон">Телефон</option><option value="Email">Email</option>
-                        </select>
-                        <div id="contactDetailBlock" class="inquiry-contact-detail" hidden>
-                            <label id="contactDetailLabel" for="formContactDetail">Контакт для связи</label>
-                            <input type="text" id="formContactDetail" name="contactDetail" maxlength="300" placeholder="Укажите контакт" />
-                            <p class="inquiry-field-hint">Укажите ник, номер или ссылку — в зависимости от выбранного способа.</p>
-                        </div>
-                        <button type="submit" class="btn" id="contactSubmitBtn">Отправить заявку</button>
-                    </form>
-                </div>
-            </div>
-        </div>
-    </section>
-</main>
+  CREATE TABLE IF NOT EXISTS site_content (
+    key TEXT PRIMARY KEY,
+    value TEXT,
+    updated_at INTEGER NOT NULL
+  );
 
-<footer>
-    <div class="container footer-grid">
-        <div class="footer-col">
-            <div class="logo"><span class="logo-paw">🐾</span> PAW <span>ART</span></div>
-            <p data-content="footer_text">Визуал для стримеров, серверов и брендов.</p>
-        </div>
-        <div class="footer-col">
-            <h4>Навигация</h4>
-            <a onclick="scrollToSection('services')">Услуги</a>
-            <a onclick="scrollToSection('projects')">Заказы</a>
-            <a onclick="scrollToSection('portfolio')">Портфолио</a>
-            <a onclick="scrollToSection('about')">О нас</a>
-        </div>
-        <div class="footer-col">
-            <h4>Соцсети</h4>
-            <a href="javascript:void(0)" onclick="openSocial('discord', state.content?.contact_discord || 'discord.gg/pawartstudio')"><i class="fab fa-discord"></i> Discord</a>
-            <a href="javascript:void(0)" onclick="openSocial('telegram', state.content?.contact_telegram || '@pawartstudio')"><i class="fab fa-telegram-plane"></i> Telegram</a>
-            <a href="javascript:void(0)" onclick="openEmail()"><i class="fas fa-envelope"></i> Email</a>
-        </div>
-    </div>
-    <div class="footer-bottom"><div class="container">&copy; 2026 PAW ART STUDIO</div></div>
-</footer>
+  CREATE TABLE IF NOT EXISTS requests (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER,
+    name TEXT NOT NULL,
+    project TEXT,
+    service TEXT NOT NULL,
+    budget TEXT,
+    reference TEXT,
+    contact_method TEXT NOT NULL DEFAULT 'Сайт',
+    contact_detail TEXT,
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE SET NULL
+  );
+  CREATE INDEX IF NOT EXISTS idx_requests_created ON requests(created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_requests_user ON requests(user_id);
 
-<div class="toast" id="toast"></div>
-<button class="scroll-top" id="scrollTop" onclick="scrollToTop()"><i class="fas fa-arrow-up"></i></button>
+  CREATE TABLE IF NOT EXISTS payments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    user_id INTEGER NOT NULL,
+    payment_id TEXT UNIQUE,
+    amount INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending',
+    created_at INTEGER NOT NULL,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
 
-<div class="modal" id="authModal" onclick="if(event.target===this) closeAuth()">
-    <div class="modal-box">
-        <button class="modal-close" onclick="closeAuth()">×</button>
-        <div class="auth-head"><div class="auth-logo">🐾</div><h3>Paw Art Studio</h3><p id="authSubtitle">Войдите или создайте аккаунт</p></div>
-        <div class="auth-tabs" id="authTabs">
-            <button class="auth-tab active" data-tab="login" onclick="switchAuthTab('login')">Вход</button>
-            <button class="auth-tab" data-tab="register" onclick="switchAuthTab('register')">Регистрация</button>
-        </div>
-        <form class="auth-form" id="loginForm" onsubmit="handleLogin(event)">
-            <label>Email</label><input type="email" id="loginEmail" placeholder="your@email.com" required />
-            <label>Пароль</label><input type="password" id="loginPassword" placeholder="••••••••" required />
-            <button type="button" class="auth-forgot-link" onclick="showForgotPassword()">Забыли пароль?</button>
-            <button type="submit" class="btn">Войти</button>
-        </form>
-        <form class="auth-form hidden" id="registerForm" onsubmit="handleRegister(event)">
-            <label for="regName">Имя</label>
-            <input type="text" id="regName" placeholder="Как вас зовут?" autocomplete="name" required />
-            <label for="regEmail">Email</label>
-            <input type="email" id="regEmail" placeholder="your@email.com" autocomplete="email" required />
-            <label for="regPassword">Пароль</label>
-            <input type="password" id="regPassword" placeholder="Минимум 6 символов" minlength="6" autocomplete="new-password" required />
-            <div class="role-info-box"><i class="fas fa-info-circle"></i><span>На указанный email придёт код подтверждения регистрации.</span></div>
-            <button type="submit" class="btn">Получить код на email</button>
-        </form>
-        <form class="auth-form hidden" id="verifyForm" onsubmit="handleVerify(event)">
-            <div class="verify-intro">
-                <p>Мы отправили код на <strong id="verifyEmailTarget">—</strong></p>
-                <p class="verify-hint" id="verifyHint">Не пришло? Проверьте папку Спам или запросите код повторно.</p>
-            </div>
-            <label for="verifyCode">Код из письма</label>
-            <input type="text" id="verifyCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" minlength="6" autocomplete="one-time-code" oninput="this.value = this.value.replace(/[^0-9]/g, '').slice(0, 6)" placeholder="6 цифр" aria-describedby="verifyHint verifyError" required />
-            <p id="verifyError" class="verify-error" role="alert" aria-live="polite"></p>
-            <button type="submit" class="btn">Подтвердить</button>
-            <button type="button" class="btn btn-outline" id="resendCodeBtn">Отправить код повторно</button>
-            <button type="button" class="btn btn-ghost" id="backToRegisterBtn">← Назад</button>
-        </form>
-        <form class="auth-form hidden" id="forgotPasswordForm" onsubmit="handleForgotPassword(event)">
-            <p class="auth-help">Введите email аккаунта. Мы отправим код для сброса пароля.</p>
-            <label>Email</label><input type="email" id="forgotEmail" autocomplete="email" placeholder="your@email.com" required />
-            <button type="submit" class="btn">Отправить код</button>
-            <button type="button" class="btn btn-ghost" onclick="switchAuthTab('login')">← Назад ко входу</button>
-        </form>
-        <form class="auth-form hidden" id="resetPasswordForm" onsubmit="handleResetPassword(event)">
-            <p class="auth-help">Введите шестизначный код из письма и установите новый пароль.</p>
-            <label>Код из письма</label><input type="text" id="resetCode" inputmode="numeric" pattern="[0-9]{6}" maxlength="6" autocomplete="one-time-code" required />
-            <label>Новый пароль</label><input type="password" id="resetNewPassword" minlength="6" autocomplete="new-password" placeholder="Минимум 6 символов" required />
-            <label>Повторите пароль</label><input type="password" id="resetConfirmPassword" minlength="6" autocomplete="new-password" placeholder="Повторите новый пароль" required />
-            <p id="resetPasswordError" class="auth-error"></p>
-            <button type="submit" class="btn">Сохранить новый пароль</button>
-            <button type="button" class="btn btn-ghost" onclick="showForgotPassword()">Отправить код повторно</button>
-        </form>
-    </div>
-</div>
+  CREATE TABLE IF NOT EXISTS promocodes (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    code TEXT UNIQUE NOT NULL COLLATE NOCASE,
+    bonus INTEGER NOT NULL DEFAULT 0,
+    discount INTEGER NOT NULL DEFAULT 0,
+    max_uses INTEGER,
+    uses INTEGER NOT NULL DEFAULT 0,
+    active INTEGER NOT NULL DEFAULT 1,
+    expires_at INTEGER,
+    created_at INTEGER NOT NULL
+  );
 
-<div class="modal" id="dashboardModal" onclick="if(event.target===this) closeDashboard()">
-    <div class="modal-box dashboard-box">
-        <button class="modal-close" onclick="closeDashboard()">×</button>
-        <div class="dash-head">
-            <div class="dash-avatar" id="dashAvatar">U</div>
-            <div><h3 id="dashName">Пользователь</h3><div class="dash-role" id="dashRole">Клиент</div></div>
-            <button class="dash-edit-btn" onclick="openProfileEditor()" title="Профиль"><i class="fas fa-pen"></i></button>
-        </div>
-        <div class="dash-tabs">
-            <button class="dash-tab active" data-dtab="wallet" onclick="switchDashTab('wallet')"><i class="fas fa-wallet"></i> Кошелёк</button>
-            <button class="dash-tab" data-dtab="withdrawals" onclick="switchDashTab('withdrawals')"><i class="fas fa-money-check-alt"></i> Выплаты</button>
-            <button class="dash-tab" data-dtab="history" onclick="switchDashTab('history')"><i class="fas fa-history"></i> История</button>
-            <button class="dash-tab" data-dtab="role" onclick="switchDashTab('role')"><i class="fas fa-user-tag"></i> Роль</button>
-        </div>
-        <div class="dash-panel" id="dashWallet">
-            <div class="balance-card">
-                <div class="balance-label">Ваш баланс</div>
-                <div class="balance-value" id="dashBalance">0 ₽</div>
-                <div class="balance-actions">
-                    <button class="btn" onclick="openDeposit()"><i class="fas fa-plus"></i> Пополнить</button>
-                    <button class="btn btn-outline" onclick="openWithdraw()"><i class="fas fa-arrow-up"></i> Вывести</button>
-                </div>
-                <div class="commission-note"><i class="fas fa-info-circle"></i> Комиссия <strong>0%</strong>. Пополнение через ЮKassa.</div>
-            </div>
-            <div class="wallet-stats">
-                <div class="wallet-stat"><div class="ws-num" id="wsIn">0 ₽</div><div class="ws-desc">пополнено</div></div>
-                <div class="wallet-stat"><div class="ws-num" id="wsOut">0 ₽</div><div class="ws-desc">выведено</div></div>
-                <div class="wallet-stat"><div class="ws-num" id="wsProjects">0</div><div class="ws-desc">проектов</div></div>
-            </div>
-        </div>
-        <div class="dash-panel hidden" id="dashWithdrawals">
-            <div class="withdrawals-list" id="userWithdrawalsList"><div class="tx-empty">Пока нет заявок на вывод</div></div>
-        </div>
-        <div class="dash-panel hidden" id="dashHistory"><div class="tx-list" id="txList"><div class="tx-empty">Пока нет операций</div></div></div>
-        <div class="dash-panel hidden" id="dashRolePanel">
-            <div class="role-current"><div class="role-current-label">Ваша роль</div><div class="role-current-value" id="roleCurrentValue">Клиент</div></div>
-            <div id="roleRequestBlock">
-                <p class="role-desc">Отправьте заявку — админ рассмотрит.</p>
-                <div class="role-request-actions">
-                    <button class="btn" onclick="requestRole('executor')"><i class="fas fa-paint-brush"></i> Стать исполнителем</button>
-                    <button class="btn btn-outline" onclick="requestRole('manager')"><i class="fas fa-briefcase"></i> Стать менеджером</button>
-                </div>
-            </div>
-            <div class="role-pending hidden" id="rolePending"><i class="fas fa-hourglass-half"></i><span id="rolePendingText">Заявка на рассмотрении</span></div>
-        </div>
-    </div>
-</div>
+  CREATE TABLE IF NOT EXISTS promo_redemptions (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    promo_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    created_at INTEGER NOT NULL,
+    UNIQUE (promo_id, user_id),
+    FOREIGN KEY (promo_id) REFERENCES promocodes(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+  );
 
-<div class="modal" id="profileModal" onclick="if(event.target===this) closeProfileEditor()">
-    <div class="modal-box">
-        <button class="modal-close" onclick="closeProfileEditor()">×</button>
-        <div class="auth-head"><div class="auth-logo">👤</div><h3>Редактировать профиль</h3></div>
-        <div class="avatar-editor">
-            <div class="avatar-preview" id="avatarPreview">U</div>
-            <div class="avatar-upload">
-                <input type="file" id="avatarInput" accept="image/*" onchange="uploadAvatar(event)" hidden />
-                <button class="btn btn-outline" onclick="document.getElementById('avatarInput').click()"><i class="fas fa-camera"></i> Загрузить аватар</button>
-                <p class="avatar-hint">PNG, JPG, WEBP до 5 МБ</p>
-            </div>
-        </div>
-        <form class="auth-form" onsubmit="handleProfileUpdate(event)">
-            <label>Имя</label><input type="text" id="profileName" placeholder="Ваше имя" />
-            <label>О себе</label><textarea id="profileBio" placeholder="Коротко о себе..." maxlength="500" style="min-height:80px;"></textarea>
-            <div class="section-divider"><span>Смена пароля</span></div>
-            <label>Текущий пароль</label><input type="password" id="profileCurrentPass" placeholder="Оставьте пустым" />
-            <label>Новый пароль</label><input type="password" id="profileNewPass" placeholder="Минимум 6 символов" minlength="6" />
-            <button type="submit" class="btn">Сохранить</button>
-        </form>
-    </div>
-</div>
+  CREATE TABLE IF NOT EXISTS referral_clicks (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    referral_code TEXT NOT NULL,
+    ip TEXT,
+    user_agent TEXT,
+    created_at INTEGER NOT NULL
+  );
 
-<div class="modal" id="projectModal" onclick="if(event.target===this) closeProjectCreator()">
-    <div class="modal-box">
-        <button class="modal-close" onclick="closeProjectCreator()">×</button>
-        <div class="auth-head"><div class="auth-logo">📦</div><h3>Создать заказ</h3><p>Опишите задачу</p></div>
-        <form class="auth-form" onsubmit="handleProjectCreate(event)">
-            <label>Название *</label><input type="text" id="projTitle" placeholder="Например: Маскот для Twitch-канала" required maxlength="120" />
-            <label>Описание *</label><textarea id="projDescription" placeholder="Что нужно нарисовать..." required maxlength="2000" style="min-height:100px;"></textarea>
-            <label>Категория *</label>
-            <select id="projCategory" required>
-                <option value="Маскот">Маскот</option><option value="Стикеры">Стикеры</option>
-                <option value="Баннеры">Баннеры</option><option value="Аватарки">Аватарки</option>
-                <option value="Арт">Арт</option><option value="Анимация">Анимация</option>
-                <option value="3D арт">3D арт</option><option value="Другое">Другое</option>
-            </select>
-<button type="submit" class="btn">Создать заказ</button>
-        </form>
-    </div>
-</div>
+  CREATE INDEX IF NOT EXISTS idx_tx_user ON transactions(user_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_msg_chat ON messages(chat_id, created_at);
+  CREATE INDEX IF NOT EXISTS idx_wd_user ON withdrawals(user_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_wd_status ON withdrawals(status, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_payments_user ON payments(user_id, created_at DESC);
+  CREATE INDEX IF NOT EXISTS idx_ref_code ON referral_clicks(referral_code, created_at DESC);
+`);
 
-<div class="modal" id="projectDetailModal" onclick="if(event.target===this) closeProjectDetail()">
-    <div class="modal-box project-detail-box">
-        <button class="modal-close" onclick="closeProjectDetail()">×</button>
-        <div id="projectDetailContent"></div>
-    </div>
-</div>
+function safeAddColumn(table, column, definition) {
+  try {
+    const cols = db.prepare(`PRAGMA table_info(${table})`).all();
+    if (!cols.some(c => c.name === column)) {
+      db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
+      console.log(`➕ Добавлена колонка ${table}.${column}`);
+    }
+  } catch (e) { console.warn(`⚠️ Миграция ${table}.${column}:`, e.message); }
+}
+db.exec("CREATE TABLE IF NOT EXISTS password_reset_codes (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL COLLATE NOCASE, code_hash TEXT NOT NULL, expires_at INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL)");
+db.exec("CREATE INDEX IF NOT EXISTS idx_password_reset_email ON password_reset_codes(email, created_at DESC)");
+safeAddColumn('users', 'referral_code', 'TEXT');
+safeAddColumn('users', 'referred_by', 'INTEGER');
 
-<div class="modal" id="publicProfileModal" onclick="if(event.target===this) closePublicProfile()">
-    <div class="modal-box user-modal-box" style="max-width:760px">
-        <button class="modal-close" onclick="closePublicProfile()">×</button>
-        <div id="publicProfileContent"><div class="empty-state small"><i class="fas fa-spinner fa-spin"></i><p>Загрузка профиля…</p></div></div>
-    </div>
-</div>
+// Portfolio author fields: user_id remains the uploader.
+safeAddColumn('portfolio', 'author_name', 'TEXT');
+safeAddColumn('portfolio', 'author_user_id', 'INTEGER');
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_portfolio_author_user
+  ON portfolio(author_user_id);
+  CREATE INDEX IF NOT EXISTS idx_portfolio_uploader
+  ON portfolio(user_id);
+`);
 
-<div class="modal" id="myPortfolioModal" onclick="if(event.target===this) closeMyPortfolio()">
-    <div class="modal-box portfolio-box">
-        <button class="modal-close" onclick="closeMyPortfolio()">×</button>
-        <div class="auth-head"><div class="auth-logo">🖼️</div><h3>Моё портфолио</h3><p>Загружайте свои работы</p></div>
-        <form class="upload-form" id="portfolioUploadForm" onsubmit="handlePortfolioUpload(event)">
-            <div class="upload-zone" onclick="document.getElementById('portfolioInput').click()">
-                <i class="fas fa-cloud-upload-alt"></i>
-                <p id="uploadZoneText">Нажмите, чтобы выбрать изображение</p>
-                <input type="file" id="portfolioInput" accept="image/*" hidden onchange="previewPortfolioFile(event)" />
-            </div>
-            <label>Название *</label><input type="text" id="portTitle" placeholder="Например: Маскот для кофейни" required maxlength="120" />
-            <label>Описание</label><textarea id="portDescription" placeholder="Коротко о работе" maxlength="500" style="min-height:60px;"></textarea>
-            <label>Категория</label>
-            <select id="portCategory">
-                <option value="Маскот">Маскот</option><option value="Стикеры">Стикеры</option>
-                <option value="Баннеры">Баннеры</option><option value="Аватарки">Аватарки</option>
-                <option value="Арт">Арт</option><option value="Анимация">Анимация</option>
-                <option value="3D арт">3D арт</option>
-            </select>
+// Backfill legacy entries: before author fields existed, the uploader
+// was the only available author reference. Preserve explicit authors.
+db.exec(`
+  UPDATE portfolio
+  SET author_user_id = user_id
+  WHERE author_user_id IS NULL
+    AND EXISTS (SELECT 1 FROM users WHERE users.id = portfolio.user_id);
 
-            <div id="adminAuthorBlock" class="hidden">
-                <label for="portAuthorName">Имя автора *</label>
-                <input type="text" id="portAuthorName"
-                    placeholder="Например, Crystal" maxlength="100" autocomplete="off" />
+  UPDATE portfolio
+  SET author_name = (
+    SELECT users.name FROM users WHERE users.id = portfolio.user_id
+  )
+  WHERE (author_name IS NULL OR TRIM(author_name) = '')
+    AND EXISTS (SELECT 1 FROM users WHERE users.id = portfolio.user_id);
+`);
 
-                <label for="portAuthorUser">Привязать к зарегистрированному пользователю</label>
-                <select id="portAuthorUser">
-                    <option value="">Указать автора вручную</option>
-                </select>
+try {
+  db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_users_ref_code ON users(referral_code) WHERE referral_code IS NOT NULL');
+} catch (e) { /* ignore */ }
 
-                <p class="form-hint">
-                    По умолчанию выбран ваш аккаунт. Можно выбрать другого пользователя или указать автора вручную.
-                </p>
-            </div>
+// --- Главный админ ---
+const adminExists = db.prepare('SELECT * FROM users WHERE email = ?').get(ADMIN_EMAIL);
+if (!adminExists) {
+  const hash = bcrypt.hashSync(ADMIN_PASSWORD, 10);
+  db.prepare(`INSERT INTO users (name, email, password, role, balance, is_root, email_verified, referral_code, created_at)
+              VALUES (?, ?, ?, 'admin', 0, 1, 1, ?, ?)`)
+    .run('Главный админ', ADMIN_EMAIL, hash, 'ROOT-' + Math.random().toString(36).slice(2, 8), Date.now());
+  console.log(`✅ Создан ГЛАВНЫЙ админ: ${ADMIN_EMAIL}`);
+} else {
+  if (adminExists.role !== 'admin' || adminExists.is_root !== 1) {
+    db.prepare(`UPDATE users SET role = 'admin', is_root = 1 WHERE id = ?`).run(adminExists.id);
+    console.log(`👑 Главный админ восстановлен`);
+  }
+  if (!bcrypt.compareSync(ADMIN_PASSWORD, adminExists.password)) {
+    db.prepare('UPDATE users SET password = ? WHERE id = ?')
+      .run(bcrypt.hashSync(ADMIN_PASSWORD, 10), adminExists.id);
+    console.log(`🔑 Пароль главного админа обновлён`);
+  }
+}
 
-            <button type="submit" class="btn">Загрузить</button>
-        </form>
-        <div class="my-portfolio-grid" id="myPortfolioGrid"></div>
-    </div>
-</div>
+// --- Дефолтный промокод ---
+const promoExists = db.prepare('SELECT id FROM promocodes WHERE code = ?').get('PAWSTART');
+if (!promoExists) {
+  db.prepare(`INSERT INTO promocodes (code, bonus, max_uses, active, created_at)
+              VALUES ('PAWSTART', 10000, 1000, 1, ?)`).run(Date.now());
+  console.log('🎟️ Создан промокод PAWSTART');
+}
 
-<aside class="messenger" id="messenger">
-    <div class="msgr-header">
-        <button class="msgr-back hidden" id="msgrBack" onclick="closeChat()"><i class="fas fa-arrow-left"></i></button>
-        <h3 id="msgrTitle"><i class="fas fa-comments"></i> Сообщения</h3>
-        <button class="msgr-close" onclick="closeMessenger()">×</button>
-    </div>
-    <div class="msgr-body">
-        <div class="chat-list" id="chatList"></div>
-        <div class="chat-window hidden" id="chatWindow">
-            <div class="chat-head hidden" id="chatHead">
-                <div class="chat-head-avatar" id="chatHeadAvatar">?</div>
-                <div class="chat-head-info">
-                    <div class="chat-head-name" id="chatHeadName">—</div>
-                    <div class="chat-head-role" id="chatHeadRole">—</div>
-                </div>
-            </div>
-            <div class="chat-messages" id="chatMessages"></div>
-            <form class="chat-input" onsubmit="sendMessage(event)">
-                <input type="text" id="chatInput" placeholder="Написать сообщение..." autocomplete="off" maxlength="2000" />
-                <button type="submit"><i class="fas fa-paper-plane"></i></button>
-            </form>
-        </div>
-    </div>
-</aside>
+// --- Дефолтный контент ---
+const DEFAULT_CONTENT = {
+  hero_title: 'Paw Art Studio',
+  hero_subtitle: 'Маскоты, стикеры и визуал с характером',
+  about_title: 'О студии',
+  about_text: 'Мы создаём уникальный визуал для брендов.',
+  about_stat_1_desc: 'проектов',
+  about_stat_2_desc: 'клиентов',
+  about_stat_3_desc: 'срок',
+  support_email: 'support@pawartstudio.store',
+  support_telegram: '',
+};
+// Fill missing defaults without overwriting values configured in the editor.
+{
+  const insertDefault = db.prepare('INSERT OR IGNORE INTO site_content (key, value, updated_at) VALUES (?, ?, ?)');
+  const now = Date.now();
+  for (const [key, value] of Object.entries(DEFAULT_CONTENT)) insertDefault.run(key, String(value), now);
+}
+const contentCount = db.prepare('SELECT COUNT(*) AS n FROM site_content').get().n;
+if (contentCount === 0) {
+  const now = Date.now();
+  const stmt = db.prepare('INSERT INTO site_content (key, value, updated_at) VALUES (?, ?, ?)');
+  const tx = db.transaction(items => {
+    for (const [k, v] of Object.entries(items)) stmt.run(k, String(v), now);
+  });
+  tx(DEFAULT_CONTENT);
+  console.log('📄 Загружен дефолтный контент');
+}
 
-<button class="msgr-fab hidden" id="msgrFab" onclick="openMessenger()">
-    <i class="fas fa-comments"></i>
-    <span class="msgr-badge hidden" id="msgrBadge">0</span>
-</button>
+app.set('trust proxy', 1);
+app.use(cors());
+app.use(express.json({ limit: '2mb' }));
+app.use(express.static(path.join(__dirname, 'public'), { maxAge: IS_PROD ? '7d' : 0 }));
+app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: IS_PROD ? '30d' : 0 }));
 
-<div class="modal" id="adminModal" onclick="if(event.target===this) closeAdminPanel()">
-    <div class="modal-box admin-box">
-        <button class="modal-close" onclick="closeAdminPanel()">×</button>
-        <div class="admin-head"><div class="admin-head-icon">🛡️</div><div><h3>Админ-панель</h3><p>Управление и статистика</p></div></div>
-        <button type="button" id="contentEditorAdminButton" class="btn btn-outline hidden" style="width:100%;margin:0 0 12px" onclick="openContentEditor()"><i class="fas fa-edit"></i> Редактор сайта 👑</button>
-        <div class="admin-tabs">
-            <button class="admin-tab active" data-atab="dashboard" onclick="switchAdminTab('dashboard')"><i class="fas fa-chart-line"></i> Статистика</button>
-            <button class="admin-tab" data-atab="withdrawals" onclick="switchAdminTab('withdrawals')"><i class="fas fa-money-check-alt"></i> Выплаты <span class="admin-badge" id="wdCount">0</span></button>
-            <button class="admin-tab" data-atab="requests" onclick="switchAdminTab('requests')"><i class="fas fa-bell"></i> Заявки <span class="admin-badge" id="reqCount">0</span></button>
-            <button class="admin-tab" data-atab="users" onclick="switchAdminTab('users')"><i class="fas fa-users"></i> Пользователи</button>
-        </div>
-        <div class="admin-panel" id="adminDashboard"><div id="dashboardStats"></div></div>
-        <div class="admin-panel hidden" id="adminWithdrawals"><div id="withdrawalsList"></div></div>
-        <div class="admin-panel hidden" id="adminRequests"><div id="requestsList"></div></div>
-        <div class="admin-panel hidden" id="adminUsers">
-            <div class="admin-search"><i class="fas fa-search"></i><input type="text" id="userSearch" placeholder="Поиск..." oninput="renderAdminUsers()" /></div>
-            <div id="usersList"></div>
-        </div>
-    </div>
-</div>
+// --- Helpers ---
+function auth(req, res, next) {
+  const h = req.headers.authorization;
+  if (!h || !h.startsWith('Bearer ')) return res.status(401).json({ error: 'Требуется авторизация' });
+  try {
+    const payload = jwt.verify(h.slice(7), JWT_SECRET);
+    const user = db.prepare('SELECT * FROM users WHERE id = ?').get(payload.id);
+    if (!user) return res.status(401).json({ error: 'Не найден' });
+    req.user = user;
+    next();
+  } catch {
+    res.status(401).json({ error: 'Токен недействителен' });
+  }
+}
 
-<div class="modal" id="userFullModal" onclick="if(event.target===this) closeUserFull()">
-    <div class="modal-box user-modal-box">
-        <button class="modal-close" onclick="closeUserFull()">×</button>
-        <div id="userFullContent"></div>
-    </div>
-</div>
+function adminOnly(req, res, next) {
+  if (req.user.role !== 'admin') return res.status(403).json({ error: 'Нужны права админа' });
+  next();
+}
 
-<div class="modal" id="contentModal" onclick="if(event.target===this) closeContentEditor()">
-    <div class="modal-box content-modal-box">
-        <button class="modal-close" onclick="closeContentEditor()">×</button>
-        <div class="admin-head">
-            <div class="admin-head-icon">👑</div>
-            <div><h3>Редактор сайта</h3><p>Редакторы и администраторы могут менять услуги, цены и контент</p></div>
-        </div>
-        <div id="contentEditorWrap" class="content-editor-wrap"></div>
-        <div class="content-editor-actions">
-            <button class="btn" id="contentSaveBtn" onclick="saveContent()"><i class="fas fa-save"></i> Сохранить всё</button>
-        </div>
-    </div>
-</div>
+function siteEditorOnly(req, res, next) {
+  if (!['admin', 'manager'].includes(req.user?.role))
+    return res.status(403).json({ error: 'Доступно редакторам сайта и администраторам' });
+  next();
+}
 
-<div class="modal" id="moneyModal" onclick="if(event.target===this) closeMoney()">
-    <div class="modal-box money-box">
-        <button class="modal-close" onclick="closeMoney()">×</button>
-        <h3 id="moneyTitle">Пополнение баланса</h3>
-        <p class="money-sub" id="moneySub">Выберите сумму или введите свою</p>
-        <div class="money-presets">
-            <button onclick="setMoney(500)">500 ₽</button><button onclick="setMoney(1000)">1 000 ₽</button>
-            <button onclick="setMoney(2000)">2 000 ₽</button><button onclick="setMoney(5000)">5 000 ₽</button>
-        </div>
-        <label>Сумма (можно копейки)</label>
-        <input type="number" id="moneyAmount" placeholder="0.00" step="0.01" min="1" />
-        <div id="moneyCardBlock" class="hidden">
-            <label>Номер карты для вывода</label>
-            <input type="text" id="moneyCard" inputmode="numeric" placeholder="0000 0000 0000 0000" maxlength="23" />
-            <p style="font-size:0.8rem;color:var(--text-mute);margin-top:6px;">
-                Заявку рассмотрит администратор. Перевод выполняется вручную.
-            </p>
-        </div>
-        <div class="money-note" id="moneyNote">Комиссия <strong>0%</strong>. Оплата через ЮKassa.</div>
-        <button class="btn" id="moneySubmit" onclick="submitMoney()">Перейти к оплате</button>
-    </div>
-</div>
+function rootOnly(req, res, next) {
+  if (req.user.role !== 'admin' || req.user.is_root !== 1)
+    return res.status(403).json({ error: 'Только главный админ' });
+  next();
+}
 
-<div class="modal" id="packageModal" onclick="if(event.target===this) closePackageConfigurator()">
-    <div class="modal-box package-modal-box">
-        <button class="modal-close" type="button" onclick="closePackageConfigurator()" aria-label="Закрыть">×</button>
-        <div class="auth-head">
-            <div class="auth-logo">🐾</div>
-            <div><h3 id="packageTitle">Настройка пака</h3><p>Выбери состав комплекта</p></div>
-        </div>
-        <div id="packageConfigurator" class="package-configurator"></div>
-        <div class="package-total">
-            <div><span class="package-total-label">Предварительная стоимость</span><strong class="package-total-price" id="packageTotalPrice">0 ₽</strong></div>
-            <button class="btn" type="button" onclick="orderCustomPackage()">Заказать пак</button>
-        </div>
-        <p class="paw-upgrade-muted">Итоговая стоимость предварительная — детали и сроки согласуем перед началом работы.</p>
-    </div>
-</div>
+function publicUser(u) {
+  if (!u) return null;
+  return {
+    id: u.id,
+    name: u.name,
+    email: u.email,
+    role: u.role,
+    requestedRole: u.requested_role,
+    balance: u.balance,
+    avatar: u.avatar,
+    bio: u.bio,
+    isRoot: u.is_root === 1,
+    emailVerified: u.email_verified === 1,
+    referralCode: u.referral_code,
+    createdAt: u.created_at,
+  };
+}
 
-<div class="lightbox" id="lightbox" onclick="closeLightbox()">
-    <button class="lb-close" onclick="closeLightbox()">×</button>
-    <div class="lb-content" onclick="event.stopPropagation()">
-        <img id="lbImg" src="" alt="">
-        <div class="lb-meta"><h3 id="lbTitle"></h3><p id="lbDesc"></p></div>
-    </div>
-</div>
+function withdrawalRow(w) {
+  if (!w) return null;
+  return {
+    id: w.id,
+    userId: w.user_id,
+    amount: w.amount,
+    status: w.status,
+    comment: w.comment,
+    cardNumber: w.card_number,
+    adminComment: w.admin_comment,
+    createdAt: w.created_at,
+    reviewedAt: w.reviewed_at,
+    reviewedBy: w.reviewed_by,
+  };
+}
 
-<aside class="paw-inquiry-bar" id="pawInquiryBar" aria-label="Быстрый переход к услугам">
-    <div class="paw-inquiry-copy"><strong>Есть идея для проекта?</strong><span>Подберём подходящую услугу и обсудим детали</span></div>
-    <button type="button" class="paw-inquiry-action" onclick="scrollToSection('services')">Выбрать услугу <span aria-hidden="true">↗</span></button>
-    <button type="button" class="paw-inquiry-close" onclick="dismissInquiryBar()" aria-label="Скрыть плашку">×</button>
-</aside>
+function txRow(t) {
+  if (!t) return null;
+  return { id: t.id, title: t.title, amount: t.amount, type: t.type, date: t.created_at };
+}
 
-<script src="/socket.io/socket.io.js"></script>
-<script src="/js/script.js?v=20261025-chat-form-fix"></script>
-<script src="/js/paw-upgrade.js?v=20261023-contact-field-fix"></script>
-<script src="/js/service-details.js?v=20261023-service-configurator"></script>
-</body>
-</html>
+function generateCode() {
+  return String(Math.floor(100000 + Math.random() * 900000));
+}
+
+function generateReferralCode() {
+  return 'PAW' + Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+async function sendVerificationEmail(email, code) {
+  if (!process.env.SMTP_HOST) {
+    console.warn('⚠️ SMTP не настроен, код не отправлен:', code);
+    return;
+  }
+  await mailer.sendMail({
+    from: process.env.SMTP_FROM || 'Paw Art Studio <no-reply@pawartstudio.store>',
+    to: email,
+    subject: 'Подтверждение регистрации — Paw Art Studio',
+    html: `
+      <h2>Добро пожаловать в Paw Art Studio!</h2>
+      <p>Ваш код подтверждения:</p>
+      <h1 style="font-size: 32px; letter-spacing: 4px;">${code}</h1>
+      <p>Код действителен 15 минут.</p>
+    `,
+  });
+}
+
+app.get('/health', (req, res) =>
+  res.json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() })
+);
+
+/* ==================== AUTH ==================== */
+app.post('/api/auth/register', async (req, res) => {
+  const { name, email, password, ref } = req.body || {};
+  if (!name || !email || !password)
+    return res.status(400).json({ error: 'Заполните все поля' });
+  if (String(password).length < 6)
+    return res.status(400).json({ error: 'Пароль минимум 6 символов' });
+
+  const cleanEmail = String(email).trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(cleanEmail))
+    return res.status(400).json({ error: 'Некорректный email' });
+
+  const existing = db.prepare('SELECT id, email_verified FROM users WHERE email = ?').get(cleanEmail);
+  if (existing && existing.email_verified === 1)
+    return res.status(400).json({ error: 'Email занят' });
+
+  let referrer = null;
+  if (ref) {
+    referrer = db.prepare('SELECT id FROM users WHERE referral_code = ?').get(String(ref).trim().toUpperCase());
+  }
+
+  const code = generateCode();
+  const expires = Date.now() + 15 * 60 * 1000;
+
+  try {
+    const hash = bcrypt.hashSync(String(password), 10);
+    const now = Date.now();
+
+    const tx = db.transaction(() => {
+      if (existing && existing.email_verified === 0) {
+        db.prepare(`UPDATE users SET name = ?, password = ?, verification_code = ?, verification_expires = ?
+                    WHERE id = ?`)
+          .run(String(name).trim(), hash, code, expires, existing.id);
+        return existing.id;
+      }
+      const myRefCode = generateReferralCode();
+      const info = db.prepare(`INSERT INTO users
+        (name, email, password, role, balance, email_verified, verification_code, verification_expires, referral_code, referred_by, created_at)
+        VALUES (?, ?, ?, 'client', 0, 0, ?, ?, ?, ?, ?)`)
+        .run(String(name).trim(), cleanEmail, hash, code, expires, myRefCode, referrer ? referrer.id : null, now);
+      return info.lastInsertRowid;
+    });
+
+    const userId = tx();
+
+    sendVerificationEmail(cleanEmail, code).catch(err =>
+      console.error('❌ Ошибка отправки письма:', err.message)
+    );
+
+    res.json({ ok: true, userId, email: cleanEmail, message: 'Код подтверждения отправлен на email' });
+  } catch (e) {
+    console.error('❌ Ошибка регистрации:', e);
+    res.status(500).json({ error: 'Внутренняя ошибка сервера. Попробуйте позже.' });
+  }
+});
+
+app.post('/api/auth/verify-email', (req, res) => {
+  try {
+    const { email, code } = req.body || {};
+    if (!email || code === undefined || code === null) return res.status(400).json({ error: 'Укажите email и код' });
+    const cleanEmail = String(email).trim().toLowerCase();
+    const cleanCode = String(code).trim();
+    if (!/^\d{6}$/.test(cleanCode)) return res.status(400).json({ error: 'Введите шестизначный код из письма' });
+
+    const user = db.prepare('SELECT * FROM users WHERE email = ?').get(cleanEmail);
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+    if (user.email_verified === 1) return res.status(400).json({ error: 'Email уже подтверждён. Попробуйте войти.' });
+    if (!user.verification_code) return res.status(400).json({ error: 'Код не найден. Запросите новый.' });
+    if (String(user.verification_code) !== cleanCode) return res.status(400).json({ error: 'Неверный код. Проверьте письмо и попробуйте снова.' });
+    if (!user.verification_expires || Date.now() > Number(user.verification_expires)) {
+      return res.status(400).json({ error: 'Код истёк. Запросите новый.' });
+    }
+
+    const updated = db.transaction(() => {
+      const result = db.prepare('UPDATE users SET email_verified = 1, verification_code = NULL, verification_expires = NULL WHERE id = ? AND email_verified = 0 AND verification_code = ? AND verification_expires > ?').run(user.id, cleanCode, Date.now());
+      if (result.changes !== 1) throw new Error('VERIFY_STATE_CHANGED');
+      return db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+    })();
+
+    if (!updated) return res.status(500).json({ error: 'Не удалось загрузить данные пользователя' });
+    const token = jwt.sign({ id: updated.id }, JWT_SECRET, { expiresIn: '30d' });
+    return res.json({ ok: true, token, user: publicUser(updated) });
+  } catch (err) {
+    if (err.message === 'VERIFY_STATE_CHANGED') {
+      return res.status(409).json({ error: 'Код уже использован или истёк. Запросите новый.' });
+    }
+    console.error('❌ Ошибка подтверждения email:', err);
+    return res.status(500).json({ error: 'Ошибка сервера при подтверждении email. Попробуйте позже.' });
+  }
+});
+
+app.post('/api/auth/resend-code', async (req, res) => {
+  const { email } = req.body || {};
+  if (!email) return res.status(400).json({ error: 'Укажите email' });
+  const cleanEmail = String(email).trim().toLowerCase();
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(cleanEmail);
+  if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+  if (user.email_verified === 1) return res.status(400).json({ error: 'Email уже подтверждён' });
+
+  const code = generateCode();
+  const expires = Date.now() + 15 * 60 * 1000;
+  db.prepare('UPDATE users SET verification_code = ?, verification_expires = ? WHERE id = ?')
+    .run(code, expires, user.id);
+
+  await sendVerificationEmail(cleanEmail, code).catch(err =>
+    console.error('❌ Ошибка отправки письма:', err.message)
+  );
+  res.json({ ok: true, message: 'Код отправлен повторно' });
+});
+
+app.post('/api/auth/forgot-password', async (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Укажите корректный email' });
+  const user = db.prepare('SELECT id, email_verified FROM users WHERE email = ?').get(email);
+  if (user && user.email_verified === 1) {
+    const code = generateCode();
+    const codeHash = crypto.createHash('sha256').update(code).digest('hex');
+    const now = Date.now();
+    db.prepare('DELETE FROM password_reset_codes WHERE email = ?').run(email);
+    db.prepare('INSERT INTO password_reset_codes (email, code_hash, expires_at, created_at) VALUES (?, ?, ?, ?)').run(email, codeHash, now + 15 * 60 * 1000, now);
+    try {
+      if (!process.env.SMTP_HOST) throw new Error('SMTP не настроен');
+      await mailer.sendMail({
+        from: process.env.SMTP_FROM || 'Paw Art Studio <no-reply@pawartstudio.store>',
+        to: email,
+        subject: 'Сброс пароля — Paw Art Studio',
+        html: '<h2>Сброс пароля Paw Art Studio</h2><p>Код для установки нового пароля:</p><h1 style="font-size:32px;letter-spacing:4px">' + code + '</h1><p>Код действует 15 минут. Если вы не запрашивали сброс, проигнорируйте письмо.</p>'
+      });
+    } catch (err) {
+      db.prepare('DELETE FROM password_reset_codes WHERE email = ?').run(email);
+      console.error('Ошибка отправки письма сброса пароля:', err.message);
+      return res.status(503).json({ error: 'Не удалось отправить письмо. Попробуйте позже или обратитесь в поддержку.' });
+    }
+  }
+  res.json({ ok: true, message: 'Если аккаунт существует, код отправлен на почту' });
+});
+
+app.post('/api/auth/reset-password', (req, res) => {
+  const email = String(req.body?.email || '').trim().toLowerCase();
+  const code = String(req.body?.code || '').trim();
+  const password = String(req.body?.password || '');
+  if (!email || !/^\d{6}$/.test(code) || password.length < 6) return res.status(400).json({ error: 'Проверьте email, шестизначный код и пароль (минимум 6 символов)' });
+  const record = db.prepare('SELECT * FROM password_reset_codes WHERE email = ? ORDER BY created_at DESC LIMIT 1').get(email);
+  if (!record) return res.status(400).json({ error: 'Код не найден. Запросите новый.' });
+  if (Date.now() > record.expires_at) {
+    db.prepare('DELETE FROM password_reset_codes WHERE id = ?').run(record.id);
+    return res.status(400).json({ error: 'Код истёк. Запросите новый.' });
+  }
+  if (record.attempts >= 5) {
+    db.prepare('DELETE FROM password_reset_codes WHERE id = ?').run(record.id);
+    return res.status(429).json({ error: 'Слишком много попыток. Запросите новый код.' });
+  }
+  const hash = crypto.createHash('sha256').update(code).digest('hex');
+  if (hash !== record.code_hash) {
+    db.prepare('UPDATE password_reset_codes SET attempts = attempts + 1 WHERE id = ?').run(record.id);
+    return res.status(400).json({ error: 'Неверный код' });
+  }
+  const user = db.prepare('SELECT id FROM users WHERE email = ? AND email_verified = 1').get(email);
+  if (!user) return res.status(400).json({ error: 'Аккаунт не найден или email не подтверждён' });
+  db.prepare('UPDATE users SET password = ? WHERE id = ?').run(bcrypt.hashSync(password, 10), user.id);
+  db.prepare('DELETE FROM password_reset_codes WHERE email = ?').run(email);
+  res.json({ ok: true, message: 'Пароль успешно изменён' });
+});
+
+app.post('/api/auth/login', (req, res) => {
+  const { email, password } = req.body || {};
+  if (!email || !password) return res.status(400).json({ error: 'Заполните все поля' });
+
+  const user = db.prepare('SELECT * FROM users WHERE email = ?').get(String(email).trim().toLowerCase());
+  if (!user || !bcrypt.compareSync(String(password), user.password))
+    return res.status(401).json({ error: 'Неверный email или пароль' });
+  if (user.email_verified !== 1)
+    return res.status(403).json({ error: 'Email не подтверждён. Проверьте почту.' });
+
+  if (!user.referral_code) {
+    const newCode = generateReferralCode();
+    db.prepare('UPDATE users SET referral_code = ? WHERE id = ?').run(newCode, user.id);
+    user.referral_code = newCode;
+  }
+
+  const token = jwt.sign({ id: user.id }, JWT_SECRET, { expiresIn: '30d' });
+  res.json({ token, user: publicUser(user) });
+});
+
+app.get('/api/me', auth, (req, res) => res.json({ user: publicUser(req.user) }));
+
+/* ==================== CONTENT ==================== */
+app.get('/api/content', (req, res) => {
+  const rows = db.prepare('SELECT key, value FROM site_content').all();
+  const content = {};
+  rows.forEach(r => { content[r.key] = r.value; });
+  res.json({ content });
+});
+
+const CONTENT_KEY_ALLOWLIST = new Set([
+  'hero_eyebrow', 'hero_title', 'hero_subtitle', 'hero_badge_1', 'hero_badge_2',
+  'hero_badge_3', 'hero_image', 'about_title', 'about_text', 'about_quote',
+  'about_stat_1', 'about_stat_1_desc', 'about_stat_2', 'about_stat_2_desc',
+  'about_stat_3', 'about_stat_3_desc', 'contact_discord', 'contact_telegram',
+  'contact_email', 'support_email', 'support_telegram', 'footer_text',
+  ...Array.from({ length: 7 }, (_, i) => i + 1).flatMap(n => [
+    `service_${n}_name`, `service_${n}_desc`, `service_${n}_price`, `service_${n}_image`
+  ]),
+  ...Array.from({ length: 5 }, (_, i) => i + 1).flatMap(n => [
+    `pricing_${n}_name`, `pricing_${n}_price`, `pricing_${n}_features`,
+    `faq_${n}_q`, `faq_${n}_a`
+  ])
+]);
+
+app.post('/api/admin/content', auth, siteEditorOnly, (req, res) => {
+  const updates = req.body?.updates;
+  if (!updates || typeof updates !== 'object' || Array.isArray(updates))
+    return res.status(400).json({ error: 'Ожидается объект updates' });
+  const entries = Object.entries(updates);
+  if (!entries.length) return res.status(400).json({ error: 'Нет полей для сохранения' });
+  if (entries.length > 100) return res.status(400).json({ error: 'Слишком много полей' });
+  for (const [key, value] of entries) {
+    if (!CONTENT_KEY_ALLOWLIST.has(key))
+      return res.status(400).json({ error: `Недопустимый ключ: ${key}` });
+    if (value !== null && value !== undefined && typeof value !== 'string' && typeof value !== 'number' && typeof value !== 'boolean')
+      return res.status(400).json({ error: `Недопустимое значение для ${key}` });
+    if (String(value ?? '').length > 20000)
+      return res.status(400).json({ error: `Поле ${key} слишком длинное` });
+  }
+
+  const now = Date.now();
+  const stmt = db.prepare(`INSERT INTO site_content (key, value, updated_at)
+    VALUES (?, ?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value, updated_at = excluded.updated_at`);
+  try {
+    const tx = db.transaction(items => {
+      for (const [key, value] of items) stmt.run(key, String(value ?? ''), now);
+    });
+    tx(entries);
+    res.json({ ok: true, count: entries.length });
+  } catch (e) {
+    console.error('[admin/content] Ошибка сохранения:', e);
+    res.status(500).json({ error: 'Не удалось сохранить контент' });
+  }
+});
+
+app.post('/api/admin/content/upload', auth, siteEditorOnly, (req, res, next) => {
+  contentUpload.single('image')(req, res, err => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Файл больше 5 МБ' });
+      return res.status(400).json({ error: 'Допустимы изображения PNG, JPG, WEBP и GIF' });
+    }
+    if (!req.file) return res.status(400).json({ error: 'Выберите изображение' });
+    res.json({ ok: true, url: '/uploads/content/' + req.file.filename });
+  });
+});
+
+/* ==================== YOOKASSA ==================== */
+app.post('/api/payments/create', auth, async (req, res) => {
+  if (!yookassa)
+    return res.status(503).json({ error: 'ЮKassa не настроена. Обратитесь к админу.' });
+
+  const rub = Number(req.body?.amount);
+  const kopecks = Math.round(rub * 100);
+  if (!kopecks || isNaN(kopecks) || kopecks < 100)
+    return res.status(400).json({ error: 'Минимум 1 ₽' });
+
+  try {
+    const payment = await yookassa.payments.create({
+      amount: { value: rub.toFixed(2), currency: 'RUB' },
+      capture: true,
+      confirmation: { type: 'redirect', return_url: `${SITE_URL}/dashboard` },
+      description: `Пополнение баланса Paw Art Studio (#${req.user.id})`,
+      metadata: { userId: String(req.user.id) },
+    }, crypto.randomUUID());
+
+    db.prepare(`INSERT INTO payments (user_id, payment_id, amount, status, created_at)
+                VALUES (?, ?, ?, 'pending', ?)`)
+      .run(req.user.id, payment.id, kopecks, Date.now());
+
+    res.json({ paymentId: payment.id, confirmationUrl: payment.confirmation.confirmation_url });
+  } catch (err) {
+    const providerMessage = String(
+      err?.description || err?.response?.data?.description ||
+      err?.response?.data?.message || err?.message || 'неизвестная ошибка'
+    );
+    const providerCode = err?.code || err?.response?.data?.code || err?.error_code || null;
+    const providerStatus = err?.status || err?.statusCode || err?.response?.status || null;
+
+    // Never log credentials or request headers; retain only useful diagnostic fields.
+    console.error('❌ ЮKassa: создание платежа отклонено', {
+      message: providerMessage,
+      code: providerCode,
+      status: providerStatus,
+    });
+
+    const forbidden = /transaction forbidden|unspecified error/i.test(providerMessage);
+    const userMessage = forbidden
+      ? 'ЮKassa отклонила создание платежа. Проверьте статус магазина и актуальность Shop ID/секретного ключа в настройках сервера. Если данные верны, обратитесь в поддержку ЮKassa — ограничение может быть на стороне магазина.'
+      : 'Не удалось создать платёж в ЮKassa. Попробуйте позже; подробности ошибки записаны в журнал сервера.';
+    res.status(502).json({ error: userMessage, code: providerCode || undefined });
+  }
+});
+
+app.post('/api/payments/webhook', express.json(), (req, res) => {
+  const { event, object } = req.body || {};
+  console.log('🔔 Webhook:', event, object?.id);
+
+  if (event === 'payment.succeeded' && object) {
+    const userId = parseInt(object.metadata?.userId, 10);
+    const amount = Math.round(parseFloat(object.amount?.value || '0') * 100);
+
+    if (userId && amount > 0) {
+      const existing = db.prepare('SELECT id, status FROM payments WHERE payment_id = ?').get(object.id);
+      if (existing && existing.status === 'succeeded') return res.status(200).send('OK');
+
+      if (existing) {
+        db.prepare('UPDATE payments SET status = ? WHERE payment_id = ?').run('succeeded', object.id);
+      } else {
+        db.prepare(`INSERT INTO payments (user_id, payment_id, amount, status, created_at)
+                    VALUES (?, ?, ?, 'succeeded', ?)`).run(userId, object.id, amount, Date.now());
+      }
+
+      const user = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
+      if (user) {
+        db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(amount, userId);
+        db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at)
+                    VALUES (?, 'Пополнение через ЮKassa', ?, 'in', ?)`).run(userId, amount, Date.now());
+        console.log(`✅ Зачислено ${amount / 100} ₽ → #${userId}`);
+      }
+    }
+  }
+  res.status(200).send('OK');
+});
+
+/* ==================== PROFILE ==================== */
+app.post('/api/profile/update', auth, (req, res) => {
+  const { name, bio, currentPassword, newPassword } = req.body || {};
+  const updates = [];
+  const params = [];
+
+  if (name && String(name).trim()) { updates.push('name = ?'); params.push(String(name).trim()); }
+  if (typeof bio === 'string') { updates.push('bio = ?'); params.push(bio.trim().slice(0, 500)); }
+
+  if (newPassword) {
+    if (!currentPassword) return res.status(400).json({ error: 'Введите текущий пароль' });
+    if (!bcrypt.compareSync(currentPassword, req.user.password))
+      return res.status(400).json({ error: 'Текущий пароль неверен' });
+    if (String(newPassword).length < 6)
+      return res.status(400).json({ error: 'Новый пароль минимум 6 символов' });
+    updates.push('password = ?');
+    params.push(bcrypt.hashSync(String(newPassword), 10));
+  }
+
+  if (!updates.length) return res.status(400).json({ error: 'Нечего обновлять' });
+  params.push(req.user.id);
+  db.prepare(`UPDATE users SET ${updates.join(', ')} WHERE id = ?`).run(...params);
+  const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  res.json({ user: publicUser(u) });
+});
+
+app.post('/api/profile/avatar', auth, upload.single('avatar'), (req, res) => {
+  if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
+  const url = '/uploads/avatars/' + req.file.filename;
+  if (req.user.avatar) {
+    const old = path.join(UPLOAD_DIR, req.user.avatar.replace(/^\/uploads\//, ''));
+    if (fs.existsSync(old)) try { fs.unlinkSync(old); } catch {}
+  }
+  db.prepare('UPDATE users SET avatar = ? WHERE id = ?').run(url, req.user.id);
+  const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  res.json({ user: publicUser(u) });
+});
+
+/* ==================== WALLET ==================== */
+app.post('/api/wallet/deposit', auth, (req, res) => {
+  const k = Math.round(Number(req.body?.amount) * 100);
+  if (!k || isNaN(k) || k <= 0) return res.status(400).json({ error: 'Некорректная сумма' });
+  db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(k, req.user.id);
+  db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at)
+              VALUES (?, 'Пополнение баланса', ?, 'in', ?)`).run(req.user.id, k, Date.now());
+  const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  res.json({ user: publicUser(u) });
+});
+
+app.post('/api/wallet/withdraw', auth, (req, res) => {
+  const { amount, cardNumber } = req.body || {};
+  const k = Math.round(Number(amount) * 100);
+  if (!k || isNaN(k) || k <= 0) return res.status(400).json({ error: 'Некорректная сумма' });
+  if (k < 100) return res.status(400).json({ error: 'Минимум 1 ₽' });
+  if (!cardNumber || String(cardNumber).replace(/\s/g, '').length < 16)
+    return res.status(400).json({ error: 'Укажите корректный номер карты (16 цифр)' });
+
+  const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  if (user.balance < k) return res.status(400).json({ error: 'Недостаточно средств' });
+
+  const pendingSum = db.prepare(`SELECT COALESCE(SUM(amount),0) AS s FROM withdrawals
+                                 WHERE user_id = ? AND status = 'pending'`).get(user.id).s;
+  if (user.balance - pendingSum < k)
+    return res.status(400).json({ error: 'Недостаточно средств (учитывая заявки)' });
+
+  const now = Date.now();
+  const cleanCard = String(cardNumber).replace(/\s/g, '');
+
+  const tx = db.transaction(() => {
+    db.prepare('UPDATE users SET balance = balance - ? WHERE id = ?').run(k, user.id);
+    const info = db.prepare(`INSERT INTO withdrawals (user_id, amount, status, card_number, created_at)
+                             VALUES (?, ?, 'pending', ?, ?)`).run(user.id, k, cleanCard, now);
+    return info.lastInsertRowid;
+  });
+
+  const wdId = tx();
+  const withdrawal = db.prepare('SELECT * FROM withdrawals WHERE id = ?').get(wdId);
+  const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(user.id);
+  res.json({ withdrawal: withdrawalRow(withdrawal), user: publicUser(updated) });
+});
+
+app.get('/api/wallet/withdrawals', auth, (req, res) => {
+  const items = db.prepare(`SELECT * FROM withdrawals WHERE user_id = ?
+                            ORDER BY created_at DESC LIMIT 100`).all(req.user.id);
+  res.json({ withdrawals: items.map(withdrawalRow) });
+});
+
+app.get('/api/wallet/transactions', auth, (req, res) => {
+  const txs = db.prepare(`SELECT id, title, amount, type, created_at FROM transactions
+                          WHERE user_id = ? ORDER BY created_at DESC LIMIT 200`).all(req.user.id);
+  res.json({ transactions: txs.map(txRow) });
+});
+
+/* ==================== ПРОМОКОДЫ ==================== */
+app.post('/api/wallet/promo/redeem', auth, (req, res) => {
+  const rawCode = String(req.body?.code || '').trim().toUpperCase();
+  if (!rawCode) return res.status(400).json({ error: 'Введите промокод' });
+
+  const promo = db.prepare('SELECT * FROM promocodes WHERE code = ?').get(rawCode);
+  if (!promo) return res.status(404).json({ error: 'Промокод не найден' });
+  if (!promo.active) return res.status(400).json({ error: 'Промокод неактивен' });
+  if (promo.expires_at && Date.now() > promo.expires_at)
+    return res.status(400).json({ error: 'Промокод истёк' });
+  if (promo.max_uses && promo.uses >= promo.max_uses)
+    return res.status(400).json({ error: 'Лимит использований исчерпан' });
+
+  const already = db.prepare('SELECT id FROM promo_redemptions WHERE promo_id = ? AND user_id = ?')
+    .get(promo.id, req.user.id);
+  if (already) return res.status(400).json({ error: 'Вы уже использовали этот промокод' });
+
+  try {
+    const tx = db.transaction(() => {
+      db.prepare(`INSERT INTO promo_redemptions (promo_id, user_id, created_at) VALUES (?, ?, ?)`)
+        .run(promo.id, req.user.id, Date.now());
+      db.prepare('UPDATE promocodes SET uses = uses + 1 WHERE id = ?').run(promo.id);
+      if (promo.bonus > 0) {
+        db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(promo.bonus, req.user.id);
+        db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at)
+                    VALUES (?, ?, ?, 'in', ?)`)
+          .run(req.user.id, `Промокод ${promo.code}`, promo.bonus, Date.now());
+      }
+    });
+    tx();
+
+    const updated = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+    const bonusRub = (promo.bonus / 100).toFixed(2);
+    res.json({
+      user: publicUser(updated),
+      message: promo.bonus > 0
+        ? `Промокод активирован! Начислено ${bonusRub} ₽`
+        : `Промокод активирован! Скидка ${promo.discount}%`,
+      bonus: promo.bonus,
+      discount: promo.discount,
+    });
+  } catch (e) {
+    console.error('❌ Ошибка промокода:', e);
+    res.status(500).json({ error: 'Не удалось активировать промокод' });
+  }
+});
+
+/* ==================== РЕФЕРАЛЫ ==================== */
+app.get('/api/referrals/me', auth, (req, res) => {
+  let code = req.user.referral_code;
+  if (!code) {
+    code = generateReferralCode();
+    db.prepare('UPDATE users SET referral_code = ? WHERE id = ?').run(code, req.user.id);
+  }
+
+  const clicks = db.prepare('SELECT COUNT(*) AS n FROM referral_clicks WHERE referral_code = ?').get(code).n;
+  const invited = db.prepare('SELECT COUNT(*) AS n FROM users WHERE referred_by = ?').get(req.user.id).n;
+
+  res.json({
+    code,
+    link: `${SITE_URL}/?ref=${code}`,
+    clicks,
+    invited,
+  });
+});
+
+app.get('/api/referrals/click/:code', (req, res) => {
+  const code = String(req.params.code || '').trim().toUpperCase();
+  if (!code) return res.status(400).json({ error: 'Нет кода' });
+
+  const owner = db.prepare('SELECT id FROM users WHERE referral_code = ?').get(code);
+  if (!owner) return res.status(404).json({ error: 'Реферал не найден' });
+
+  db.prepare(`INSERT INTO referral_clicks (referral_code, ip, user_agent, created_at)
+              VALUES (?, ?, ?, ?)`)
+    .run(code, req.ip || null, String(req.headers['user-agent'] || '').slice(0, 300), Date.now());
+
+  res.json({ ok: true, code });
+});
+
+/* ==================== CONTACT REQUESTS ==================== */
+function optionalRequestUser(req) {
+  const header = req.headers.authorization || '';
+  if (!header.startsWith('Bearer ')) return null;
+  try {
+    const payload = jwt.verify(header.slice(7), JWT_SECRET);
+    return db.prepare('SELECT id FROM users WHERE id = ?').get(payload.id) || null;
+  } catch { return null; }
+}
+
+app.post('/api/requests', (req, res) => {
+  try {
+    const b = req.body || {};
+    const v = {
+      name: String(b.name || '').trim(), project: String(b.project || '').trim(),
+      service: String(b.service || '').trim(), budget: String(b.budget || '').trim(),
+      reference: String(b.reference || '').trim(),
+      contactMethod: String(b.contactMethod || 'Сайт').trim(),
+      contactDetail: String(b.contactDetail || '').trim()
+    };
+    if (!v.name || !v.service) return res.status(400).json({ error: 'Укажите имя и услугу' });
+    const limits = { name: 100, project: 200, service: 100, budget: 100, reference: 5000, contactDetail: 300 };
+    for (const [key, max] of Object.entries(limits)) {
+      if (v[key].length > max) return res.status(400).json({ error: 'Поле превышает допустимую длину: ' + key });
+    }
+    if (!['Сайт', 'Discord', 'Telegram', 'VK', 'Телефон', 'Email'].includes(v.contactMethod))
+      return res.status(400).json({ error: 'Неизвестный способ связи' });
+    if (v.contactMethod !== 'Сайт' && !v.contactDetail)
+      return res.status(400).json({ error: 'Укажите контакт для связи' });
+    const user = optionalRequestUser(req);
+    const result = db.prepare(`
+      INSERT INTO requests (user_id, name, project, service, budget, reference, contact_method, contact_detail, created_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(user ? user.id : null, v.name, v.project || null, v.service, v.budget || null,
+      v.reference || null, v.contactMethod, v.contactDetail || null, Date.now());
+    return res.status(201).json({ ok: true, id: Number(result.lastInsertRowid), message: 'Заявка успешно сохранена' });
+  } catch (err) {
+    console.error('[requests] Ошибка сохранения:', err);
+    return res.status(500).json({ error: 'Не удалось сохранить заявку' });
+  }
+});
+
+app.get('/api/admin/requests/:id', auth, adminOnly, (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: 'Некорректный ID заявки' });
+  try {
+    const r = db.prepare(`
+      SELECT r.*, u.name AS account_name, u.email AS account_email, u.role AS account_role
+      FROM requests r LEFT JOIN users u ON u.id = r.user_id WHERE r.id = ?
+    `).get(id);
+    if (!r) return res.status(404).json({ error: 'Заявка не найдена' });
+    return res.json({ request: {
+      id: Number(r.id), userId: r.user_id == null ? null : Number(r.user_id),
+      name: r.name || '', project: r.project || '', service: r.service || '',
+      budget: r.budget || '', reference: r.reference || '',
+      contactMethod: r.contact_method || 'Сайт', contactDetail: r.contact_detail || '',
+      createdAt: Number(r.created_at || 0),
+      account: r.user_id == null ? null : {
+        id: Number(r.user_id), name: r.account_name || '',
+        email: r.account_email || '', role: r.account_role || 'client'
+      }
+    }});
+  } catch (err) {
+    console.error('[admin/requests/:id] Ошибка:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить заявку' });
+  }
+});
+
+app.get('/api/admin/users/:id/full', auth, adminOnly, (req, res) => {
+  const userId = Number(req.params.id);
+  if (!Number.isSafeInteger(userId) || userId <= 0) return res.status(400).json({ error: 'Некорректный ID пользователя' });
+  try {
+    const user = db.prepare('SELECT id, name, email, role, balance, avatar, bio, created_at, is_root FROM users WHERE id = ?').get(userId);
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+    const transactions = db.prepare('SELECT id, title, amount, type, created_at FROM transactions WHERE user_id = ? ORDER BY created_at DESC LIMIT 200').all(userId).map(t => ({
+      id: Number(t.id), title: t.title || '', amount: Number(t.amount || 0), type: t.type, date: Number(t.created_at || 0)
+    }));
+    const withdrawals = db.prepare('SELECT id, amount, status, comment, card_number, admin_comment, created_at, reviewed_at FROM withdrawals WHERE user_id = ? ORDER BY created_at DESC LIMIT 100').all(userId).map(w => ({
+      id: Number(w.id), amount: Number(w.amount || 0), status: w.status, comment: w.comment || '',
+      cardNumber: w.card_number || '', adminComment: w.admin_comment || '', createdAt: Number(w.created_at || 0),
+      reviewedAt: w.reviewed_at == null ? null : Number(w.reviewed_at)
+    }));
+    const stats = db.prepare(`
+      SELECT COALESCE(SUM(CASE WHEN type = 'in' THEN amount ELSE 0 END), 0) AS totalIn,
+             COALESCE(SUM(CASE WHEN type = 'out' THEN amount ELSE 0 END), 0) AS totalOut
+      FROM transactions WHERE user_id = ?
+    `).get(userId);
+    return res.json({
+      user: { id: Number(user.id), name: user.name || '', email: user.email || '', role: user.role || 'client',
+        balance: Number(user.balance || 0), avatar: user.avatar || null, bio: user.bio || '',
+        createdAt: Number(user.created_at || 0), isRoot: Number(user.is_root || 0) === 1 },
+      transactions, withdrawals,
+      stats: { totalIn: Number(stats.totalIn || 0), totalOut: Number(stats.totalOut || 0) }
+    });
+  } catch (err) {
+    console.error('[admin/users/:id/full] Ошибка:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить историю пользователя' });
+  }
+});
+
+/* ==================== ADMIN: users and balance ==================== */
+app.get('/api/admin/users', auth, (req, res) => {
+  const isAdmin = req.user?.role === 'admin' || Number(req.user?.is_root) === 1;
+  if (!isAdmin) return res.status(403).json({ error: 'Недостаточно прав' });
+
+  try {
+    // Only expose fields required by the UI, never password hashes.
+    const users = db.prepare(`
+      SELECT id, name, email, role, balance, avatar, is_root, created_at
+      FROM users
+      ORDER BY id DESC
+      LIMIT 5000
+    `).all().map(u => ({
+      id: Number(u.id),
+      name: String(u.name || 'Без имени'),
+      email: String(u.email || ''),
+      role: String(u.role || 'client'),
+      balance: Number(u.balance ?? 0),
+      avatar: u.avatar || null,
+      isRoot: Number(u.is_root) === 1,
+      createdAt: Number(u.created_at || 0)
+    }));
+    return res.json({ users });
+  } catch (err) {
+    console.error('[admin/users] Ошибка:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить пользователей' });
+  }
+});
+
+
+// Admin statistics: all monetary values are stored and returned in kopecks.
+app.get('/api/admin/stats', auth, adminOnly, (req, res) => {
+  try {
+    const scalar = (sql, ...params) => Number(db.prepare(sql).get(...params)?.n || 0);
+    const sevenDaysAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const stats = {
+      money: {
+        totalBalance: scalar('SELECT COALESCE(SUM(balance), 0) AS n FROM users'),
+        totalIn: scalar("SELECT COALESCE(SUM(amount), 0) AS n FROM transactions WHERE type = 'in'"),
+        totalOut: scalar("SELECT COALESCE(SUM(amount), 0) AS n FROM transactions WHERE type = 'out'")
+      },
+      withdrawals: {
+        pendingCount: scalar("SELECT COUNT(*) AS n FROM withdrawals WHERE status = 'pending'"),
+        pendingSum: scalar("SELECT COALESCE(SUM(amount), 0) AS n FROM withdrawals WHERE status = 'pending'")
+      },
+      users: {
+        total: scalar('SELECT COUNT(*) AS n FROM users'),
+        new7: scalar('SELECT COUNT(*) AS n FROM users WHERE created_at >= ?', sevenDaysAgo),
+        clients: scalar("SELECT COUNT(*) AS n FROM users WHERE role = 'client'"),
+        executors: scalar("SELECT COUNT(*) AS n FROM users WHERE role = 'executor'"),
+        managers: scalar("SELECT COUNT(*) AS n FROM users WHERE role = 'manager'"),
+        admins: scalar("SELECT COUNT(*) AS n FROM users WHERE role = 'admin'")
+      },
+      projects: {
+        total: scalar('SELECT COUNT(*) AS n FROM projects'),
+        inProgress: scalar("SELECT COUNT(*) AS n FROM projects WHERE status = 'in_progress'"),
+        completed: scalar("SELECT COUNT(*) AS n FROM projects WHERE status = 'completed'"),
+        cancelled: scalar("SELECT COUNT(*) AS n FROM projects WHERE status = 'cancelled'")
+      },
+      messages: { total: scalar('SELECT COUNT(*) AS n FROM messages') },
+      portfolio: { total: scalar('SELECT COUNT(*) AS n FROM portfolio') },
+      payments: {
+        succeededSum: scalar("SELECT COALESCE(SUM(amount), 0) AS n FROM payments WHERE LOWER(status) IN ('succeeded', 'success', 'paid')")
+      }
+    };
+    return res.json(stats);
+  } catch (err) {
+    console.error('[admin/stats] Ошибка:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить статистику' });
+  }
+});
+
+app.get('/api/admin/requests', auth, adminOnly, (req, res) => {
+  try {
+    const requests = db.prepare(`
+      SELECT id, name, email, avatar, role, requested_role, created_at
+      FROM users
+      WHERE requested_role IS NOT NULL AND TRIM(requested_role) <> ''
+      ORDER BY created_at ASC, id ASC
+      LIMIT 1000
+    `).all().map(u => ({
+      id: Number(u.id),
+      name: String(u.name || 'Без имени'),
+      email: String(u.email || ''),
+      avatar: u.avatar || null,
+      role: String(u.role || 'client'),
+      requestedRole: String(u.requested_role),
+      createdAt: Number(u.created_at || 0)
+    }));
+    const contactRequests = db.prepare(`
+      SELECT r.id, r.user_id, r.name, r.project, r.service, r.budget, r.reference,
+             r.contact_method, r.contact_detail, r.created_at, u.email AS user_email
+      FROM requests r LEFT JOIN users u ON u.id = r.user_id
+      ORDER BY r.created_at DESC, r.id DESC LIMIT 1000
+    `).all().map(r => ({
+      id: Number(r.id), userId: r.user_id == null ? null : Number(r.user_id),
+      name: String(r.name || ''), project: String(r.project || ''),
+      service: String(r.service || ''), budget: String(r.budget || ''),
+      reference: String(r.reference || ''), contactMethod: String(r.contact_method || 'Сайт'),
+      contactDetail: String(r.contact_detail || ''), createdAt: Number(r.created_at || 0),
+      userEmail: String(r.user_email || '')
+    }));
+    return res.json({ requests, contactRequests });
+  } catch (err) {
+    console.error('[admin/requests] Ошибка:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить заявки' });
+  }
+});
+
+app.post('/api/admin/approve', auth, adminOnly, (req, res) => {
+  const userId = Number(req.body?.userId);
+  if (!Number.isSafeInteger(userId) || userId <= 0)
+    return res.status(400).json({ error: 'Некорректный ID пользователя' });
+  const target = db.prepare('SELECT id, requested_role FROM users WHERE id = ?').get(userId);
+  if (!target) return res.status(404).json({ error: 'Заявка не найдена' });
+  if (!['executor', 'manager'].includes(target.requested_role))
+    return res.status(400).json({ error: 'У пользователя нет ожидающей заявки' });
+  db.prepare('UPDATE users SET role = requested_role, requested_role = NULL WHERE id = ?').run(userId);
+  return res.json({ ok: true, userId });
+});
+
+app.post('/api/admin/reject', auth, adminOnly, (req, res) => {
+  const userId = Number(req.body?.userId);
+  if (!Number.isSafeInteger(userId) || userId <= 0)
+    return res.status(400).json({ error: 'Некорректный ID пользователя' });
+  const target = db.prepare('SELECT id, requested_role FROM users WHERE id = ?').get(userId);
+  if (!target) return res.status(404).json({ error: 'Заявка не найдена' });
+  if (!target.requested_role)
+    return res.status(400).json({ error: 'У пользователя нет ожидающей заявки' });
+  db.prepare('UPDATE users SET requested_role = NULL WHERE id = ?').run(userId);
+  return res.json({ ok: true, userId });
+});
+
+app.post('/api/admin/balance', auth, (req, res) => {
+  const isAdmin = req.user?.role === 'admin' || Number(req.user?.is_root) === 1;
+  const isRoot = req.user?.role === 'admin' && Number(req.user?.is_root) === 1;
+  if (!isAdmin) return res.status(403).json({ error: 'Недостаточно прав' });
+
+  const userId = Number(req.body?.userId);
+  const amountRubles = req.body?.amount;
+  if (!Number.isSafeInteger(userId) || userId <= 0 ||
+      typeof amountRubles !== 'number' || !Number.isFinite(amountRubles) ||
+      amountRubles === 0 || Math.abs(amountRubles) > 1_000_000) {
+    return res.status(400).json({ error: 'Некорректная сумма или ID пользователя' });
+  }
+
+  const amountKopecks = Math.round(amountRubles * 100);
+  if (!Number.isSafeInteger(amountKopecks) || amountKopecks === 0) {
+    return res.status(400).json({ error: 'Сумма превышает допустимый диапазон' });
+  }
+
+  try {
+    const adjustBalance = db.transaction(() => {
+      const target = db.prepare(
+        'SELECT id, role, balance FROM users WHERE id = ?'
+      ).get(userId);
+
+      if (!target) {
+        const error = new Error('Пользователь не найден');
+        error.status = 404;
+        throw error;
+      }
+      if (target.role === 'admin' && !isRoot && userId !== Number(req.user.id)) {
+        const error = new Error('Изменять баланс другого администратора может только главный администратор');
+        error.status = 403;
+        throw error;
+      }
+
+      const current = Number(target.balance ?? 0);
+      if (!Number.isSafeInteger(current) || current < 0) {
+        const error = new Error('Текущий баланс некорректен; требуется проверка БД');
+        error.status = 409;
+        throw error;
+      }
+
+      const nextBig = BigInt(current) + BigInt(amountKopecks);
+      const maxSafe = BigInt(Number.MAX_SAFE_INTEGER);
+      const sqliteMax = 9223372036854775807n;
+      if (nextBig < 0n || nextBig > maxSafe || nextBig > sqliteMax) {
+        const error = new Error('Итоговый баланс вне допустимого диапазона');
+        error.status = 400;
+        throw error;
+      }
+
+      const next = Number(nextBig);
+      db.prepare('UPDATE users SET balance = ? WHERE id = ?').run(next, userId);
+      db.prepare(`
+        INSERT INTO transactions (user_id, title, amount, type, created_at)
+        VALUES (?, ?, ?, ?, ?)
+      `).run(
+        userId,
+        amountKopecks > 0 ? 'Корректировка баланса администратором' : 'Списание администратором',
+        Math.abs(amountKopecks),
+        amountKopecks > 0 ? 'in' : 'out',
+        Date.now()
+      );
+      return next;
+    });
+
+    return res.json({ ok: true, userId, balance: adjustBalance() });
+  } catch (err) {
+    if (err.status) return res.status(err.status).json({ error: err.message });
+    console.error('[admin/balance] Ошибка:', err);
+    return res.status(500).json({ error: 'Не удалось изменить баланс' });
+  }
+});
+
+/* ==================== ADMIN: withdrawals ==================== */
+app.get('/api/admin/withdrawals', auth, adminOnly, (req, res) => {
+  const items = db.prepare(`SELECT w.*, u.name AS user_name, u.email AS user_email, u.avatar AS user_avatar,
+                                   r.name AS reviewer_name
+                            FROM withdrawals w
+                            JOIN users u ON u.id = w.user_id
+                            LEFT JOIN users r ON r.id = w.reviewed_by
+                            ORDER BY w.created_at DESC LIMIT 200`).all();
+  res.json({
+    withdrawals: items.map(w => ({
+      ...withdrawalRow(w),
+      // Keep nested user shape expected by the current frontend, plus legacy flat fields.
+      user: { id: Number(w.user_id), name: w.user_name || 'Без имени', email: w.user_email || '', avatar: w.user_avatar || null },
+      userName: w.user_name,
+      userEmail: w.user_email,
+      reviewerName: w.reviewer_name,
+    })),
+  });
+});
+
+app.post('/api/admin/withdrawals/:id/approve', auth, adminOnly, (req, res) => {
+  const { adminComment } = req.body || {};
+  const wd = db.prepare('SELECT * FROM withdrawals WHERE id = ?').get(req.params.id);
+  if (!wd) return res.status(404).json({ error: 'Заявка не найдена' });
+  if (wd.status !== 'pending') return res.status(400).json({ error: 'Заявка уже обработана' });
+
+  db.prepare(`UPDATE withdrawals SET status = 'approved', admin_comment = ?,
+              reviewed_at = ?, reviewed_by = ? WHERE id = ?`)
+    .run(adminComment || 'Перевод выполнен', Date.now(), req.user.id, wd.id);
+
+  const updated = db.prepare('SELECT * FROM withdrawals WHERE id = ?').get(wd.id);
+  res.json({ withdrawal: withdrawalRow(updated) });
+});
+
+app.post('/api/admin/withdrawals/:id/reject', auth, adminOnly, (req, res) => {
+  const { adminComment } = req.body || {};
+  const wd = db.prepare('SELECT * FROM withdrawals WHERE id = ?').get(req.params.id);
+  if (!wd) return res.status(404).json({ error: 'Заявка не найдена' });
+  if (wd.status !== 'pending') return res.status(400).json({ error: 'Заявка уже обработана' });
+
+  const tx = db.transaction(() => {
+    db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(wd.amount, wd.user_id);
+    db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at)
+                VALUES (?, 'Возврат по заявке на вывод', ?, 'in', ?)`).run(wd.user_id, wd.amount, Date.now());
+    db.prepare(`UPDATE withdrawals SET status = 'rejected', admin_comment = ?,
+                reviewed_at = ?, reviewed_by = ? WHERE id = ?`)
+      .run(adminComment || 'Отклонено', Date.now(), req.user.id, wd.id);
+  });
+  tx();
+
+  const updated = db.prepare('SELECT * FROM withdrawals WHERE id = ?').get(wd.id);
+  res.json({ withdrawal: withdrawalRow(updated) });
+});
+
+/* ==================== ROLE ==================== */
+app.post('/api/role/request', auth, (req, res) => {
+  const { role } = req.body || {};
+  if (!['executor', 'manager'].includes(role))
+    return res.status(400).json({ error: 'Некорректная роль' });
+  if (req.user.role === 'admin') return res.status(400).json({ error: 'Админ не меняет роль' });
+  if (req.user.role === role) return res.status(400).json({ error: 'Эта роль уже ваша' });
+
+  db.prepare('UPDATE users SET requested_role = ? WHERE id = ?').run(role, req.user.id);
+  const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
+  res.json({ user: publicUser(u) });
+});
+
+/* ==================== PROJECTS ==================== */
+app.get('/api/projects', auth, (req, res) => {
+  try {
+    const role = req.user?.role;
+    const userId = Number(req.user?.id);
+    let where = '';
+    let params = [];
+
+    // Клиенты видят только собственные заказы.
+    if (role === 'client') {
+      where = 'WHERE p.client_id = ?';
+      params = [userId];
+    } else if (role === 'executor') {
+      // Исполнители видят открытые заказы и заказы, уже назначенные им.
+      where = "WHERE (p.status = 'open' AND p.executor_id IS NULL) OR p.executor_id = ?";
+      params = [userId];
+    } else if (role !== 'admin' && role !== 'manager') {
+      return res.status(403).json({ error: 'Нет доступа к заказам' });
+    }
+
+    const rows = db.prepare(`SELECT p.*,
+                                    u.name AS client_name, u.avatar AS client_avatar,
+                                    e.name AS executor_name, e.avatar AS executor_avatar
+                             FROM projects p
+                             LEFT JOIN users u ON u.id = p.client_id
+                             LEFT JOIN users e ON e.id = p.executor_id
+                             ${where}
+                             ORDER BY p.created_at DESC LIMIT 100`).all(...params);
+    const projects = rows.map(p => ({
+      ...p,
+      clientId: p.client_id ?? null,
+      executorId: p.executor_id ?? null,
+      client: { id: p.client_id ?? 0, name: p.client_name || 'Пользователь', avatar: p.client_avatar ?? null },
+      executor: p.executor_id ? {
+        id: p.executor_id, name: p.executor_name || 'Исполнитель', avatar: p.executor_avatar ?? null,
+      } : null,
+    }));
+    res.json({ projects });
+  } catch (err) {
+    console.error('❌ Ошибка загрузки заказов:', err);
+    res.status(500).json({ error: 'Не удалось загрузить заказы' });
+  }
+});
+
+app.post('/api/projects', auth, (req, res) => {
+  const { title, description, category, budget } = req.body || {};
+  if (!title || !description || !category)
+    return res.status(400).json({ error: 'Заполните поля' });
+  const now = Date.now();
+  const info = db.prepare(`INSERT INTO projects
+    (title, description, category, budget, status, client_id, created_at, updated_at)
+    VALUES (?, ?, ?, ?, 'open', ?, ?, ?)`)
+    .run(title, description, category, Math.round(Number(budget) * 100) || 0, req.user.id, now, now);
+  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(info.lastInsertRowid);
+  res.json({ project });
+});
+
+
+/* Project detail/actions used by the client-side project cards. */
+app.get('/api/projects/:id', auth, (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: 'Некорректный ID заказа' });
+  try {
+    const p = db.prepare(`SELECT p.*, u.name AS client_name, u.avatar AS client_avatar,
+                                e.name AS executor_name, e.avatar AS executor_avatar
+                         FROM projects p
+                         LEFT JOIN users u ON u.id = p.client_id
+                         LEFT JOIN users e ON e.id = p.executor_id
+                         WHERE p.id = ?`).get(id);
+    if (!p) return res.status(404).json({ error: 'Заказ не найден' });
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'manager' || Number(req.user.is_root) === 1;
+    const canView = isAdmin || Number(p.client_id) === Number(req.user.id) ||
+      (req.user.role === 'executor' && (p.status === 'open' || Number(p.executor_id) === Number(req.user.id)));
+    if (!canView) return res.status(403).json({ error: 'Нет доступа к этому заказу' });
+    return res.json({ project: {
+      ...p, clientId: p.client_id, executorId: p.executor_id,
+      client: { id: p.client_id, name: p.client_name || 'Пользователь', avatar: p.client_avatar || null },
+      executor: p.executor_id ? { id: p.executor_id, name: p.executor_name || 'Исполнитель', avatar: p.executor_avatar || null } : null
+    }});
+  } catch (err) {
+    console.error('Ошибка загрузки заказа:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить заказ' });
+  }
+});
+
+app.post('/api/projects/:id/accept', auth, (req, res) => {
+  if (req.user.role !== 'executor') return res.status(403).json({ error: 'Только исполнитель может взять заказ' });
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: 'Некорректный ID заказа' });
+  try {
+    const result = db.prepare(`UPDATE projects SET executor_id = ?, status = 'in_progress', updated_at = ?
+      WHERE id = ? AND status = 'open' AND executor_id IS NULL`).run(req.user.id, Date.now(), id);
+    if (!result.changes) {
+      const exists = db.prepare('SELECT id FROM projects WHERE id = ?').get(id);
+      return res.status(exists ? 409 : 404).json({ error: exists ? 'Заказ уже взят или закрыт' : 'Заказ не найден' });
+    }
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Ошибка принятия заказа:', err);
+    return res.status(500).json({ error: 'Не удалось взять заказ' });
+  }
+});
+
+app.post('/api/projects/:id/status', auth, (req, res) => {
+  const id = Number(req.params.id);
+  const { status } = req.body || {};
+  const allowed = ['open', 'in_progress', 'review', 'completed', 'cancelled'];
+  if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: 'Некорректный ID заказа' });
+  if (!allowed.includes(status)) return res.status(400).json({ error: 'Некорректный статус заказа' });
+  try {
+    const p = db.prepare('SELECT id, client_id, executor_id FROM projects WHERE id = ?').get(id);
+    if (!p) return res.status(404).json({ error: 'Заказ не найден' });
+    const isAdmin = req.user.role === 'admin' || req.user.role === 'manager' || Number(req.user.is_root) === 1;
+    if (!isAdmin && Number(p.client_id) !== Number(req.user.id) && Number(p.executor_id) !== Number(req.user.id))
+      return res.status(403).json({ error: 'Нет доступа к изменению этого заказа' });
+    db.prepare('UPDATE projects SET status = ?, updated_at = ? WHERE id = ?').run(status, Date.now(), id);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Ошибка изменения статуса заказа:', err);
+    return res.status(500).json({ error: 'Не удалось изменить статус заказа' });
+  }
+});
+
+/* ==================== PORTFOLIO ==================== */
+
+// Authorize before Multer writes an uploaded file.
+function portfolioUploadAccess(req, res, next) {
+  const user = req.user;
+  if (user.role === 'executor' || user.role === 'manager' || user.role === 'admin' || Number(user.is_root) === 1) {
+    return next();
+  }
+  return res.status(403).json({ error: 'Нет прав для загрузки работ в портфолио' });
+}
+
+app.post('/api/portfolio', auth, portfolioUploadAccess, upload.single('image'), (req, res) => {
+  try {
+    if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
+
+    const { title, description, category } = req.body || {};
+    const cleanTitle = String(title || '').trim();
+    const cleanDescription = String(description || '').trim();
+    const cleanCategory = String(category || 'Другое').trim();
+
+    const removeUploadedFile = () => {
+      if (req.file?.path) fs.unlink(req.file.path, () => {});
+    };
+
+    if (!cleanTitle) {
+      removeUploadedFile();
+      return res.status(400).json({ error: 'Укажите название работы' });
+    }
+    if (cleanTitle.length > 120) {
+      removeUploadedFile();
+      return res.status(400).json({ error: 'Название не должно превышать 120 символов' });
+    }
+    if (cleanDescription.length > 500) {
+      removeUploadedFile();
+      return res.status(400).json({ error: 'Описание не должно превышать 500 символов' });
+    }
+
+    const user = req.user;
+    let authorUserId = null;
+    let authorName = '';
+
+    if (user.role === 'executor') {
+      // Never trust author fields submitted by an executor.
+      authorUserId = user.id;
+      authorName = user.name;
+    } else {
+      const rawAuthorUserId = String(req.body.authorUserId || '').trim();
+
+      if (rawAuthorUserId) {
+        const parsedId = Number(rawAuthorUserId);
+        if (!Number.isSafeInteger(parsedId) || parsedId <= 0) {
+          removeUploadedFile();
+          return res.status(400).json({ error: 'Некорректный пользователь' });
+        }
+
+        const author = db.prepare('SELECT id, name FROM users WHERE id = ?').get(parsedId);
+        if (!author) {
+          removeUploadedFile();
+          return res.status(400).json({ error: 'Выбранный пользователь не найден' });
+        }
+
+        authorUserId = author.id;
+        authorName = author.name;
+      } else {
+        authorName = String(req.body.authorName || '').trim();
+        if (!authorName) {
+          removeUploadedFile();
+          return res.status(400).json({ error: 'Укажите имя автора' });
+        }
+        if (authorName.length > 100) {
+          removeUploadedFile();
+          return res.status(400).json({ error: 'Имя автора слишком длинное' });
+        }
+      }
+    }
+
+    const result = db.prepare(`
+      INSERT INTO portfolio (
+        user_id, author_user_id, author_name, filename,
+        title, description, category, created_at
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      user.id, authorUserId, authorName, req.file.filename,
+      cleanTitle, cleanDescription, cleanCategory, Date.now()
+    );
+
+    return res.status(201).json({
+      ok: true,
+      id: Number(result.lastInsertRowid),
+      filename: req.file.filename,
+      url: '/uploads/portfolio/' + encodeURIComponent(req.file.filename),
+      authorName
+    });
+  } catch (err) {
+    console.error('Ошибка загрузки портфолио:', err);
+    if (req.file?.path) fs.unlink(req.file.path, () => {});
+    return res.status(500).json({ error: 'Не удалось сохранить работу' });
+  }
+});
+
+app.get('/api/portfolio/all', (req, res) => {
+  try {
+    const rows = db.prepare(`
+      SELECT
+        p.id, p.filename, p.title, p.description, p.category,
+        p.created_at AS createdAt, p.author_user_id AS authorUserId,
+        COALESCE(
+          NULLIF(TRIM(u.name), ''),
+          NULLIF(TRIM(p.author_name), ''),
+          NULLIF(TRIM(uploader.name), ''),
+          'Аноним'
+        ) AS authorName,
+        u.avatar AS authorAvatar
+      FROM portfolio p
+      LEFT JOIN users u ON u.id = p.author_user_id
+      LEFT JOIN users uploader ON uploader.id = p.user_id
+      ORDER BY p.created_at DESC, p.id DESC
+      LIMIT 200
+    `).all();
+
+    const items = rows.map(row => ({
+      ...row,
+      filename: row.filename
+        ? (row.filename.startsWith('/uploads/')
+            ? row.filename
+            : '/uploads/portfolio/' + encodeURIComponent(row.filename))
+        : null,
+      authorName: row.authorName || 'Аноним',
+      authorAvatar: row.authorAvatar || null
+    }));
+
+    return res.json({ items });
+  } catch (err) {
+    console.error('Ошибка загрузки публичного портфолио:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить портфолио' });
+  }
+});
+
+app.get('/api/portfolio/me', auth, (req, res) => {
+  try {
+    const userId = req.user.id;
+    const rows = db.prepare(`
+      SELECT p.id, p.filename, p.title, p.description, p.category,
+             p.created_at AS createdAt, p.author_name AS authorName,
+             p.author_user_id AS authorUserId
+      FROM portfolio p
+      WHERE p.author_user_id = ? OR p.user_id = ?
+      ORDER BY p.created_at DESC, p.id DESC
+      LIMIT 200
+    `).all(userId, userId);
+
+    const items = rows.map(row => ({
+      ...row,
+      filename: row.filename
+        ? (row.filename.startsWith('/uploads/')
+            ? row.filename
+            : '/uploads/portfolio/' + encodeURIComponent(row.filename))
+        : null
+    }));
+
+    return res.json({ items });
+  } catch (err) {
+    console.error('Ошибка загрузки личного портфолио:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить ваши работы' });
+  }
+});
+
+// Public profile endpoint exposes only fields intended for visitors.
+app.get('/api/users/:id/public', (req, res) => {
+  const userId = Number(req.params.id);
+  if (!Number.isSafeInteger(userId) || userId <= 0) return res.status(400).json({ error: 'Некорректный ID пользователя' });
+  try {
+    const user = db.prepare('SELECT id, name, avatar, bio, created_at AS createdAt FROM users WHERE id = ?').get(userId);
+    if (!user) return res.status(404).json({ error: 'Пользователь не найден' });
+    const rows = db.prepare('SELECT id, filename, title, description, category, created_at AS createdAt FROM portfolio WHERE author_user_id = ? ORDER BY created_at DESC, id DESC LIMIT 100').all(userId);
+    const items = rows.map(row => ({ ...row, filename: row.filename ? (row.filename.startsWith('/uploads/') ? row.filename : '/uploads/portfolio/' + encodeURIComponent(row.filename)) : null }));
+    return res.json({ user: { id: user.id, name: user.name, avatar: user.avatar || null, bio: user.bio || '', createdAt: user.createdAt }, items });
+  } catch (err) {
+    console.error('Ошибка загрузки публичного профиля:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить профиль' });
+  }
+});
+
+app.get('/api/users/list', auth, (req, res) => {
+  if (!['admin', 'manager'].includes(req.user.role) && Number(req.user.is_root) !== 1) {
+    return res.status(403).json({ error: 'Недостаточно прав' });
+  }
+
+  try {
+    const users = db.prepare(`
+      SELECT id, name, avatar
+      FROM users
+      ORDER BY name COLLATE NOCASE ASC
+      LIMIT 1000
+    `).all();
+    return res.json({ users });
+  } catch (err) {
+    console.error('Ошибка списка пользователей:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить список пользователей' });
+  }
+});
+
+// Keep portfolio deletion limited to the uploader or an administrator.
+app.delete('/api/portfolio/:id', auth, (req, res) => {
+  const id = Number(req.params.id);
+  if (!Number.isSafeInteger(id) || id <= 0) {
+    return res.status(400).json({ error: 'Некорректный ID работы' });
+  }
+
+  const item = db.prepare('SELECT id, user_id FROM portfolio WHERE id = ?').get(id);
+  if (!item) return res.status(404).json({ error: 'Работа не найдена' });
+
+  const isAdmin = req.user.role === 'admin' || Number(req.user.is_root) === 1;
+  const isUploader = item.user_id === req.user.id;
+  const author = db.prepare('SELECT author_user_id FROM portfolio WHERE id = ?').get(id);
+  const isAuthor = author?.author_user_id === req.user.id;
+  if (!isAdmin && !isUploader && !isAuthor) {
+    return res.status(403).json({ error: 'Нет прав удалить эту работу' });
+  }
+
+  try {
+    db.prepare('DELETE FROM portfolio WHERE id = ?').run(id);
+    return res.json({ ok: true });
+  } catch (err) {
+    console.error('Ошибка удаления работы:', err);
+    return res.status(500).json({ error: 'Не удалось удалить работу' });
+  }
+});
+
+app.get('/api/portfolio', (req, res) => {
+  const userId = req.query.userId ? parseInt(req.query.userId, 10) : null;
+  const items = userId
+    ? db.prepare('SELECT * FROM portfolio WHERE user_id = ? ORDER BY created_at DESC').all(userId)
+    : db.prepare('SELECT * FROM portfolio ORDER BY created_at DESC LIMIT 100').all();
+  res.json({ portfolio: items });
+});
+
+
+/* Chat API endpoints used by the messenger UI. */
+app.get('/api/chats', auth, (req, res) => {
+  try {
+    const uid = Number(req.user.id);
+    const rows = db.prepare(`
+      SELECT c.id, c.user_a, c.user_b,
+        CASE WHEN c.user_a = ? THEN b.id ELSE a.id END AS peer_id,
+        CASE WHEN c.user_a = ? THEN b.name ELSE a.name END AS peer_name,
+        CASE WHEN c.user_a = ? THEN b.avatar ELSE a.avatar END AS peer_avatar,
+        (SELECT m.text FROM messages m WHERE m.chat_id = c.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_text,
+        (SELECT m.created_at FROM messages m WHERE m.chat_id = c.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_created,
+        (SELECT COUNT(*) FROM messages m WHERE m.chat_id = c.id AND m.sender_id != ? AND m.read_at IS NULL) AS unread
+      FROM chats c
+      JOIN users a ON a.id = c.user_a
+      JOIN users b ON b.id = c.user_b
+      WHERE c.user_a = ? OR c.user_b = ?
+      ORDER BY COALESCE(last_created, c.created_at) DESC
+    `).all(uid, uid, uid, uid, uid, uid);
+    return res.json({ chats: rows.map(r => ({
+      id: Number(r.id),
+      peer: { id: Number(r.peer_id), name: r.peer_name || 'Пользователь', avatar: r.peer_avatar || null },
+      lastMessage: r.last_text == null ? null : { text: r.last_text, createdAt: Number(r.last_created || 0) },
+      unread: Number(r.unread || 0)
+    })) });
+  } catch (err) {
+    console.error('Ошибка загрузки чатов:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить чаты' });
+  }
+});
+
+app.post('/api/chats', auth, (req, res) => {
+  const uid = Number(req.user.id);
+  const peerId = Number(req.body?.peerId);
+  if (!Number.isSafeInteger(peerId) || peerId <= 0 || peerId === uid)
+    return res.status(400).json({ error: 'Некорректный собеседник' });
+  try {
+    const peer = db.prepare('SELECT id FROM users WHERE id = ?').get(peerId);
+    if (!peer) return res.status(404).json({ error: 'Пользователь не найден' });
+    const userA = Math.min(uid, peerId);
+    const userB = Math.max(uid, peerId);
+    let chat = db.prepare('SELECT id FROM chats WHERE user_a = ? AND user_b = ?').get(userA, userB);
+    if (!chat) {
+      try {
+        const info = db.prepare('INSERT INTO chats (user_a, user_b, created_at) VALUES (?, ?, ?)').run(userA, userB, Date.now());
+        chat = { id: Number(info.lastInsertRowid) };
+      } catch (err) {
+        // Handle simultaneous attempts to create the same conversation.
+        chat = db.prepare('SELECT id FROM chats WHERE user_a = ? AND user_b = ?').get(userA, userB);
+        if (!chat) throw err;
+      }
+    }
+    return res.json({ chatId: Number(chat.id) });
+  } catch (err) {
+    console.error('Ошибка создания чата:', err);
+    return res.status(500).json({ error: 'Не удалось открыть чат' });
+  }
+});
+
+app.get('/api/chats/:chatId/messages', auth, (req, res) => {
+  const chatId = Number(req.params.chatId);
+  if (!Number.isSafeInteger(chatId) || chatId <= 0) return res.status(400).json({ error: 'Некорректный ID чата' });
+  try {
+    const chat = db.prepare('SELECT user_a, user_b FROM chats WHERE id = ?').get(chatId);
+    if (!chat) return res.status(404).json({ error: 'Чат не найден' });
+    if (![Number(chat.user_a), Number(chat.user_b)].includes(Number(req.user.id)))
+      return res.status(403).json({ error: 'Нет доступа к этому чату' });
+    db.prepare('UPDATE messages SET read_at = ? WHERE chat_id = ? AND sender_id != ? AND read_at IS NULL')
+      .run(Date.now(), chatId, req.user.id);
+    const messages = db.prepare(`
+      SELECT m.id, m.chat_id AS chatId, m.sender_id AS senderId, m.text, m.created_at AS createdAt, m.read_at AS readAt
+      FROM messages m WHERE m.chat_id = ? ORDER BY m.created_at ASC, m.id ASC LIMIT 500
+    `).all(chatId).map(m => ({ ...m, id: Number(m.id), chatId: Number(m.chatId), senderId: Number(m.senderId), createdAt: Number(m.createdAt), readAt: m.readAt == null ? null : Number(m.readAt) }));
+    return res.json({ messages });
+  } catch (err) {
+    console.error('Ошибка загрузки сообщений:', err);
+    return res.status(500).json({ error: 'Не удалось загрузить сообщения' });
+  }
+});
+
+/* ==================== CHATS ==================== */
+// Authenticate sockets with the same JWT used by the REST API.
+io.use((socket, next) => {
+  try {
+    const token = socket.handshake.auth?.token;
+    if (!token) return next(new Error('Требуется авторизация'));
+    const payload = jwt.verify(token, JWT_SECRET);
+    const user = db.prepare('SELECT id, name FROM users WHERE id = ?').get(payload.id);
+    if (!user) return next(new Error('Пользователь не найден'));
+    socket.data.user = { id: Number(user.id), name: user.name || 'Пользователь' };
+    next();
+  } catch {
+    next(new Error('Сессия истекла. Войдите снова.'));
+  }
+});
+
+io.on('connection', (socket) => {
+  const uid = Number(socket.data.user.id);
+  socket.on('chat:join', ({ chatId } = {}) => {
+    const id = Number(chatId);
+    if (!Number.isSafeInteger(id) || id <= 0) return;
+    const chat = db.prepare('SELECT user_a, user_b FROM chats WHERE id = ?').get(id);
+    if (chat && [Number(chat.user_a), Number(chat.user_b)].includes(uid)) socket.join('chat:' + id);
+  });
+  socket.on('chat:leave', ({ chatId } = {}) => {
+    const id = Number(chatId);
+    if (Number.isSafeInteger(id) && id > 0) socket.leave('chat:' + id);
+  });
+  socket.on('chat:send', ({ chatId, text } = {}) => {
+    const id = Number(chatId);
+    const cleanText = String(text || '').trim().slice(0, 2000);
+    if (!Number.isSafeInteger(id) || id <= 0 || !cleanText) return;
+    const chat = db.prepare('SELECT user_a, user_b FROM chats WHERE id = ?').get(id);
+    if (!chat || ![Number(chat.user_a), Number(chat.user_b)].includes(uid)) {
+      socket.emit('chat:error', { message: 'Нет доступа к этому чату' });
+      return;
+    }
+    try {
+      const now = Date.now();
+      const info = db.prepare('INSERT INTO messages (chat_id, sender_id, text, created_at) VALUES (?, ?, ?, ?)')
+        .run(id, uid, cleanText, now);
+      const msg = { id: Number(info.lastInsertRowid), chatId: id, senderId: uid, text: cleanText, createdAt: now, readAt: null };
+      io.to('chat:' + id).emit('chat:new', msg);
+      io.to('chat:' + id).emit('chat:notify', { chatId: id, message: { senderName: socket.data.user.name, text: cleanText } });
+    } catch (err) {
+      console.error('Ошибка отправки сообщения:', err);
+      socket.emit('chat:error', { message: 'Не удалось отправить сообщение' });
+    }
+  });
+  socket.on('chat:typing', ({ chatId } = {}) => {
+    const id = Number(chatId);
+    if (!Number.isSafeInteger(id) || id <= 0) return;
+    const chat = db.prepare('SELECT user_a, user_b FROM chats WHERE id = ?').get(id);
+    if (chat && [Number(chat.user_a), Number(chat.user_b)].includes(uid)) socket.to('chat:' + id).emit('chat:typing', { name: socket.data.user.name });
+  });
+});
+
+// Explicit 404 handlers for unknown API endpoints and page URLs.
+app.use('/api', (req, res) => res.status(404).json({ error: 'API_ENDPOINT_NOT_FOUND', message: 'Такой API-маршрут не существует.' }));
+app.use((req, res) => {
+  res.status(404).type('html').send(`<!doctype html><html lang="ru"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><title>Страница не найдена — Paw Art Studio</title><style>body{margin:0;min-height:100vh;display:grid;place-items:center;background:#0d0810;color:#f8effa;font:16px system-ui,sans-serif;text-align:center;padding:24px;box-sizing:border-box}.box{max-width:520px}.code{font-size:clamp(4rem,15vw,7rem);font-weight:800;line-height:1;color:#ec4899}p{color:#c4b5c5;line-height:1.6}a{display:inline-block;margin-top:12px;padding:12px 18px;border-radius:12px;background:#ec4899;color:white;text-decoration:none;font-weight:700}</style></head><body><main class="box"><div class="code">404</div><h1>Такой страницы нет</h1><p>Возможно, ссылка устарела или адрес введён с ошибкой. Вернитесь на главную и продолжите знакомство с Paw Art Studio.</p><a href="/">На главную</a></main></body></html>`);
+});
+
+/* ==================== SERVER ==================== */
+server.listen(PORT, HOST, () => {
+  console.log(`🚀 Paw Art Studio запущен на http://${HOST}:${PORT}`);
+  console.log(`🌐 Сайт: ${SITE_URL}`);
+});
+
+process.on('SIGTERM', () => { db.close(); server.close(() => process.exit(0)); });
