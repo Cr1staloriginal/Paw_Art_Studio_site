@@ -496,6 +496,10 @@ function closeContentEditor() {
 
 function renderContentEditor() {
     const c = state.content || {};
+    Object.entries(PACKAGES).forEach(([packageId, pkg]) => pkg.items.forEach(item => {
+        const key = `package_${packageId}_${item.id.replace(/-/g, '_')}_price`;
+        if (c[key] === undefined || c[key] === null || String(c[key]).trim() === '') c[key] = String(item.price);
+    }));
     applyPackagePrices(c);
     const wrap = document.getElementById('contentEditorWrap');
     if (!wrap) return;
