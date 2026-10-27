@@ -312,20 +312,20 @@ function updateUI() {
         else if (u.role === 'admin') { pendingBlock.classList.add('hidden'); requestBlock.classList.add('hidden'); }
         else { pendingBlock.classList.add('hidden'); requestBlock.classList.remove('hidden'); }
 
+        const canEditSite = u.role === 'admin' || u.role === 'manager';
         if (u.role === 'admin') {
             adminBtn.classList.remove('hidden'); adminMenuLink.classList.remove('hidden');
             const isRoot = u.isRoot === true || Number(u.isRoot ?? u.is_root ?? 0) === 1;
             const editorAdminButton = document.getElementById('contentEditorAdminButton');
             adminBtn.style.background = isRoot ? 'linear-gradient(135deg, #fbbf24, #f59e0b)' : '';
             adminBtn.title = isRoot ? '👑 Главный админ' : 'Админ';
-            // Управление контентом и ценами доступно всем администраторам.
             if (contentLink) contentLink.classList.remove('hidden');
             if (editorAdminButton) editorAdminButton.classList.remove('hidden');
         } else {
             adminBtn.classList.add('hidden'); adminMenuLink.classList.add('hidden');
-            if (contentLink) contentLink.classList.add('hidden');
+            if (contentLink) contentLink.classList.toggle('hidden', !canEditSite);
             const editorAdminButton = document.getElementById('contentEditorAdminButton');
-            if (editorAdminButton) editorAdminButton.classList.add('hidden');
+            if (editorAdminButton) editorAdminButton.classList.toggle('hidden', !canEditSite);
         }
         if (u.role === 'executor') createProjectBtn.classList.add('hidden'); else createProjectBtn.classList.remove('hidden');
     } else {
@@ -437,7 +437,7 @@ const CONTENT_FIELDS = [
 
 async function openContentEditor() {
     if (!state.user) return openAuth();
-    if (state.user.role !== 'admin') return showToast('⛔ Только администраторы могут изменять сайт', 'error');
+    if (!['admin', 'manager'].includes(state.user.role)) return showToast('⛔ Нет доступа к редактору сайта', 'error');
 
     const modal = document.getElementById('contentModal');
     if (!modal) return showToast('❌ Окно редактора не найдено', 'error');
@@ -995,10 +995,11 @@ async function openMyPortfolio() {
 
     const user = state.user;
     const isAdmin = user.role === 'admin' || user.isRoot === true || Number(user.is_root) === 1;
+    const isEditor = user.role === 'manager';
     const isExecutor = user.role === 'executor';
 
-    if (!isAdmin && !isExecutor) {
-        return showToast('⚠️ Портфолио доступно исполнителям и администраторам', 'error');
+    if (!isAdmin && !isEditor && !isExecutor) {
+        return showToast('⚠️ Портфолио доступно редакторам, исполнителям и администраторам', 'error');
     }
 
     const modal = document.getElementById('myPortfolioModal');
@@ -1074,8 +1075,9 @@ async function handlePortfolioUpload(e) {
     if (!user) return showToast('⚠️ Сначала войдите в аккаунт', 'error');
 
     const isAdmin = user.role === 'admin' || user.isRoot === true || Number(user.is_root) === 1;
+    const isEditor = user.role === 'manager';
     const isExecutor = user.role === 'executor';
-    if (!isAdmin && !isExecutor) return showToast('❌ Недостаточно прав', 'error');
+    if (!isAdmin && !isEditor && !isExecutor) return showToast('❌ Недостаточно прав', 'error');
 
     const form = e.currentTarget;
     const fileInput = document.getElementById('portfolioInput');
@@ -1094,7 +1096,7 @@ async function handlePortfolioUpload(e) {
     fd.append('description', description);
     fd.append('category', category);
 
-    if (isAdmin) {
+    if (isAdmin || isEditor) {
         const authorName = document.getElementById('portAuthorName')?.value.trim() || '';
         const authorUserId = document.getElementById('portAuthorUser')?.value || '';
         if (!authorUserId && !authorName) return showToast('⚠️ Укажите имя автора', 'error');
