@@ -1003,14 +1003,15 @@ async function openMyPortfolio() {
     }
 
     const modal = document.getElementById('myPortfolioModal');
+    const isEditor = user.role === 'manager';
     const authorBlock = document.getElementById('adminAuthorBlock');
-    if (authorBlock) authorBlock.classList.toggle('hidden', !isAdmin);
+    if (authorBlock) authorBlock.classList.toggle('hidden', !isAdmin && !isEditor);
 
     modal.classList.add('open');
     document.body.style.overflow = 'hidden';
     document.getElementById('userMenu')?.classList.add('hidden');
 
-    if (isAdmin) await loadPortfolioAuthors();
+    if (isAdmin || isEditor) await loadPortfolioAuthors();
     await loadMyPortfolio();
 }
 
