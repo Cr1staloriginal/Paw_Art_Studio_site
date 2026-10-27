@@ -668,7 +668,17 @@ const CONTENT_KEY_ALLOWLIST = new Set([
   ...Array.from({ length: 5 }, (_, i) => i + 1).flatMap(n => [
     `pricing_${n}_name`, `pricing_${n}_price`, `pricing_${n}_features`,
     `faq_${n}_q`, `faq_${n}_a`
-  ])
+  ]),
+  ...[
+    'package_ds_avatar_price', 'package_ds_banner_price', 'package_ds_sticker_price',
+    'package_ds_mascot_price', 'package_ds_roles_price', 'package_ds_boost_price',
+    'package_streamer_model2d_price', 'package_streamer_emoji_price',
+    'package_streamer_art_price', 'package_streamer_overlay_price',
+    'package_brand_brand_mascot_price', 'package_brand_brand_sticker_price',
+    'package_brand_brand_overlay_price', 'package_full_full_mascot_price',
+    'package_full_full_sticker_price', 'package_full_full_overlay_price',
+    'package_full_full_banner_price', 'package_full_full_animation_price'
+  ]
 ]);
 
 app.post('/api/admin/content', auth, siteEditorOnly, (req, res) => {
