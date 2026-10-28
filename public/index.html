@@ -425,7 +425,7 @@
                 <div class="balance-value" id="dashBalance">0 ₽</div>
                 <div class="balance-actions">
                     <button class="btn" onclick="openDeposit()"><i class="fas fa-plus"></i> Пополнить</button>
-                    <button class="btn btn-outline" onclick="openWithdraw()"><i class="fas fa-arrow-up"></i> Вывести</button>
+                    <button type="button" class="btn btn-outline" onclick="openWithdraw()"><i class="fas fa-arrow-up"></i> Вывести</button>
                 </div>
                 <div class="commission-note"><i class="fas fa-info-circle"></i> Комиссия <strong>0%</strong>. Пополнение через ЮKassa.</div>
             </div>
@@ -637,11 +637,11 @@
             <label>Номер карты для вывода</label>
             <input type="text" id="moneyCard" inputmode="numeric" placeholder="0000 0000 0000 0000" maxlength="23" />
             <p style="font-size:0.8rem;color:var(--text-mute);margin-top:6px;">
-                Заявку рассмотрит администратор. Перевод выполняется вручную.
+                Только для исполнителей. Администратор проверит заявку и вручную переведёт сумму на указанную карту. При отказе сумма вернётся на баланс.
             </p>
         </div>
         <div class="money-note" id="moneyNote">Комиссия <strong>0%</strong>. Оплата через ЮKassa.</div>
-        <button class="btn" id="moneySubmit" onclick="submitMoney()">Перейти к оплате</button>
+        <button type="button" class="btn" id="moneySubmit" onclick="submitMoney()">Перейти к оплате</button>
     </div>
 </div>
 
