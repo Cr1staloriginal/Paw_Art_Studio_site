@@ -775,35 +775,71 @@ app.post('/api/payments/create', auth, async (req, res) => {
   }
 });
 
-app.post('/api/payments/webhook', express.json(), (req, res) => {
+app.post('/api/payments/webhook', async (req, res) => {
   const { event, object } = req.body || {};
-  console.log('🔔 Webhook:', event, object?.id);
+  if (event !== 'payment.succeeded' || !object?.id) return res.status(200).send('OK');
 
-  if (event === 'payment.succeeded' && object) {
-    const userId = parseInt(object.metadata?.userId, 10);
-    const amount = Math.round(parseFloat(object.amount?.value || '0') * 100);
+  // Never trust the webhook payload alone: fetch the payment from YooKassa.
+  // Unknown payments, mismatched users and mismatched amounts are ignored.
+  try {
+    if (!process.env.YOOKASSA_SHOP_ID || !process.env.YOOKASSA_SECRET_KEY) {
+      console.error('❌ YooKassa webhook ignored: credentials are not configured');
+      return res.status(503).send('Payment verification unavailable');
+    }
 
-    if (userId && amount > 0) {
-      const existing = db.prepare('SELECT id, status FROM payments WHERE payment_id = ?').get(object.id);
-      if (existing && existing.status === 'succeeded') return res.status(200).send('OK');
+    const authHeader = 'Basic ' + Buffer.from(
+      process.env.YOOKASSA_SHOP_ID + ':' + process.env.YOOKASSA_SECRET_KEY
+    ).toString('base64');
+    const verifyResponse = await fetch(
+      'https://api.yookassa.ru/v3/payments/' + encodeURIComponent(String(object.id)),
+      { headers: { Authorization: authHeader, Accept: 'application/json' } }
+    );
+    if (!verifyResponse.ok) {
+      console.warn('⚠️ YooKassa webhook: payment verification failed', verifyResponse.status);
+      return res.status(502).send('Payment verification failed');
+    }
 
-      if (existing) {
-        db.prepare('UPDATE payments SET status = ? WHERE payment_id = ?').run('succeeded', object.id);
-      } else {
-        db.prepare(`INSERT INTO payments (user_id, payment_id, amount, status, created_at)
-                    VALUES (?, ?, ?, 'succeeded', ?)`).run(userId, object.id, amount, Date.now());
-      }
+    const verified = await verifyResponse.json();
+    if (verified.status !== 'succeeded' || verified.paid !== true) {
+      console.warn('⚠️ YooKassa webhook ignored: payment is not succeeded');
+      return res.status(200).send('OK');
+    }
+
+    const userId = Number(verified.metadata?.userId);
+    const amount = Math.round(Number(verified.amount?.value) * 100);
+    if (!Number.isSafeInteger(userId) || userId <= 0 ||
+        !Number.isSafeInteger(amount) || amount <= 0) {
+      console.warn('⚠️ YooKassa webhook ignored: invalid verified metadata or amount');
+      return res.status(200).send('OK');
+    }
+
+    const applyPayment = db.transaction(() => {
+      const payment = db.prepare(
+        'SELECT id, user_id, amount, status FROM payments WHERE payment_id = ?'
+      ).get(String(verified.id));
+
+      // Only credit a payment created by this application, once, to its original user.
+      if (!payment || Number(payment.user_id) !== userId ||
+          Number(payment.amount) !== amount || payment.status === 'succeeded') return false;
 
       const user = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
-      if (user) {
-        db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(amount, userId);
-        db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at)
-                    VALUES (?, 'Пополнение через ЮKassa', ?, 'in', ?)`).run(userId, amount, Date.now());
-        console.log(`✅ Зачислено ${amount / 100} ₽ → #${userId}`);
-      }
-    }
+      if (!user) return false;
+
+      db.prepare("UPDATE payments SET status = 'succeeded' WHERE id = ?").run(payment.id);
+      db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(amount, userId);
+      db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at)
+                  VALUES (?, 'Пополнение через ЮKassa', ?, 'in', ?)`)
+        .run(userId, amount, Date.now());
+      return true;
+    });
+
+    const credited = applyPayment();
+    if (credited) console.log(`✅ Проверенный платёж ЮKassa зачислен: ${amount / 100} ₽ → #${userId}`);
+    return res.status(200).send('OK');
+  } catch (err) {
+    console.error('❌ Ошибка проверки webhook YooKassa:', err?.message || err);
+    return res.status(500).send('Webhook processing failed');
   }
-  res.status(200).send('OK');
 });
 
 /* ==================== PROFILE ==================== */
@@ -846,13 +882,11 @@ app.post('/api/profile/avatar', auth, upload.single('avatar'), (req, res) => {
 
 /* ==================== WALLET ==================== */
 app.post('/api/wallet/deposit', auth, (req, res) => {
-  const k = Math.round(Number(req.body?.amount) * 100);
-  if (!k || isNaN(k) || k <= 0) return res.status(400).json({ error: 'Некорректная сумма' });
-  db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(k, req.user.id);
-  db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at)
-              VALUES (?, 'Пополнение баланса', ?, 'in', ?)`).run(req.user.id, k, Date.now());
-  const u = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
-  res.json({ user: publicUser(u) });
+  // A client must never be able to mint balance by posting an arbitrary amount.
+  // Real deposits must go through /api/payments/create and a verified YooKassa webhook.
+  return res.status(410).json({
+    error: 'Прямое пополнение отключено. Используйте защищённую оплату через ЮKassa.'
+  });
 });
 
 app.post('/api/wallet/withdraw', auth, (req, res) => {
