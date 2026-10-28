@@ -73,7 +73,7 @@ const storage = multer.diskStorage({
 const upload = multer({
   storage,
   limits: { fileSize: 5 * 1024 * 1024 },
-  fileFilter: (req, file, cb) => cb(null, /^image\/(png|jpe?g|gif|webp)$/i.test(file.mimetype)),
+  fileFilter: (req, file, cb) => cb(null, /^image\/(png|jpe?g|gif|webp|avif)$/i.test(file.mimetype)),
 });
 
 const contentStorage = multer.diskStorage({
@@ -663,7 +663,7 @@ const CONTENT_KEY_ALLOWLIST = new Set([
   'about_stat_3', 'about_stat_3_desc', 'contact_discord', 'contact_telegram',
   'contact_email', 'support_email', 'support_telegram', 'footer_text',
   ...Array.from({ length: 7 }, (_, i) => i + 1).flatMap(n => [
-    `service_${n}_name`, `service_${n}_desc`, `service_${n}_price`, `service_${n}_image`
+    `service_${n}_name`, `service_${n}_desc`, `service_${n}_price`, `service_${n}_unit_price`, `service_${n}_image`
   ]),
   ...Array.from({ length: 5 }, (_, i) => i + 1).flatMap(n => [
     `pricing_${n}_name`, `pricing_${n}_price`, `pricing_${n}_features`,
@@ -677,7 +677,8 @@ const CONTENT_KEY_ALLOWLIST = new Set([
     'package_brand_brand_mascot_price', 'package_brand_brand_sticker_price',
     'package_brand_brand_overlay_price', 'package_full_full_mascot_price',
     'package_full_full_sticker_price', 'package_full_full_overlay_price',
-    'package_full_full_banner_price', 'package_full_full_animation_price'
+    'package_full_full_banner_price', 'package_full_full_animation_price',
+    'package_offer_1_price', 'package_offer_2_price'
   ]
 ]);
 
@@ -695,7 +696,8 @@ app.post('/api/admin/content', auth, siteEditorOnly, (req, res) => {
       return res.status(400).json({ error: `Недопустимое значение для ${key}` });
     if (String(value ?? '').length > 20000)
       return res.status(400).json({ error: `Поле ${key} слишком длинное` });
-    if (key.startsWith('package_') && key.endsWith('_price')) {
+    if ((key.startsWith('package_') && key.endsWith('_price')) ||
+        (key.startsWith('service_') && key.endsWith('_unit_price'))) {
       const price = Number(value);
       if (String(value ?? '').trim() === '' || !Number.isFinite(price) || price < 0 || price > 10000000)
         return res.status(400).json({ error: `Цена ${key} должна быть числом от 0 до 10 000 000 ₽` });
@@ -1521,7 +1523,19 @@ function portfolioUploadAccess(req, res, next) {
   return res.status(403).json({ error: 'Нет прав для загрузки работ в портфолио' });
 }
 
-app.post('/api/portfolio', auth, portfolioUploadAccess, upload.single('image'), (req, res) => {
+function portfolioUploadMiddleware(req, res, next) {
+  upload.single('image')(req, res, err => {
+    if (err) {
+      if (err.code === 'LIMIT_FILE_SIZE') return res.status(413).json({ error: 'Изображение больше 5 МБ' });
+      console.error('Ошибка приёма файла портфолио:', err.message);
+      return res.status(400).json({ error: 'Не удалось принять изображение. Используйте PNG, JPG, WEBP, AVIF или GIF до 5 МБ.' });
+    }
+    if (!req.file) return res.status(400).json({ error: 'Выберите изображение PNG, JPG, WEBP, AVIF или GIF до 5 МБ.' });
+    next();
+  });
+}
+
+app.post('/api/portfolio', auth, portfolioUploadAccess, portfolioUploadMiddleware, (req, res) => {
   try {
     if (!req.file) return res.status(400).json({ error: 'Файл не загружен' });
 
