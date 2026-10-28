@@ -1043,7 +1043,6 @@ async function openMyPortfolio() {
     }
 
     const modal = document.getElementById('myPortfolioModal');
-    const isEditor = user.role === 'manager';
     const authorBlock = document.getElementById('adminAuthorBlock');
     if (authorBlock) authorBlock.classList.toggle('hidden', !isAdmin && !isEditor);
 
