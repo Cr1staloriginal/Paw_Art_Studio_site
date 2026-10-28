@@ -748,6 +748,8 @@ function openDeposit() {
     document.body.style.overflow = 'hidden';
 }
 function openWithdraw() {
+    if (!state.user) return openAuth();
+    if (state.user.role !== 'executor') return showToast('Вывод средств доступен только исполнителям заказов', 'error');
     state.moneyMode = 'withdraw';
     document.getElementById('moneyTitle').textContent = 'Заявка на вывод';
     document.getElementById('moneySub').textContent = 'Админ подтвердит вручную';
@@ -771,8 +773,8 @@ async function submitMoney() {
     const btn = document.getElementById('moneySubmit'); btn.disabled = true; const oldText = btn.textContent;
     try {
         if (state.moneyMode === 'withdraw') {
-            const cardNumber = document.getElementById('moneyCard').value.replace(/\s/g, '');
-            if (cardNumber.length < 16) { showToast('⚠️ Введите корректный номер карты (16 цифр)', 'error'); btn.disabled = false; return; }
+            const cardNumber = document.getElementById('moneyCard').value.replace(/[\s-]/g, '');
+            if (!/^\d{16,19}$/.test(cardNumber)) { showToast('⚠️ Введите номер карты из 16–19 цифр', 'error'); btn.disabled = false; return; }
             const { user } = await api('/api/wallet/withdraw', { method: 'POST', body: { amount, cardNumber } });
             state.user = user; updateUI(); closeMoney(); await loadDashboardData();
             showToast(`⏳ Заявка на вывод отправлена`);
@@ -1400,7 +1402,7 @@ function renderAdminWithdrawals() {
     const list = document.getElementById('withdrawalsList'); const badge = document.getElementById('wdCount'); if (!list) return;
     const pending = state.adminWithdrawals.filter(w => w.status === 'pending'); badge.textContent = pending.length;
     if (!state.adminWithdrawals.length) { list.innerHTML = '<div class="admin-empty">💸 Нет заявок</div>'; return; }
-    list.innerHTML = state.adminWithdrawals.map(w => { const cls = WD_STATUS_CLASS[w.status] || 'status-review'; const av = w.user.avatar ? `<img src="${escapeHtml(w.user.avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : escapeHtml(w.user.name.charAt(0).toUpperCase()); const actions = w.status === 'pending' ? `<div class="request-actions" style="margin-top:10px"><button class="admin-act-btn primary" onclick="approveWithdrawal(${w.id})"><i class="fas fa-check"></i> Одобрить</button><button class="admin-act-btn danger" onclick="rejectWithdrawal(${w.id})"><i class="fas fa-times"></i> Отклонить</button></div>` : ''; const card = w.cardNumber ? `<div class="wd-date">💳 ${escapeHtml(w.cardNumber)}</div>` : ''; return `<div class="withdrawal-card ${w.status === 'pending' ? 'pending' : ''}"><div class="wd-head"><div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0"><div class="admin-user-avatar" style="width:36px;height:36px;font-size:0.9rem">${av}</div><div style="min-width:0;flex:1"><div class="wd-user">${escapeHtml(w.user.name)}</div><div class="wd-email">${escapeHtml(w.user.email)}</div></div></div><div class="wd-amount">${formatMoney(w.amount)}</div><span class="project-status ${cls}">${WD_STATUS[w.status]}</span></div>${card}<div class="wd-date">Создано: ${formatDateTime(w.createdAt)}</div>${w.reviewedAt ? `<div class="wd-date">Рассмотрено: ${formatDateTime(w.reviewedAt)}</div>` : ''}${w.comment ? `<div class="wd-comment">💬 ${escapeHtml(w.comment)}</div>` : ''}${actions}</div>`; }).join('');
+    list.innerHTML = state.adminWithdrawals.map(w => { const cls = WD_STATUS_CLASS[w.status] || 'status-review'; const av = w.user.avatar ? `<img src="${escapeHtml(w.user.avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : escapeHtml(w.user.name.charAt(0).toUpperCase()); const actions = w.status === 'pending' ? `<div class="request-actions" style="margin-top:10px"><button class="admin-act-btn primary" onclick="approveWithdrawal(${w.id})"><i class="fas fa-check"></i> Подтвердить перевод</button><button class="admin-act-btn danger" onclick="rejectWithdrawal(${w.id})"><i class="fas fa-times"></i> Отклонить</button></div>` : ''; const card = w.cardNumber ? `<div class="wd-date">💳 ${escapeHtml(w.cardNumber)}</div>` : ''; return `<div class="withdrawal-card ${w.status === 'pending' ? 'pending' : ''}"><div class="wd-head"><div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0"><div class="admin-user-avatar" style="width:36px;height:36px;font-size:0.9rem">${av}</div><div style="min-width:0;flex:1"><div class="wd-user">${escapeHtml(w.user.name)}</div><div class="wd-email">${escapeHtml(w.user.email)}</div></div></div><div class="wd-amount">${formatMoney(w.amount)}</div><span class="project-status ${cls}">${WD_STATUS[w.status]}</span></div>${card}<div class="wd-date">Создано: ${formatDateTime(w.createdAt)}</div>${w.reviewedAt ? `<div class="wd-date">Рассмотрено: ${formatDateTime(w.reviewedAt)}</div>` : ''}${w.comment ? `<div class="wd-comment">💬 ${escapeHtml(w.comment)}</div>` : ''}${actions}</div>`; }).join('');
 }
 async function approveWithdrawal(id) { if (!confirm('Подтвердить выплату?')) return; try { await api(`/api/admin/withdrawals/${id}/approve`, { method: 'POST' }); showToast('✅ Одобрено'); await loadAdminData(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 async function rejectWithdrawal(id) { const comment = prompt('Причина отклонения:', ''); if (comment === null) return; try { await api(`/api/admin/withdrawals/${id}/reject`, { method: 'POST', body: { comment } }); showToast('↩️ Отклонено'); await loadAdminData(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
