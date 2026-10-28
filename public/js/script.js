@@ -390,10 +390,11 @@ function applyContent(c) {
         const servicePrice = String(c[`service_${i}_price`] ?? '').trim();
         const priceNode = document.querySelector(`[data-content="service_${i}_price"]`);
         const serviceCard = priceNode?.closest('.service-card');
-        if (serviceCard && servicePrice) {
-            serviceCard.dataset.price = servicePrice;
-            const numericPrice = Number(servicePrice.replace(/[^0-9,\.]/g, '').replace(',', '.'));
-            if (Number.isFinite(numericPrice) && numericPrice > 0) serviceCard.dataset.unitPrice = String(numericPrice);
+        if (serviceCard && servicePrice) serviceCard.dataset.price = servicePrice;
+        const savedUnitPrice = c[`service_${i}_unit_price`];
+        if (serviceCard && savedUnitPrice !== undefined && String(savedUnitPrice).trim() !== '') {
+            const unitPrice = Number(savedUnitPrice);
+            if (Number.isFinite(unitPrice) && unitPrice >= 0) serviceCard.dataset.unitPrice = String(unitPrice);
         }
         const serviceName = c[`service_${i}_name`];
         const serviceDesc = c[`service_${i}_desc`];
@@ -412,6 +413,8 @@ function applyContent(c) {
         const ul = document.querySelector(`[data-content="pricing_${i}_features"]`);
         if (ul && features.length) ul.innerHTML = features.map(f => `<li><i class="fas fa-check"></i> ${escapeHtml(f.trim())}</li>`).join('');
     }
+    setText('[data-content="package_offer_1_price"]', c.package_offer_1_price);
+    setText('[data-content="package_offer_2_price"]', c.package_offer_2_price);
     ['about_text','about_quote','about_stat_1','about_stat_1_desc','about_stat_2','about_stat_2_desc','about_stat_3','about_stat_3_desc'].forEach(k => setText(`[data-content="${k}"]`, c[k]));
     setText('[data-content="contact_discord"]', c.contact_discord);
     setText('[data-content="contact_telegram"]', c.contact_telegram);
@@ -433,11 +436,15 @@ const CONTENT_FIELDS = [
         { key: 'hero_image', label: 'Фоновое изображение', type: 'image' },
     ]},
     { section: '🛠 Услуги', fields: Array.from({ length: 7 }, (_, i) => { const n = i + 1; return [
-        { key: `service_${n}_name`, label: `Услуга ${n} — название` }, { key: `service_${n}_desc`, label: `Услуга ${n} — описание`, type: 'textarea' }, { key: `service_${n}_price`, label: `Услуга ${n} — цена` }, { key: `service_${n}_image`, label: `Услуга ${n} — изображение`, type: 'image' },
+        { key: `service_${n}_name`, label: `Услуга ${n} — название` }, { key: `service_${n}_desc`, label: `Услуга ${n} — описание`, type: 'textarea' }, { key: `service_${n}_price`, label: `Услуга ${n} — цена на карточке` }, { key: `service_${n}_unit_price`, label: `Услуга ${n} — цена за единицу в калькуляторе (₽)`, type: 'number' }, { key: `service_${n}_image`, label: `Услуга ${n} — изображение`, type: 'image' },
     ]; }).flat() },
     { section: '💰 Тарифы', fields: Array.from({ length: 5 }, (_, i) => { const n = i + 1; return [
         { key: `pricing_${n}_name`, label: `Тариф ${n} — название` }, { key: `pricing_${n}_price`, label: `Тариф ${n} — цена` }, { key: `pricing_${n}_features`, label: `Тариф ${n} — фичи (через |)`, type: 'textarea' },
     ]; }).flat() },
+    { section: '📌 Отображаемые цены пакетов', fields: [
+        { key: 'package_offer_1_price', label: 'Пак «Бренд» — текст цены' },
+        { key: 'package_offer_2_price', label: 'Пак «Под ключ» — текст цены' },
+    ]},
     { section: '📦 Цены элементов пакетов (₽ за штуку)', fields: [
         { key: 'package_ds_avatar_price', label: 'Пак DS — Ава', type: 'number' },
         { key: 'package_ds_banner_price', label: 'Пак DS — Баннер сезонный', type: 'number' },
@@ -496,6 +503,30 @@ function closeContentEditor() {
 
 function renderContentEditor() {
     const c = state.content || {};
+    // Seed editable price fields from the currently visible site when no saved value exists.
+    for (let i = 1; i <= 7; i++) {
+        const priceNode = document.querySelector(`[data-content="service_${i}_price"]`);
+        const card = priceNode?.closest('.service-card');
+        const unitKey = `service_${i}_unit_price`;
+        if (c[`service_${i}_price`] === undefined || String(c[`service_${i}_price`]).trim() === '') {
+            if (priceNode?.textContent.trim()) c[`service_${i}_price`] = priceNode.textContent.trim();
+        }
+        if (c[unitKey] === undefined || String(c[unitKey]).trim() === '') {
+            if (card?.dataset.unitPrice) c[unitKey] = card.dataset.unitPrice;
+        }
+    }
+    for (let i = 1; i <= 5; i++) {
+        const node = document.querySelector(`[data-content="pricing_${i}_price"]`);
+        const key = `pricing_${i}_price`;
+        if ((c[key] === undefined || String(c[key]).trim() === '') && node?.textContent.trim()) c[key] = node.textContent.trim();
+    }
+    for (const [key, selector] of [
+        ['package_offer_1_price', '[data-content="package_offer_1_price"]'],
+        ['package_offer_2_price', '[data-content="package_offer_2_price"]']
+    ]) {
+        const node = document.querySelector(selector);
+        if ((c[key] === undefined || String(c[key]).trim() === '') && node?.textContent.trim()) c[key] = node.textContent.trim();
+    }
     Object.entries(PACKAGES).forEach(([packageId, pkg]) => pkg.items.forEach(item => {
         const key = `package_${packageId}_${item.id.replace(/-/g, '_')}_price`;
         if (c[key] === undefined || c[key] === null || String(c[key]).trim() === '') c[key] = String(item.price);
@@ -1107,7 +1138,22 @@ function renderMyPortfolio() {
     if (!state.myPortfolio.length) { grid.innerHTML = `<div class="empty-state small"><i class="fas fa-image"></i><p>Пока нет работ</p></div>`; return; }
     grid.innerHTML = state.myPortfolio.map(it => `<div class="my-portfolio-item"><img src="${escapeHtml(it.filename)}" alt="${escapeHtml(it.title)}"><button class="my-portfolio-delete" onclick="deletePortfolioItem(${it.id})">×</button></div>`).join('');
 }
-function previewPortfolioFile(e) { const f = e.target.files?.[0]; if (!f) return; if (f.size > 5 * 1024 * 1024) { showToast('❌ Максимум 5 МБ', 'error'); e.target.value = ''; return; } document.getElementById('uploadZoneText').textContent = f.name; }
+function previewPortfolioFile(e) {
+    const f = e.target.files?.[0];
+    if (!f) return;
+    if (f.size > 5 * 1024 * 1024) {
+        showToast('Файл слишком большой. Максимум — 5 МБ', 'error');
+        e.target.value = '';
+        return;
+    }
+    if (f.type && !/^image\/(png|jpe?g|gif|webp|avif)$/i.test(f.type)) {
+        showToast('Поддерживаются PNG, JPG, WEBP, AVIF и GIF', 'error');
+        e.target.value = '';
+        return;
+    }
+    const label = document.getElementById('uploadZoneText');
+    if (label) label.textContent = f.name;
+}
 async function handlePortfolioUpload(e) {
     e.preventDefault();
 
@@ -1124,6 +1170,9 @@ async function handlePortfolioUpload(e) {
     const file = fileInput?.files?.[0];
     if (!file) return showToast('⚠️ Выберите изображение', 'error');
     if (file.size > 5 * 1024 * 1024) return showToast('⚠️ Максимальный размер — 5 МБ', 'error');
+    if (file.type && !/^image\/(png|jpe?g|gif|webp|avif)$/i.test(file.type)) {
+        return showToast('Поддерживаются PNG, JPG, WEBP, AVIF и GIF', 'error');
+    }
 
     const title = document.getElementById('portTitle').value.trim();
     const description = document.getElementById('portDescription').value.trim();
