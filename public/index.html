@@ -186,14 +186,14 @@
                         <div class="package-offer-icon">✨</div>
                         <h4>Пак «Бренд»</h4>
                         <p>Комплект из маскота, 10 стикеров и оверлея. Настройте состав и посмотрите предварительную цену.</p>
-                        <div class="package-offer-price">Ориентир: 10 000–12 000 ₽</div>
+                        <div class="package-offer-price" data-content="package_offer_1_price">Ориентир: 10 000–12 000 ₽</div>
                         <button class="btn" type="button" onclick="openPackageConfigurator('brand')">Настроить пак</button>
                     </article>
                     <article class="package-offer-card">
                         <div class="package-offer-icon">🚀</div>
                         <h4>Пак «Под ключ»</h4>
                         <p>Расширенное оформление: маскот, стикеры, оверлей, баннеры и анимация.</p>
-                        <div class="package-offer-price">Ориентир: 15 000–20 000 ₽</div>
+                        <div class="package-offer-price" data-content="package_offer_2_price">Ориентир: 15 000–20 000 ₽</div>
                         <button class="btn" type="button" onclick="openPackageConfigurator('full')">Настроить пак</button>
                     </article>
                 </div>
@@ -517,7 +517,7 @@
             <div class="upload-zone" onclick="document.getElementById('portfolioInput').click()">
                 <i class="fas fa-cloud-upload-alt"></i>
                 <p id="uploadZoneText">Нажмите, чтобы выбрать изображение</p>
-                <input type="file" id="portfolioInput" accept="image/*" hidden onchange="previewPortfolioFile(event)" />
+                <input type="file" id="portfolioInput" accept="image/png,image/jpeg,image/webp,image/avif,image/gif" hidden onchange="previewPortfolioFile(event)" />
             </div>
             <label>Название *</label><input type="text" id="portTitle" placeholder="Например: Маскот для кофейни" required maxlength="120" />
             <label>Описание</label><textarea id="portDescription" placeholder="Коротко о работе" maxlength="500" style="min-height:60px;"></textarea>
