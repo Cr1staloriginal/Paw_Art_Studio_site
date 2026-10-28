@@ -892,24 +892,24 @@ app.post('/api/wallet/deposit', auth, (req, res) => {
 });
 
 app.post('/api/wallet/withdraw', auth, (req, res) => {
+  if (req.user.role !== 'executor')
+    return res.status(403).json({ error: 'Вывод средств доступен только исполнителям заказов' });
+
   const { amount, cardNumber } = req.body || {};
-  const k = Math.round(Number(amount) * 100);
-  if (!k || isNaN(k) || k <= 0) return res.status(400).json({ error: 'Некорректная сумма' });
+  const numericAmount = Number(amount);
+  const k = Math.round(numericAmount * 100);
+  if (!Number.isFinite(numericAmount) || !k || k <= 0) return res.status(400).json({ error: 'Некорректная сумма' });
   if (k < 100) return res.status(400).json({ error: 'Минимум 1 ₽' });
-  if (!cardNumber || String(cardNumber).replace(/\s/g, '').length < 16)
-    return res.status(400).json({ error: 'Укажите корректный номер карты (16 цифр)' });
+
+  const cleanCard = String(cardNumber || '').replace(/[\s-]/g, '');
+  if (!/^\d{16,19}$/.test(cleanCard))
+    return res.status(400).json({ error: 'Укажите корректный номер карты (16–19 цифр)' });
 
   const user = db.prepare('SELECT * FROM users WHERE id = ?').get(req.user.id);
-  if (user.balance < k) return res.status(400).json({ error: 'Недостаточно средств' });
+  if (!user || user.balance < k) return res.status(400).json({ error: 'Недостаточно средств' });
 
-  const pendingSum = db.prepare(`SELECT COALESCE(SUM(amount),0) AS s FROM withdrawals
-                                 WHERE user_id = ? AND status = 'pending'`).get(user.id).s;
-  if (user.balance - pendingSum < k)
-    return res.status(400).json({ error: 'Недостаточно средств (учитывая заявки)' });
-
+  // Средства резервируются списанием при создании заявки; отказ вернёт их на баланс.
   const now = Date.now();
-  const cleanCard = String(cardNumber).replace(/\s/g, '');
-
   const tx = db.transaction(() => {
     db.prepare('UPDATE users SET balance = balance - ? WHERE id = ?').run(k, user.id);
     const info = db.prepare(`INSERT INTO withdrawals (user_id, amount, status, card_number, created_at)
@@ -1348,9 +1348,15 @@ app.post('/api/admin/withdrawals/:id/approve', auth, adminOnly, (req, res) => {
   if (!wd) return res.status(404).json({ error: 'Заявка не найдена' });
   if (wd.status !== 'pending') return res.status(400).json({ error: 'Заявка уже обработана' });
 
-  db.prepare(`UPDATE withdrawals SET status = 'approved', admin_comment = ?,
-              reviewed_at = ?, reviewed_by = ? WHERE id = ?`)
-    .run(adminComment || 'Перевод выполнен', Date.now(), req.user.id, wd.id);
+  // Подтверждать следует только после фактического ручного перевода денег.
+  const tx = db.transaction(() => {
+    db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at)
+                VALUES (?, 'Вывод средств', ?, 'out', ?)`).run(wd.user_id, wd.amount, Date.now());
+    db.prepare(`UPDATE withdrawals SET status = 'approved', admin_comment = ?,
+                reviewed_at = ?, reviewed_by = ? WHERE id = ? AND status = 'pending'`)
+      .run(adminComment || 'Перевод выполнен вручную', Date.now(), req.user.id, wd.id);
+  });
+  tx();
 
   const updated = db.prepare('SELECT * FROM withdrawals WHERE id = ?').get(wd.id);
   res.json({ withdrawal: withdrawalRow(updated) });
