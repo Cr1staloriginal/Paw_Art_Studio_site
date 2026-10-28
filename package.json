@@ -10,7 +10,11 @@
   "engines": {
     "node": ">=18"
   },
-  "keywords": ["paw-art-studio", "express", "sqlite"],
+  "keywords": [
+    "paw-art-studio",
+    "express",
+    "sqlite"
+  ],
   "license": "UNLICENSED",
   "private": true,
   "dependencies": {
@@ -23,6 +27,6 @@
     "multer": "^1.4.5-lts.1",
     "nodemailer": "^6.9.15",
     "socket.io": "^4.7.5",
-    "yookassa-api-sdk": "^2.0.0"
+    "yookassa-api-sdk": "0.1.1"
   }
 }
