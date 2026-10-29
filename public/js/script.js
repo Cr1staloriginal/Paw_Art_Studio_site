@@ -575,7 +575,28 @@ async function uploadContentImage(e, key) {
 async function saveContent() {
     const inputs = document.querySelectorAll('#contentEditorWrap [data-content-key]');
     const updates = {};
-    inputs.forEach(input => { updates[input.dataset.contentKey] = input.value.trim(); });
+    let invalidPriceInput = null;
+    inputs.forEach(input => {
+        const key = input.dataset.contentKey;
+        const value = input.value.trim();
+        updates[key] = value;
+        if (/^service_\\d+_unit_price$/.test(key) && value !== '') {
+            const normalized = value.replace(',', '.');
+            const price = Number(normalized);
+            if (!/^\\d+(?:\\.\\d{1,2})?$/.test(normalized) ||
+                !Number.isFinite(price) || price < 0 || price > 10000000) {
+                invalidPriceInput = input;
+            }
+        }
+    });
+    if (invalidPriceInput) {
+        invalidPriceInput.focus();
+        invalidPriceInput.setCustomValidity('Введите число от 0 до 10 000 000 ₽ или оставьте поле пустым');
+        invalidPriceInput.reportValidity();
+        invalidPriceInput.addEventListener('input', () => invalidPriceInput.setCustomValidity(''), { once: true });
+        showToast('⚠️ Проверьте цену услуги: допустимо число или пустое поле', 'error');
+        return;
+    }
     const btn = document.getElementById('contentSaveBtn');
     if (!btn) return;
     btn.disabled = true;
