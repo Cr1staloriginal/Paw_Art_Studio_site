@@ -697,7 +697,7 @@ app.post('/api/admin/content', auth, siteEditorOnly, (req, res) => {
     if (String(value ?? '').length > 20000)
       return res.status(400).json({ error: `Поле ${key} слишком длинное` });
     const isPackagePrice = key.startsWith('package_') && key.endsWith('_price');
-    const isServiceUnitPrice = /^service_\\d+_unit_price$/.test(key);
+    const isServiceUnitPrice = /^service_\d+_unit_price$/.test(key);
     if (isPackagePrice || isServiceUnitPrice) {
       const rawPrice = String(value ?? '').trim();
       // Цена за единицу услуги необязательна: пустое значение означает,
@@ -705,7 +705,7 @@ app.post('/api/admin/content', auth, siteEditorOnly, (req, res) => {
       if (isServiceUnitPrice && rawPrice === '') continue;
       const normalizedPrice = rawPrice.replace(',', '.');
       const price = Number(normalizedPrice);
-      if (!/^\\d+(?:\\.\\d{1,2})?$/.test(normalizedPrice) ||
+      if (!/^\d+(?:\\.\d{1,2})?$/.test(normalizedPrice) ||
           !Number.isFinite(price) || price < 0 || price > 10000000)
         return res.status(400).json({ error: `Цена ${key} должна быть числом от 0 до 10 000 000 ₽` });
     }
