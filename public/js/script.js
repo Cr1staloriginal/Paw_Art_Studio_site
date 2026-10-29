@@ -580,10 +580,10 @@ async function saveContent() {
         const key = input.dataset.contentKey;
         const value = input.value.trim();
         updates[key] = value;
-        if (/^service_\\d+_unit_price$/.test(key) && value !== '') {
+        if (/^service_\d+_unit_price$/.test(key) && value !== '') {
             const normalized = value.replace(',', '.');
             const price = Number(normalized);
-            if (!/^\\d+(?:\\.\\d{1,2})?$/.test(normalized) ||
+            if (!/^\d+(?:\\.\d{1,2})?$/.test(normalized) ||
                 !Number.isFinite(price) || price < 0 || price > 10000000) {
                 invalidPriceInput = input;
             }
