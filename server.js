@@ -696,9 +696,12 @@ app.post('/api/admin/content', auth, siteEditorOnly, (req, res) => {
       return res.status(400).json({ error: `Недопустимое значение для ${key}` });
     if (String(value ?? '').length > 20000)
       return res.status(400).json({ error: `Поле ${key} слишком длинное` });
-    const isPackagePrice = key.startsWith('package_') && key.endsWith('_price');
+    // Текстовые ориентиры пакетов (например, «10 000–12 000 ₽») не являются
+    // числовыми ценами элементов пакета.
+    const isPackageItemPrice = key.startsWith('package_') &&
+      key.endsWith('_price') && !/^package_offer_\d+_price$/.test(key);
     const isServiceUnitPrice = /^service_\d+_unit_price$/.test(key);
-    if (isPackagePrice || isServiceUnitPrice) {
+    if (isPackageItemPrice || isServiceUnitPrice) {
       const rawPrice = String(value ?? '').trim();
       // Цена за единицу услуги необязательна: пустое значение означает,
       // что калькулятор не должен использовать цену для этой услуги.
