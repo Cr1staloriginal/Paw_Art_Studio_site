@@ -4,7 +4,7 @@ const API = '';
 const TOKEN_KEY = 'paw_token';
 const ROLE_LABELS = { client: 'Клиент', executor: 'Исполнитель', manager: 'Менеджер', admin: 'Администратор' };
 const STATUS_LABELS = { open: 'Открыт', in_progress: 'В работе', review: 'На проверке', completed: 'Завершён', cancelled: 'Отменён' };
-const WD_STATUS = { pending: 'На рассмотрении', approved: 'Одобрено', rejected: 'Отклонено' };
+const WD_STATUS = { pending: 'На рассмотрении', approved: 'Выплачено', rejected: 'Отклонено' };
 const WD_STATUS_CLASS = { pending: 'status-review', approved: 'status-completed', rejected: 'status-cancelled' };
 
 const state = {
@@ -1453,8 +1453,26 @@ function renderAdminWithdrawals() {
     if (!state.adminWithdrawals.length) { list.innerHTML = '<div class="admin-empty">💸 Нет заявок</div>'; return; }
     list.innerHTML = state.adminWithdrawals.map(w => { const cls = WD_STATUS_CLASS[w.status] || 'status-review'; const av = w.user.avatar ? `<img src="${escapeHtml(w.user.avatar)}" style="width:100%;height:100%;object-fit:cover;border-radius:50%">` : escapeHtml(w.user.name.charAt(0).toUpperCase()); const actions = w.status === 'pending' ? `<div class="request-actions" style="margin-top:10px"><button class="admin-act-btn primary" onclick="approveWithdrawal(${w.id})"><i class="fas fa-check"></i> Подтвердить перевод</button><button class="admin-act-btn danger" onclick="rejectWithdrawal(${w.id})"><i class="fas fa-times"></i> Отклонить</button></div>` : ''; const card = w.cardNumber ? `<div class="wd-date">💳 ${escapeHtml(w.cardNumber)}</div>` : ''; return `<div class="withdrawal-card ${w.status === 'pending' ? 'pending' : ''}"><div class="wd-head"><div style="display:flex;align-items:center;gap:10px;flex:1;min-width:0"><div class="admin-user-avatar" style="width:36px;height:36px;font-size:0.9rem">${av}</div><div style="min-width:0;flex:1"><div class="wd-user">${escapeHtml(w.user.name)}</div><div class="wd-email">${escapeHtml(w.user.email)}</div></div></div><div class="wd-amount">${formatMoney(w.amount)}</div><span class="project-status ${cls}">${WD_STATUS[w.status]}</span></div>${card}<div class="wd-date">Создано: ${formatDateTime(w.createdAt)}</div>${w.reviewedAt ? `<div class="wd-date">Рассмотрено: ${formatDateTime(w.reviewedAt)}</div>` : ''}${w.comment ? `<div class="wd-comment">💬 ${escapeHtml(w.comment)}</div>` : ''}${actions}</div>`; }).join('');
 }
-async function approveWithdrawal(id) { if (!confirm('Подтвердить выплату?')) return; try { await api(`/api/admin/withdrawals/${id}/approve`, { method: 'POST' }); showToast('✅ Одобрено'); await loadAdminData(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
-async function rejectWithdrawal(id) { const comment = prompt('Причина отклонения:', ''); if (comment === null) return; try { await api(`/api/admin/withdrawals/${id}/reject`, { method: 'POST', body: { comment } }); showToast('↩️ Отклонено'); await loadAdminData(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
+async function approveWithdrawal(id) {
+    const confirmation = prompt('Сначала вручную переведите деньги по указанным реквизитам. После успешного перевода введите подтверждение: ПЕРЕВЕДЕНО');
+    if (confirmation !== 'ПЕРЕВЕДЕНО') return;
+    const adminComment = prompt('Комментарий к выплате (необязательно):', 'Перевод выполнен вручную');
+    if (adminComment === null) return;
+    try {
+        await api(`/api/admin/withdrawals/${id}/approve`, { method: 'POST', body: { adminComment } });
+        showToast('✅ Выплата отмечена как выполненная');
+        await loadAdminData();
+    } catch (err) { showToast('❌ ' + err.message, 'error'); }
+}
+async function rejectWithdrawal(id) {
+    const adminComment = prompt('Причина отклонения:', '');
+    if (adminComment === null) return;
+    try {
+        await api(`/api/admin/withdrawals/${id}/reject`, { method: 'POST', body: { adminComment } });
+        showToast('↩️ Заявка отклонена, деньги возвращены на баланс');
+        await loadAdminData();
+    } catch (err) { showToast('❌ ' + err.message, 'error'); }
+}
 function renderAdminRequests() {
     const list = document.getElementById('requestsList');
     const badge = document.getElementById('reqCount');
