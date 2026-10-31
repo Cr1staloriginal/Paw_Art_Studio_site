@@ -662,7 +662,7 @@ const CONTENT_KEY_ALLOWLIST = new Set([
   'about_stat_1', 'about_stat_1_desc', 'about_stat_2', 'about_stat_2_desc',
   'about_stat_3', 'about_stat_3_desc', 'contact_discord', 'contact_telegram',
   'contact_email', 'support_email', 'support_telegram', 'footer_text',
-  ...Array.from({ length: 7 }, (_, i) => i + 1).flatMap(n => [
+  ...Array.from({ length: 6 }, (_, i) => i + 1).flatMap(n => [
     `service_${n}_name`, `service_${n}_desc`, `service_${n}_price`, `service_${n}_unit_price`, `service_${n}_min_qty`, `service_${n}_max_qty`, `service_${n}_image`
   ]),
   ...Array.from({ length: 5 }, (_, i) => i + 1).flatMap(n => [
@@ -700,14 +700,14 @@ app.post('/api/admin/content', auth, siteEditorOnly, (req, res) => {
     // числовыми ценами элементов пакета.
     const isPackageItemPrice = key.startsWith('package_') &&
       key.endsWith('_price') && !/^package_offer_\d+_price$/.test(key);
-    const isServiceUnitPrice = /^service_\\d+_unit_price$/.test(key);
-    const isServiceQuantity = /^service_\\d+_(?:min_qty|max_qty)$/.test(key);
+    const isServiceUnitPrice = /^service_\d+_unit_price$/.test(key);
+    const isServiceQuantity = /^service_\d+_(?:min_qty|max_qty)$/.test(key);
     if (isPackageItemPrice || isServiceUnitPrice || isServiceQuantity) {
       const rawValue = String(value ?? '').trim();
       if (isServiceUnitPrice && rawValue === '') continue;
       const normalized = rawValue.replace(',', '.');
       const number = Number(normalized);
-      if (!/^\\d+(?:\\.\\d{1,2})?$/.test(normalized) ||
+      if (!/^\d+(?:\.\d{1,2})?$/.test(normalized) ||
           !Number.isFinite(number) || number < 0 ||
           number > (isServiceQuantity ? 100000 : 10000000) ||
           (isServiceQuantity && !Number.isInteger(number))) {
