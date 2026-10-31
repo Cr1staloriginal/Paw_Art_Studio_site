@@ -33,9 +33,9 @@
         <p id="pawReferralStats" class="paw-upgrade-muted"></p>
       </section>
       <section class="paw-upgrade-panel" data-paw-panel="support" hidden>
-        <h4>Нужен вывод средств?</h4>
-        <p class="paw-upgrade-muted">Для безопасности прямой вывод отключён. Напиши в поддержку — сотрудник проверит баланс и поможет оформить выплату вручную.</p>
-        <div class="paw-upgrade-row"><a class="btn paw-support-button" id="pawSupportLink" href="mailto:support@pawartstudio.store?subject=Запрос%20на%20вывод%20средств">💬 Обратиться в поддержку</a></div>
+        <h4>Вывод средств</h4>
+        <p class="paw-upgrade-muted">Исполнители могут отправить заявку на вывод доступного баланса. Администратор проверит реквизиты и вручную выполнит перевод. До рассмотрения сумма резервируется; при отказе возвращается на баланс.</p>
+        <div class="paw-upgrade-row"><button class="btn paw-support-button" type="button" onclick="openWithdraw()">💸 Оформить вывод</button></div>
       </section>`;
     wallet.insertAdjacentElement('afterend', tabs);
     tabs.insertAdjacentElement('afterend', panels);
@@ -86,19 +86,6 @@
       $('pawReferralStats').textContent = e.message || '';
     }
   }
-
-  const oldOpenWithdraw = window.openWithdraw;
-  window.openWithdraw = function () {
-    if (!window.state || !state.user) return typeof openAuth === 'function' ? openAuth() : undefined;
-    const tabs = $('pawUpgradeTabs');
-    if (tabs) {
-      tabs.querySelector('[data-paw-tab="support"]').click();
-      tabs.scrollIntoView({behavior:'smooth',block:'center'});
-    } else {
-      const message = 'Для вывода средств напиши в поддержку Paw Art Studio.';
-      if (confirm(message + '\\nОткрыть письмо в поддержку?')) location.href = 'mailto:support@pawartstudio.store?subject=Запрос%20на%20вывод%20средств';
-    }
-  };
 
   function init() {
     injectDashboard();
