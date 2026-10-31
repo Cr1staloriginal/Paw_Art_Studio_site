@@ -596,14 +596,14 @@ async function saveContent() {
         const key = input.dataset.contentKey;
         const value = input.value.trim();
         updates[key] = value;
-        if (/^service_\\d+_unit_price$/.test(key) && value !== '') {
+        if (/^service_\d+_unit_price$/.test(key) && value !== '') {
             const normalized = value.replace(',', '.');
             const price = Number(normalized);
-            if (!/^\\d+(?:\\.\\d{1,2})?$/.test(normalized) || !Number.isFinite(price) || price < 0 || price > 10000000) invalidPriceInput = input;
+            if (!/^\d+(?:\.\d{1,2})?$/.test(normalized) || !Number.isFinite(price) || price < 0 || price > 10000000) invalidPriceInput = input;
         }
-        if (/^service_\\d+_(?:min_qty|max_qty)$/.test(key) && value !== '') {
+        if (/^service_\d+_(?:min_qty|max_qty)$/.test(key) && value !== '') {
             const qty = Number(value);
-            if (!/^\\d+$/.test(value) || !Number.isSafeInteger(qty) || qty < 0 || qty > 100000) invalidPriceInput = input;
+            if (!/^\d+$/.test(value) || !Number.isSafeInteger(qty) || qty < 0 || qty > 100000) invalidPriceInput = input;
         }
     });
     for (let i = 1; i <= 6; i++) {
