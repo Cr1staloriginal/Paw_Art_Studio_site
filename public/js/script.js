@@ -383,23 +383,39 @@ function applyContent(c) {
             heroBg.style.backgroundPosition = 'center';
         }
     }
-    for (let i = 1; i <= 7; i++) {
+    for (let i = 1; i <= 6; i++) {
         setText(`[data-content="service_${i}_name"]`, c[`service_${i}_name`]);
         setText(`[data-content="service_${i}_desc"]`, c[`service_${i}_desc`]);
-        setText(`[data-content="service_${i}_price"]`, c[`service_${i}_price`]);
-        const servicePrice = String(c[`service_${i}_price`] ?? '').trim();
         const priceNode = document.querySelector(`[data-content="service_${i}_price"]`);
-        const serviceCard = priceNode?.closest('.service-card');
-        if (serviceCard && servicePrice) serviceCard.dataset.price = servicePrice;
-        const savedUnitPrice = c[`service_${i}_unit_price`];
-        if (serviceCard && savedUnitPrice !== undefined && String(savedUnitPrice).trim() !== '') {
-            const unitPrice = Number(savedUnitPrice);
-            if (Number.isFinite(unitPrice) && unitPrice >= 0) serviceCard.dataset.unitPrice = String(unitPrice);
+        const card = priceNode?.closest('.service-card');
+        const unitValue = c[`service_${i}_unit_price`];
+        const minValue = c[`service_${i}_min_qty`];
+        const maxValue = c[`service_${i}_max_qty`];
+        if (card && unitValue !== undefined && String(unitValue).trim() !== '') {
+            const unit = Number(String(unitValue).replace(',', '.'));
+            if (Number.isFinite(unit) && unit >= 0) card.dataset.unitPrice = String(unit);
         }
-        const serviceName = c[`service_${i}_name`];
-        const serviceDesc = c[`service_${i}_desc`];
-        if (serviceCard && serviceName) serviceCard.dataset.service = serviceName;
-        if (serviceCard && serviceDesc) serviceCard.dataset.detail = serviceDesc;
+        if (card && minValue !== undefined && String(minValue).trim() !== '') {
+            const min = Number(minValue);
+            if (Number.isInteger(min) && min >= 0) card.dataset.min = String(min);
+        }
+        if (card && maxValue !== undefined && String(maxValue).trim() !== '') {
+            const max = Number(maxValue);
+            if (Number.isInteger(max) && max >= 0) card.dataset.max = String(max);
+        }
+        const unit = Number(card?.dataset.unitPrice);
+        const min = Number(card?.dataset.min ?? 1);
+        const legacyPrice = String(c[`service_${i}_price`] ?? '').trim();
+        if (card && Number.isFinite(unit) && unit >= 0) {
+            const display = `от ${new Intl.NumberFormat('ru-RU').format(unit * min)} ₽`;
+            card.dataset.price = display;
+            if (priceNode) priceNode.textContent = display;
+        } else if (priceNode && legacyPrice) {
+            priceNode.textContent = legacyPrice;
+            if (card) card.dataset.price = legacyPrice;
+        }
+        if (card && c[`service_${i}_name`]) card.dataset.service = c[`service_${i}_name`];
+        if (card && c[`service_${i}_desc`]) card.dataset.detail = c[`service_${i}_desc`];
         const image = document.querySelector(`[data-content="service_${i}_image"]`);
         if (image && c[`service_${i}_image`]) {
             if (image.matches('img')) image.src = c[`service_${i}_image`];
@@ -435,8 +451,8 @@ const CONTENT_FIELDS = [
         { key: 'hero_badge_1', label: 'Бейдж 1' }, { key: 'hero_badge_2', label: 'Бейдж 2' }, { key: 'hero_badge_3', label: 'Бейдж 3' },
         { key: 'hero_image', label: 'Фоновое изображение', type: 'image' },
     ]},
-    { section: '🛠 Услуги', fields: Array.from({ length: 7 }, (_, i) => { const n = i + 1; return [
-        { key: `service_${n}_name`, label: `Услуга ${n} — название` }, { key: `service_${n}_desc`, label: `Услуга ${n} — описание`, type: 'textarea' }, { key: `service_${n}_price`, label: `Услуга ${n} — цена на карточке` }, { key: `service_${n}_unit_price`, label: `Услуга ${n} — цена за единицу в калькуляторе (₽)`, type: 'number' }, { key: `service_${n}_image`, label: `Услуга ${n} — изображение`, type: 'image' },
+    { section: '🛠 Услуги', fields: Array.from({ length: 6 }, (_, i) => { const n = i + 1; return [
+        { key: `service_${n}_name`, label: `Услуга ${n} — название` }, { key: `service_${n}_desc`, label: `Услуга ${n} — описание`, type: 'textarea' }, { key: `service_${n}_unit_price`, label: `Услуга ${n} — цена за единицу (₽)`, type: 'number', step: '0.01' }, { key: `service_${n}_min_qty`, label: `Услуга ${n} — минимум количества`, type: 'number', step: '1' }, { key: `service_${n}_max_qty`, label: `Услуга ${n} — максимум количества`, type: 'number', step: '1' }, { key: `service_${n}_image`, label: `Услуга ${n} — изображение`, type: 'image' },
     ]; }).flat() },
     { section: '💰 Тарифы', fields: Array.from({ length: 5 }, (_, i) => { const n = i + 1; return [
         { key: `pricing_${n}_name`, label: `Тариф ${n} — название` }, { key: `pricing_${n}_price`, label: `Тариф ${n} — цена` }, { key: `pricing_${n}_features`, label: `Тариф ${n} — фичи (через |)`, type: 'textarea' },
@@ -503,16 +519,16 @@ function closeContentEditor() {
 
 function renderContentEditor() {
     const c = state.content || {};
-    // Seed editable price fields from the currently visible site when no saved value exists.
-    for (let i = 1; i <= 7; i++) {
-        const priceNode = document.querySelector(`[data-content="service_${i}_price"]`);
-        const card = priceNode?.closest('.service-card');
-        const unitKey = `service_${i}_unit_price`;
-        if (c[`service_${i}_price`] === undefined || String(c[`service_${i}_price`]).trim() === '') {
-            if (priceNode?.textContent.trim()) c[`service_${i}_price`] = priceNode.textContent.trim();
-        }
-        if (c[unitKey] === undefined || String(c[unitKey]).trim() === '') {
-            if (card?.dataset.unitPrice) c[unitKey] = card.dataset.unitPrice;
+    // Seed editable prices and quantity limits from the six live service cards.
+    for (let i = 1; i <= 6; i++) {
+        const card = document.querySelector(`[data-content="service_${i}_price"]`)?.closest('.service-card');
+        const values = {
+            [`service_${i}_unit_price`]: card?.dataset.unitPrice,
+            [`service_${i}_min_qty`]: card?.dataset.min,
+            [`service_${i}_max_qty`]: card?.dataset.max
+        };
+        for (const [key, value] of Object.entries(values)) {
+            if ((c[key] === undefined || String(c[key]).trim() === '') && value !== undefined && value !== '') c[key] = String(value);
         }
     }
     for (let i = 1; i <= 5; i++) {
@@ -541,7 +557,7 @@ function renderContentEditor() {
                 const val = c[f.key] ?? '';
                 const label = escapeHtml(f.label);
                 const key = escapeHtml(f.key);
-                if (f.type === 'number') return `<label class="content-label">${label}<input type="number" min="0" step="1" data-content-key="${key}" class="content-input" value="${escapeHtml(val)}" /></label>`;
+                if (f.type === 'number') return `<label class="content-label">${label}<input type="number" min="0" step="${escapeHtml(f.step || '1')}" data-content-key="${key}" class="content-input" value="${escapeHtml(val)}" /></label>`;
                 if (f.type === 'textarea') return `<label class="content-label">${label}<textarea data-content-key="${key}" class="content-input">${escapeHtml(val)}</textarea></label>`;
                 if (f.type === 'image') return `<div class="content-label"><span>${label}</span><div class="content-image-row"><input type="text" data-content-key="${key}" class="content-input" value="${escapeHtml(val)}" placeholder="/uploads/content/..." /><input type="file" id="content-img-${key}" accept="image/png,image/jpeg,image/webp,image/gif" hidden onchange="uploadContentImage(event, '${key}')" /><button type="button" class="btn btn-outline" onclick="document.getElementById('content-img-${key}').click()" aria-label="Загрузить изображение"><i class="fas fa-camera"></i></button></div><img data-content-preview="${key}" src="${escapeHtml(val)}" alt="" ${val ? '' : 'hidden'} style="max-width:200px;max-height:140px;object-fit:contain;margin-top:8px;border-radius:8px;"></div>`;
                 return `<label class="content-label">${label}<input type="text" data-content-key="${key}" class="content-input" value="${escapeHtml(val)}" /></label>`;
@@ -580,21 +596,33 @@ async function saveContent() {
         const key = input.dataset.contentKey;
         const value = input.value.trim();
         updates[key] = value;
-        if (/^service_\d+_unit_price$/.test(key) && value !== '') {
+        if (/^service_\\d+_unit_price$/.test(key) && value !== '') {
             const normalized = value.replace(',', '.');
             const price = Number(normalized);
-            if (!/^\d+(?:\\.\d{1,2})?$/.test(normalized) ||
-                !Number.isFinite(price) || price < 0 || price > 10000000) {
-                invalidPriceInput = input;
-            }
+            if (!/^\\d+(?:\\.\\d{1,2})?$/.test(normalized) || !Number.isFinite(price) || price < 0 || price > 10000000) invalidPriceInput = input;
+        }
+        if (/^service_\\d+_(?:min_qty|max_qty)$/.test(key) && value !== '') {
+            const qty = Number(value);
+            if (!/^\\d+$/.test(value) || !Number.isSafeInteger(qty) || qty < 0 || qty > 100000) invalidPriceInput = input;
         }
     });
+    for (let i = 1; i <= 6; i++) {
+        const minInput = document.querySelector(`[data-content-key="service_${i}_min_qty"]`);
+        const maxInput = document.querySelector(`[data-content-key="service_${i}_max_qty"]`);
+        if (!minInput || !maxInput) continue;
+        const min = Number(minInput.value), max = Number(maxInput.value);
+        if (!Number.isInteger(min) || !Number.isInteger(max) || min < 0 || max < min || max > 100000) {
+            invalidPriceInput = maxInput;
+            maxInput.setCustomValidity('Максимум должен быть целым числом и не меньше минимума');
+            break;
+        }
+    }
     if (invalidPriceInput) {
         invalidPriceInput.focus();
-        invalidPriceInput.setCustomValidity('Введите число от 0 до 10 000 000 ₽ или оставьте поле пустым');
+        invalidPriceInput.setCustomValidity('Проверьте цену и диапазон количества: цена — до 10 000 000 ₽, количество — целые числа, максимум не меньше минимума');
         invalidPriceInput.reportValidity();
         invalidPriceInput.addEventListener('input', () => invalidPriceInput.setCustomValidity(''), { once: true });
-        showToast('⚠️ Проверьте цену услуги: допустимо число или пустое поле', 'error');
+        showToast('⚠️ Проверьте цены и диапазоны количества услуг', 'error');
         return;
     }
     const btn = document.getElementById('contentSaveBtn');
