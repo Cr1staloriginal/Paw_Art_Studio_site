@@ -663,7 +663,7 @@ const CONTENT_KEY_ALLOWLIST = new Set([
   'about_stat_3', 'about_stat_3_desc', 'contact_discord', 'contact_telegram',
   'contact_email', 'support_email', 'support_telegram', 'footer_text',
   ...Array.from({ length: 7 }, (_, i) => i + 1).flatMap(n => [
-    `service_${n}_name`, `service_${n}_desc`, `service_${n}_price`, `service_${n}_unit_price`, `service_${n}_image`
+    `service_${n}_name`, `service_${n}_desc`, `service_${n}_price`, `service_${n}_unit_price`, `service_${n}_min_qty`, `service_${n}_max_qty`, `service_${n}_image`
   ]),
   ...Array.from({ length: 5 }, (_, i) => i + 1).flatMap(n => [
     `pricing_${n}_name`, `pricing_${n}_price`, `pricing_${n}_features`,
@@ -688,7 +688,7 @@ app.post('/api/admin/content', auth, siteEditorOnly, (req, res) => {
     return res.status(400).json({ error: 'Ожидается объект updates' });
   const entries = Object.entries(updates);
   if (!entries.length) return res.status(400).json({ error: 'Нет полей для сохранения' });
-  if (entries.length > 100) return res.status(400).json({ error: 'Слишком много полей' });
+  if (entries.length > 250) return res.status(400).json({ error: 'Слишком много полей' });
   for (const [key, value] of entries) {
     if (!CONTENT_KEY_ALLOWLIST.has(key))
       return res.status(400).json({ error: `Недопустимый ключ: ${key}` });
@@ -700,17 +700,31 @@ app.post('/api/admin/content', auth, siteEditorOnly, (req, res) => {
     // числовыми ценами элементов пакета.
     const isPackageItemPrice = key.startsWith('package_') &&
       key.endsWith('_price') && !/^package_offer_\d+_price$/.test(key);
-    const isServiceUnitPrice = /^service_\d+_unit_price$/.test(key);
-    if (isPackageItemPrice || isServiceUnitPrice) {
-      const rawPrice = String(value ?? '').trim();
-      // Цена за единицу услуги необязательна: пустое значение означает,
-      // что калькулятор не должен использовать цену для этой услуги.
-      if (isServiceUnitPrice && rawPrice === '') continue;
-      const normalizedPrice = rawPrice.replace(',', '.');
-      const price = Number(normalizedPrice);
-      if (!/^\d+(?:\\.\d{1,2})?$/.test(normalizedPrice) ||
-          !Number.isFinite(price) || price < 0 || price > 10000000)
-        return res.status(400).json({ error: `Цена ${key} должна быть числом от 0 до 10 000 000 ₽` });
+    const isServiceUnitPrice = /^service_\\d+_unit_price$/.test(key);
+    const isServiceQuantity = /^service_\\d+_(?:min_qty|max_qty)$/.test(key);
+    if (isPackageItemPrice || isServiceUnitPrice || isServiceQuantity) {
+      const rawValue = String(value ?? '').trim();
+      if (isServiceUnitPrice && rawValue === '') continue;
+      const normalized = rawValue.replace(',', '.');
+      const number = Number(normalized);
+      if (!/^\\d+(?:\\.\\d{1,2})?$/.test(normalized) ||
+          !Number.isFinite(number) || number < 0 ||
+          number > (isServiceQuantity ? 100000 : 10000000) ||
+          (isServiceQuantity && !Number.isInteger(number))) {
+        return res.status(400).json({ error: `Поле ${key} содержит некорректное значение` });
+      }
+    }
+  }
+
+  for (let i = 1; i <= 6; i++) {
+    const minKey = `service_${i}_min_qty`;
+    const maxKey = `service_${i}_max_qty`;
+    const minRow = db.prepare('SELECT value FROM site_content WHERE key = ?').get(minKey);
+    const maxRow = db.prepare('SELECT value FROM site_content WHERE key = ?').get(maxKey);
+    const min = Number(Object.prototype.hasOwnProperty.call(updates, minKey) ? updates[minKey] : (minRow?.value ?? 1));
+    const max = Number(Object.prototype.hasOwnProperty.call(updates, maxKey) ? updates[maxKey] : (maxRow?.value ?? 1));
+    if (!Number.isInteger(min) || !Number.isInteger(max) || min < 0 || max < min || max > 100000) {
+      return res.status(400).json({ error: `Для услуги ${i}: максимум должен быть целым числом и не меньше минимума` });
     }
   }
 
