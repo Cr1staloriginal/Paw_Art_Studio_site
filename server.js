@@ -1703,8 +1703,9 @@ app.post('/api/projects/:id/status', auth, (req, res) => {
   if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: 'Некорректный ID заказа' });
   if (!allowed.includes(status)) return res.status(400).json({ error: 'Некорректный статус заказа' });
   try {
-    const p = db.prepare('SELECT id, client_id, executor_id FROM projects WHERE id = ?').get(id);
+    const p = db.prepare('SELECT id, client_id, executor_id,status FROM projects WHERE id = ?').get(id);
     if (!p) return res.status(404).json({ error: 'Заказ не найден' });
+    if(p.status==='cancelled'&&status!=='cancelled')return res.status(409).json({error:'Отменённый заказ нельзя повторно открыть'});
     const isAdmin = req.user.role === 'admin' || req.user.role === 'manager' || Number(req.user.is_root) === 1;
     if (!isAdmin && Number(p.client_id) !== Number(req.user.id) && Number(p.executor_id) !== Number(req.user.id))
       return res.status(403).json({ error: 'Нет доступа к изменению этого заказа' });
