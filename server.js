@@ -2116,7 +2116,7 @@ app.get('/api/admin/partners',auth,adminOnly,(req,res)=>{
  const promos=db.prepare("SELECT c.*,p.name partner_name FROM promocodes c JOIN partners p ON p.id=c.partner_id ORDER BY c.created_at DESC").all();
  const contests=db.prepare("SELECT c.*,p.name partner_name FROM partner_contests c JOIN partners p ON p.id=c.partner_id ORDER BY c.created_at DESC").all();
  const ads=db.prepare("SELECT a.*,p.name partner_name FROM partner_ads a JOIN partners p ON p.id=a.partner_id ORDER BY a.created_at DESC").all();
- const ledger=db.prepare("SELECT l.*,p.name partner_name,u.name customer_name FROM partner_ledger l JOIN partners p ON p.id=l.partner_id LEFT JOIN users u ON u.id=l.user_id ORDER BY l.created_at DESC LIMIT 100").all();
+ const ledger=db.prepare("SELECT l.*,p.name partner_name,u.name customer_name,pr.payment_status project_payment_status,pr.partner_payment_reference FROM partner_ledger l JOIN partners p ON p.id=l.partner_id JOIN projects pr ON pr.id=l.project_id LEFT JOIN users u ON u.id=l.user_id ORDER BY l.created_at DESC LIMIT 100").all();
  const payouts=db.prepare("SELECT r.*,p.name partner_name FROM partner_payout_requests r JOIN partners p ON p.id=r.partner_id ORDER BY r.created_at DESC LIMIT 100").all();
  res.json({partners,promos,contests,ads,ledger,payouts});
 });
