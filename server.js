@@ -1136,6 +1136,7 @@ app.post('/api/requests', (req, res) => {
       if (!user) return res.status(401).json({ error: 'Для применения промокода войдите в аккаунт' });
       promo = db.prepare('SELECT * FROM promocodes WHERE code=?').get(v.promoCode);
       if (!promo || !promo.active) return res.status(400).json({ error: 'Промокод не найден или неактивен' });
+      if (promo.partner_id && !db.prepare("SELECT id FROM partners WHERE id=? AND status='active'").get(promo.partner_id)) return res.status(400).json({ error: 'Промокод партнёра временно недоступен' });
       if (promo.expires_at && Date.now() > promo.expires_at) return res.status(400).json({ error: 'Срок действия промокода истёк' });
       if (promo.max_uses && promo.uses >= promo.max_uses) return res.status(400).json({ error: 'Лимит использований промокода исчерпан' });
       if (db.prepare('SELECT id FROM promo_redemptions WHERE promo_id=? AND user_id=?').get(promo.id,user.id))
@@ -1173,6 +1174,7 @@ app.get('/api/admin/requests/:id', auth, adminOnly, (req, res) => {
       name: r.name || '', project: r.project || '', service: r.service || '',
       budget: r.budget || '', reference: r.reference || '',
       contactMethod: r.contact_method || 'Сайт', contactDetail: r.contact_detail || '',
+      promoCode: r.promo_code || '', discountPercent: Number(r.discount_percent || 0), partnerId: r.partner_id == null ? null : Number(r.partner_id),
       createdAt: Number(r.created_at || 0),
       account: r.user_id == null ? null : {
         id: Number(r.user_id), name: r.account_name || '',
