@@ -1,0 +1,25 @@
+<!doctype html>
+<html lang="ru">
+<head>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Кабинет партнёра — Paw Art Studio</title>
+<style>
+:root{color-scheme:dark;--bg:#0d1019;--panel:#171c2a;--line:#2b3348;--text:#eef1fa;--muted:#9da8c0;--accent:#a78bfa;--good:#6ee7b7;--warn:#fbbf24}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#22203b 0,#0d1019 55%);color:var(--text);font:15px/1.55 Inter,system-ui,sans-serif}
+main{width:min(1100px,calc(100% - 32px));margin:38px auto 70px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:26px}.brand{font-weight:800;font-size:20px}.brand span{color:var(--accent)}a{color:#c4b5fd}.muted{color:var(--muted)}.panel,.stat{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin:18px 0}.stat b{display:block;font-size:25px;margin-top:6px}.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}.panel h2{margin:0 0 14px;font-size:18px}input,textarea,button{font:inherit}input,textarea{width:100%;background:#0e1320;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:12px;margin:7px 0 14px}button{border:0;border-radius:10px;padding:11px 16px;background:var(--accent);color:#171326;font-weight:700;cursor:pointer}.secondary{background:#293149;color:var(--text)}table{width:100%;border-collapse:collapse;font-size:14px}td,th{text-align:left;padding:10px;border-bottom:1px solid var(--line)}.scroll{overflow:auto}.status{color:var(--good)}#notice{padding:12px;border-radius:10px;background:#20283a;margin:14px 0}.hidden{display:none}@media(max-width:720px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
+</style>
+</head>
+<body><main>
+<header class="top"><div><div class="brand">🐾 Paw Art <span>Studio</span></div><div class="muted">Партнёрский кабинет</div></div><a href="/">На главную</a></header>
+<div id="notice">Загружаем партнёрский кабинет…</div>
+<section id="dashboard" class="hidden">
+<div class="panel"><div class="muted">Официальный партнёр</div><h1 id="partnerName">—</h1><p id="partnerDescription" class="muted"></p><p>Ваша ссылка: <a id="partnerLink" href="#">—</a> <button class="secondary" id="copyLink">Копировать</button></p><p class="muted">Срок атрибуции: серверное значение (по умолчанию 30 дней).</p></div>
+<div class="stats">
+<div class="stat">Переходы<b id="clicks">0</b></div><div class="stat">Регистрации<b id="registrations">0</b></div><div class="stat">Заказы<b id="orders">0</b></div><div class="stat">Ожидает проверки<b id="pending">0 ₽</b></div><div class="stat">Одобрено<b id="approved">0 ₽</b></div><div class="stat">Доступно к выплате<b id="available">0 ₽</b></div><div class="stat">Выплачено<b id="paid">0 ₽</b></div>
+</div>
+<div class="grid">
+<section class="panel"><h2>Запросить выплату</h2><p class="muted">Укажите реквизиты. Заявка поступит администратору, перевод выполняется вручную после проверки.</p><form id="payoutForm"><label for="paymentDetails">Платёжные реквизиты</label><textarea id="paymentDetails" required minlength="5" maxlength="500" placeholder="Способ и реквизиты для перевода"></textarea><button type="submit">Отправить заявку на выплату</button></form></section>
+<section class="panel"><h2>История выплат</h2><div id="payoutHistory" class="muted">Пока нет заявок.</div></section>
+</div>
+<section class="panel" style="margin-top:16px"><h2>История начислений</h2><div class="scroll"><table><thead><tr><th>Заказ</th><th>Сумма заказа</th><th>Вознаграждение</th><th>Статус</th><th>Дата</th></tr></thead><tbody id="ledgerRows"><tr><td colspan="5">Нет начислений.</td></tr></tbody></table></div></section>
+</section></main><script src="/js/partner-dashboard.js?v=20261101"></script></body></html>
