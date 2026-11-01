@@ -1166,15 +1166,9 @@ app.post('/api/requests', (req, res) => {
       if (!promo.discount) return res.status(400).json({ error: 'Этот промокод не даёт скидку на заявку' });
     }
     const now=Date.now();
-    const createRequest=db.transaction(()=>{
-      if(promo){
-        db.prepare('INSERT INTO promo_redemptions(promo_id,user_id,created_at) VALUES(?,?,?)').run(promo.id,user.id,now);
-        db.prepare('UPDATE promocodes SET uses=uses+1 WHERE id=?').run(promo.id);
-      }
-      return db.prepare('INSERT INTO requests(user_id,name,project,service,budget,reference,contact_method,contact_detail,promo_code,discount_percent,partner_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
-        .run(user?user.id:null,v.name,v.project||null,v.service,v.budget||null,v.reference||null,v.contactMethod,v.contactDetail||null,promo?promo.code:null,promo?promo.discount:0,promo?promo.partner_id:null,now);
-    });
-    const result=createRequest();
+    // An inquiry reserves the promo code but does not consume it; redemption happens only when a project order is created.
+    const result=db.prepare('INSERT INTO requests(user_id,name,project,service,budget,reference,contact_method,contact_detail,promo_code,discount_percent,partner_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
+      .run(user?user.id:null,v.name,v.project||null,v.service,v.budget||null,v.reference||null,v.contactMethod,v.contactDetail||null,promo?promo.code:null,promo?promo.discount:0,promo?promo.partner_id:null,now);
     return res.status(201).json({ ok:true,id:Number(result.lastInsertRowid),discountPercent:promo?promo.discount:0,message:promo?'Заявка отправлена с промокодом '+promo.code+' (скидка '+promo.discount+'%)':'Заявка успешно сохранена' });
   } catch (err) {
     console.error('[requests] Ошибка сохранения:', err);
