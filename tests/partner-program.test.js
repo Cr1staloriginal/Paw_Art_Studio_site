@@ -101,7 +101,7 @@ test('partner referral, discount, verified reward and payout lifecycle', async t
   assert.equal((await request('/api/admin/partner-ledger/'+ledger.id+'/approve',{method:'POST',token:adminToken,body:{}})).status,200);
   let partnerData=(await request('/api/partner/me',{token:partnerToken})).data;
   assert.equal(partnerData.stats.available,4500);
-  assert.equal(partnerData.stats.paidOrders,0);
+  assert.equal(partnerData.stats.paidOrders,1);
   assert.ok(partnerData.stats.conversionPercent>0);
 
   const payout=await request('/api/partner/payouts',{method:'POST',token:partnerToken,body:{paymentDetails:'Test bank account 0001'}});
