@@ -24,7 +24,7 @@
       document.getElementById('partnerDescription').textContent=p.description || 'Официальный партнёр Paw Art Studio';
       const link=location.origin+'/?ref='+encodeURIComponent(p.referralCode);
       const linkEl=document.getElementById('partnerLink');linkEl.href=link;linkEl.textContent=link;
-      for(const [id,value] of Object.entries({clicks:s.clicks,registrations:s.registrations,orders:s.orders,pending:money(s.pending),approved:money(s.approved),available:money(s.available),paid:money(s.paid)}))document.getElementById(id).textContent=value;
+      for(const [id,value] of Object.entries({clicks:s.clicks,registrations:s.registrations,orders:s.orders,paidOrders:s.paidOrders,conversion:s.conversionPercent+'%',pending:money(s.pending),approved:money(s.approved),available:money(s.available),paid:money(s.paid)}))document.getElementById(id).textContent=value;
       document.getElementById('payoutHistory').innerHTML=(data.payouts||[]).map(x=>'<div style="padding:9px 0;border-bottom:1px solid var(--line)"><b>'+money(x.amount)+'</b> · '+esc(statuses[x.status]||x.status)+'<div class="muted">'+date(x.created_at)+(x.comment?' · '+esc(x.comment):'')+'</div></div>').join('') || 'Пока нет заявок.';
       document.getElementById('ledgerRows').innerHTML=(data.ledger||[]).map(x=>'<tr><td>#'+x.project_id+'</td><td>'+money(x.order_amount)+'</td><td>'+money(x.reward_amount)+'</td><td>'+esc(statuses[x.status]||x.status)+(Number(x.paid_amount)>0?' · выплачено '+money(x.paid_amount):'')+'</td><td>'+date(x.created_at)+'</td></tr>').join('') || '<tr><td colspan="5">Нет начислений.</td></tr>';
     } catch(e) { showError(e.message); }
