@@ -1696,7 +1696,7 @@ app.post('/api/projects/:id/status', auth, (req, res) => {
       db.prepare('UPDATE projects SET status=?,updated_at=? WHERE id=?').run(status,now,id);
       if(status==='cancelled') {
         const ledger=db.prepare('SELECT * FROM partner_ledger WHERE project_id=?').get(id);
-        if(ledger&&ledger.status==='paid')db.prepare('INSERT OR IGNORE INTO partner_balance_adjustments(partner_id,project_id,amount,reason,created_at,created_by) VALUES(?,?,?,?,?,?)').run(ledger.partner_id,id,ledger.paid_amount||ledger.reward_amount,'Возврат/отмена уже выплаченного партнёрского заказа',now,req.user.id);
+        if(ledger&&Number(ledger.paid_amount)>0)db.prepare('INSERT OR IGNORE INTO partner_balance_adjustments(partner_id,project_id,amount,reason,created_at,created_by) VALUES(?,?,?,?,?,?)').run(ledger.partner_id,id,ledger.paid_amount,'Возврат/отмена уже выплаченного партнёрского заказа',now,req.user.id);
         db.prepare("UPDATE partner_ledger SET status=CASE WHEN status='pending' THEN 'rejected' ELSE 'reversed' END,reviewed_at=?,reviewed_by=? WHERE project_id=? AND status IN ('pending','approved','paid')").run(now,req.user.id,id);
         db.prepare("UPDATE projects SET payment_status=CASE WHEN payment_status='paid' THEN 'refund_required' ELSE payment_status END WHERE id=?").run(id);
       }
@@ -2169,6 +2169,24 @@ app.post('/api/admin/projects/:id/confirm-payment',auth,adminOnly,(req,res)=>{
   ensurePartnerLedgerForPaidProject(projectId,now);
  })();
  res.json({ok:true,confirmedAt:now});
+});
+app.post('/api/admin/projects/:id/refund',auth,adminOnly,(req,res)=>{
+ const id=Number(req.params.id),reference=String(req.body?.reference||'').trim(),comment=String(req.body?.comment||'').trim();
+ if(!Number.isSafeInteger(id)||id<=0||reference.length<3||reference.length>120)return res.status(400).json({error:'Укажите заказ и подтверждение фактического возврата'});
+ const project=db.prepare('SELECT id,payment_status FROM projects WHERE id=?').get(id);
+ if(!project)return res.status(404).json({error:'Заказ не найден'});
+ if(!['paid','refund_required'].includes(project.payment_status))return res.status(409).json({error:'Заказ не находится в статусе, требующем возврата'});
+ const now=Date.now();
+ try{
+  db.transaction(()=>{
+   const ledger=db.prepare('SELECT * FROM partner_ledger WHERE project_id=?').get(id);
+   if(ledger&&Number(ledger.paid_amount)>0)db.prepare('INSERT OR IGNORE INTO partner_balance_adjustments(partner_id,project_id,amount,reason,created_at,created_by) VALUES(?,?,?,?,?,?)').run(ledger.partner_id,id,ledger.paid_amount,'Возврат оплаченного заказа #'+id,now,req.user.id);
+   db.prepare("UPDATE partner_ledger SET status=CASE WHEN status='pending' THEN 'rejected' ELSE 'reversed' END,reviewed_at=?,reviewed_by=? WHERE project_id=? AND status IN ('pending','approved','paid')").run(now,req.user.id,id);
+   db.prepare("UPDATE projects SET payment_status='refunded',partner_paid_at=NULL,partner_payment_reference=? WHERE id=?").run('REFUND:'+reference+(comment?' '+comment.slice(0,100):''),id);
+   db.prepare("UPDATE payments SET status='refunded' WHERE project_id=? AND purpose='project' AND status='succeeded'").run(id);
+  })();
+  res.json({ok:true,message:'Возврат зафиксирован. Партнёрское начисление сторнировано.'});
+ }catch(e){console.error('[partner refund]',e);res.status(500).json({error:'Не удалось зафиксировать возврат'});}
 });
 app.post('/api/admin/partner-ledger/:id/:action',auth,adminOnly,(req,res)=>{
  const id=Number(req.params.id),row=db.prepare('SELECT l.*,p.status project_status,p.partner_paid_at FROM partner_ledger l JOIN projects p ON p.id=l.project_id WHERE l.id=?').get(id),action=req.params.action;
