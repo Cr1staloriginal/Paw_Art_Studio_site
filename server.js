@@ -2014,7 +2014,12 @@ app.get('/api/partners',(req,res)=>{
  const partners=db.prepare("SELECT * FROM partners WHERE status='active' ORDER BY name").all();
  const ads=db.prepare("SELECT a.*,p.referral_code FROM partner_ads a JOIN partners p ON p.id=a.partner_id WHERE a.active=1 AND p.status='active' ORDER BY a.created_at DESC").all();
  const contests=db.prepare("SELECT c.*,p.referral_code FROM partner_contests c JOIN partners p ON p.id=c.partner_id WHERE c.status='active' AND p.status='active' ORDER BY c.created_at DESC").all();
- res.json({partners:partners.map(p=>({...partnerRow(p),ads:ads.filter(a=>a.referral_code===p.referral_code),contests:contests.filter(c=>c.referral_code===p.referral_code)}))});
+ res.json({partners:partners.map(p=>({
+  id:Number(p.id),name:p.name,description:p.description||'',discordUrl:p.discord_url||'',logoUrl:p.logo_url||'',
+  referralCode:p.referral_code,discountPercent:Number(p.discount_percent||0),
+  ads:ads.filter(a=>a.referral_code===p.referral_code).map(a=>({title:a.title,description:a.description,target_url:a.target_url})),
+  contests:contests.filter(c=>c.referral_code===p.referral_code).map(c=>({title:c.title,description:c.description,prize:c.prize}))
+ }))});
 });
 app.get('/api/admin/partners',auth,adminOnly,(req,res)=>{
  const partners=db.prepare("SELECT p.*,(SELECT COUNT(*) FROM partner_clicks c WHERE c.partner_id=p.id) clicks,(SELECT COUNT(*) FROM users u WHERE u.partner_id=p.id) registrations,(SELECT COUNT(*) FROM partner_ledger l WHERE l.partner_id=p.id) orders,(SELECT COALESCE(SUM(reward_amount),0) FROM partner_ledger l WHERE l.partner_id=p.id AND l.status='approved') payable,(SELECT COALESCE(SUM(reward_amount),0) FROM partner_ledger l WHERE l.partner_id=p.id AND l.status='paid') paid FROM partners p ORDER BY p.created_at DESC").all().map(p=>({...partnerRow(p),clicks:Number(p.clicks),registrations:Number(p.registrations),orders:Number(p.orders),payable:Number(p.payable),paid:Number(p.paid)}));
@@ -2029,6 +2034,7 @@ app.post('/api/admin/partners',auth,adminOnly,(req,res)=>{
  const b=req.body||{},name=String(b.name||'').trim(),code=String(b.referralCode||'').trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'');
  const discount=Math.max(0,Math.min(100,Math.round(Number(b.discountPercent)||0))),reward=Math.max(0,Math.min(50,Number(b.rewardPercent)||0)),discord=String(b.discordUrl||'').trim();
  if(!name||name.length>100||!/^[A-Z0-9_-]{3,24}$/.test(code))return res.status(400).json({error:'Проверьте название и код партнёра (3–24 символа)'});
+ if(db.prepare('SELECT id FROM users WHERE referral_code=?').get(code))return res.status(409).json({error:'Этот код уже занят личной реферальной системой'});
  if(discord&&!/^https:\/\/(discord\.gg|discord\.com)\//i.test(discord))return res.status(400).json({error:'Некорректная Discord-ссылка'});
  try{const now=Date.now(),r=db.prepare("INSERT INTO partners(name,description,discord_url,logo_url,owner_name,contact_email,referral_code,discount_percent,reward_percent,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,'active',?,?)").run(name,String(b.description||'').slice(0,1000),discord,String(b.logoUrl||'').slice(0,500),String(b.ownerName||'').slice(0,100),String(b.contactEmail||'').slice(0,160),code,discount,reward,now,now);res.status(201).json({partner:partnerRow(db.prepare('SELECT * FROM partners WHERE id=?').get(r.lastInsertRowid))});}
  catch(e){if(String(e.message).includes('UNIQUE'))return res.status(409).json({error:'Реферальный код уже занят'});console.error(e);res.status(500).json({error:'Не удалось создать партнёра'});}
@@ -2057,7 +2063,8 @@ app.post('/api/admin/partners/:id/ads',auth,adminOnly,(req,res)=>{
 });
 app.post('/api/admin/partner-ledger/:id/:action',auth,adminOnly,(req,res)=>{
  const id=Number(req.params.id),row=db.prepare('SELECT * FROM partner_ledger WHERE id=?').get(id),next=req.params.action==='approve'?'approved':req.params.action==='paid'?'paid':null;
- if(!row)return res.status(404).json({error:'Начисление не найдено'});if(!next||!['pending','approved'].includes(row.status))return res.status(409).json({error:'Недопустимый переход статуса'});
+ if(!row)return res.status(404).json({error:'Начисление не найдено'});
+ if((req.params.action==='approve'&&row.status!=='pending')||(req.params.action==='paid'&&row.status!=='approved')||!next)return res.status(409).json({error:'Недопустимый переход статуса'});
  db.prepare('UPDATE partner_ledger SET status=?,reviewed_at=?,reviewed_by=? WHERE id=?').run(next,Date.now(),req.user.id,id);res.json({ok:true});
 });
 app.post('/api/admin/partners/:id/payouts',auth,adminOnly,(req,res)=>{
