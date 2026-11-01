@@ -25,6 +25,7 @@
       const link=location.origin+'/?ref='+encodeURIComponent(p.referralCode);
       const linkEl=document.getElementById('partnerLink');linkEl.href=link;linkEl.textContent=link;
       for(const [id,value] of Object.entries({clicks:s.clicks,registrations:s.registrations,orders:s.orders,paidOrders:s.paidOrders,conversion:s.conversionPercent+'%',pending:money(s.pending),approved:money(s.approved),available:money(s.available),paid:money(s.paid)}))document.getElementById(id).textContent=value;
+      document.getElementById('promoList').innerHTML=(data.promos||[]).map(x=>'<div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:9px 0;border-bottom:1px solid var(--line)"><div><b>'+esc(x.code)+'</b> · скидка '+Number(x.discount)+'%<div class="muted">Использовано '+Number(x.uses)+(x.max_uses?' / '+Number(x.max_uses):'')+(x.expires_at?' · до '+date(x.expires_at):' · без срока')+'</div></div><button class="secondary" data-copy-promo="'+esc(x.code)+'">Копировать</button></div>').join('')||'Активных промокодов пока нет.';
       document.getElementById('payoutHistory').innerHTML=(data.payouts||[]).map(x=>'<div style="padding:9px 0;border-bottom:1px solid var(--line)"><b>'+money(x.amount)+'</b> · '+esc(statuses[x.status]||x.status)+'<div class="muted">'+date(x.created_at)+(x.comment?' · '+esc(x.comment):'')+'</div></div>').join('') || 'Пока нет заявок.';
       document.getElementById('ledgerRows').innerHTML=(data.ledger||[]).map(x=>'<tr><td>#'+x.project_id+'</td><td>'+money(x.order_amount)+'</td><td>'+money(x.reward_amount)+'</td><td>'+esc(statuses[x.status]||x.status)+(Number(x.paid_amount)>0?' · выплачено '+money(x.paid_amount):'')+'</td><td>'+date(x.created_at)+'</td></tr>').join('') || '<tr><td colspan="5">Нет начислений.</td></tr>';
     } catch(e) { showError(e.message); }
@@ -36,6 +37,7 @@
     catch(e){showError(e.message);}
     finally{button.disabled=false;}
   });
+  document.getElementById('promoList').addEventListener('click',async event=>{const button=event.target.closest('[data-copy-promo]');if(!button)return;try{await navigator.clipboard.writeText(button.dataset.copyPromo);notice.textContent='Промокод скопирован: '+button.dataset.copyPromo;notice.classList.remove('hidden');}catch{showError('Не удалось скопировать промокод.');}});
   document.getElementById('copyLink').addEventListener('click',async()=>{
     try{await navigator.clipboard.writeText(document.getElementById('partnerLink').href);notice.textContent='Партнёрская ссылка скопирована.';notice.classList.remove('hidden');}
     catch{showError('Не удалось скопировать ссылку. Скопируйте её вручную.');}
