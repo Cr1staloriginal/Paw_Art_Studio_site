@@ -269,6 +269,10 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,partner_id INTEGER NOT NULL,ip_hash TEXT,user_agent TEXT,created_at INTEGER NOT NULL,
     FOREIGN KEY(partner_id) REFERENCES partners(id) ON DELETE CASCADE
   );
+  CREATE TABLE IF NOT EXISTS partner_balance_adjustments (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,partner_id INTEGER NOT NULL,project_id INTEGER,amount INTEGER NOT NULL,reason TEXT NOT NULL,created_at INTEGER NOT NULL,created_by INTEGER,
+    FOREIGN KEY(partner_id) REFERENCES partners(id) ON DELETE CASCADE
+  );
   CREATE TABLE IF NOT EXISTS referral_clicks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     referral_code TEXT NOT NULL,
@@ -304,6 +308,8 @@ safeAddColumn('projects', 'partner_paid_at', 'INTEGER');
 safeAddColumn('projects', 'partner_payment_reference', 'TEXT');
 safeAddColumn('partner_ledger', 'payment_verified_at', 'INTEGER');
 safeAddColumn('partner_ledger', 'payment_reference', 'TEXT');
+safeAddColumn('partners', 'partner_user_id', 'INTEGER');
+safeAddColumn('partners', 'payout_minimum', 'INTEGER NOT NULL DEFAULT 100');
 const PARTNER_ATTRIBUTION_DAYS = Math.max(1, Math.min(365, Number(process.env.PARTNER_ATTRIBUTION_DAYS) || 30));
 safeAddColumn('requests', 'promo_code', 'TEXT');
 safeAddColumn('requests', 'discount_percent', 'INTEGER NOT NULL DEFAULT 0');
@@ -2046,7 +2052,7 @@ app.get('/api/partners',(req,res)=>{
  }))});
 });
 app.get('/api/admin/partners',auth,adminOnly,(req,res)=>{
- const partners=db.prepare("SELECT p.*,(SELECT COUNT(*) FROM partner_clicks c WHERE c.partner_id=p.id) clicks,(SELECT COUNT(*) FROM users u WHERE u.partner_id=p.id) registrations,(SELECT COUNT(*) FROM partner_ledger l WHERE l.partner_id=p.id) orders,(SELECT COALESCE(SUM(reward_amount),0) FROM partner_ledger l WHERE l.partner_id=p.id AND l.status='approved') payable,(SELECT COALESCE(SUM(reward_amount),0) FROM partner_ledger l WHERE l.partner_id=p.id AND l.status='paid') paid FROM partners p ORDER BY p.created_at DESC").all().map(p=>({...partnerRow(p),clicks:Number(p.clicks),registrations:Number(p.registrations),orders:Number(p.orders),payable:Number(p.payable),paid:Number(p.paid)}));
+ const partners=db.prepare("SELECT p.*,(SELECT COUNT(*) FROM partner_clicks c WHERE c.partner_id=p.id) clicks,(SELECT COUNT(*) FROM users u WHERE u.partner_id=p.id) registrations,(SELECT COUNT(*) FROM partner_ledger l WHERE l.partner_id=p.id) orders,(SELECT COALESCE(SUM(reward_amount),0) FROM partner_ledger l WHERE l.partner_id=p.id AND l.status='approved') payable,(SELECT COALESCE(SUM(reward_amount),0) FROM partner_ledger l WHERE l.partner_id=p.id AND l.status='paid') paid,(SELECT COALESCE(SUM(reward_amount),0) FROM partner_ledger l WHERE l.partner_id=p.id AND l.status='pending') pending,(SELECT COALESCE(SUM(amount),0) FROM partner_balance_adjustments a WHERE a.partner_id=p.id) adjustments FROM partners p ORDER BY p.created_at DESC").all().map(p=>({...partnerRow(p),clicks:Number(p.clicks),registrations:Number(p.registrations),orders:Number(p.orders),payable:Number(p.payable),paid:Number(p.paid),pending:Number(p.pending),adjustments:Number(p.adjustments),available:Number(p.payable)-Number(p.adjustments)}));
  const promos=db.prepare("SELECT c.*,p.name partner_name FROM promocodes c JOIN partners p ON p.id=c.partner_id ORDER BY c.created_at DESC").all();
  const contests=db.prepare("SELECT c.*,p.name partner_name FROM partner_contests c JOIN partners p ON p.id=c.partner_id ORDER BY c.created_at DESC").all();
  const ads=db.prepare("SELECT a.*,p.name partner_name FROM partner_ads a JOIN partners p ON p.id=a.partner_id ORDER BY a.created_at DESC").all();
@@ -2056,17 +2062,22 @@ app.get('/api/admin/partners',auth,adminOnly,(req,res)=>{
 });
 app.post('/api/admin/partners',auth,adminOnly,(req,res)=>{
  const b=req.body||{},name=String(b.name||'').trim(),code=String(b.referralCode||'').trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'');
+ const accountEmail=String(b.accountEmail||b.contactEmail||'').trim().toLowerCase();
+ const linkedUser=accountEmail?db.prepare('SELECT id,email_verified FROM users WHERE email=?').get(accountEmail):null;
+ if(accountEmail&&(!linkedUser||linkedUser.email_verified!==1))return res.status(400).json({error:'Аккаунт партнёра не найден или email не подтверждён. Попросите партнёра сначала зарегистрироваться.'});
  const discount=Math.max(0,Math.min(100,Math.round(Number(b.discountPercent)||0))),reward=Math.max(0,Math.min(50,Number(b.rewardPercent)||0)),discord=String(b.discordUrl||'').trim();
  if(!name||name.length>100||!/^[A-Z0-9_-]{3,24}$/.test(code))return res.status(400).json({error:'Проверьте название и код партнёра (3–24 символа)'});
  if(db.prepare('SELECT id FROM users WHERE referral_code=?').get(code))return res.status(409).json({error:'Этот код уже занят личной реферальной системой'});
  if(discord&&!/^https:\/\/(discord\.gg|discord\.com)\//i.test(discord))return res.status(400).json({error:'Некорректная Discord-ссылка'});
- try{const now=Date.now(),r=db.prepare("INSERT INTO partners(name,description,discord_url,logo_url,owner_name,contact_email,referral_code,discount_percent,reward_percent,status,created_at,updated_at) VALUES(?,?,?,?,?,?,?,?,?,'active',?,?)").run(name,String(b.description||'').slice(0,1000),discord,String(b.logoUrl||'').slice(0,500),String(b.ownerName||'').slice(0,100),String(b.contactEmail||'').slice(0,160),code,discount,reward,now,now);res.status(201).json({partner:partnerRow(db.prepare('SELECT * FROM partners WHERE id=?').get(r.lastInsertRowid))});}
+ try{const now=Date.now(),r=db.prepare("INSERT INTO partners(name,description,discord_url,logo_url,owner_name,contact_email,referral_code,discount_percent,reward_percent,status,created_at,updated_at,partner_user_id) VALUES(?,?,?,?,?,?,?,?,?,'active',?,?,?)").run(name,String(b.description||'').slice(0,1000),discord,String(b.logoUrl||'').slice(0,500),String(b.ownerName||'').slice(0,100),accountEmail,code,discount,reward,now,now,linkedUser?.id||null);res.status(201).json({partner:partnerRow(db.prepare('SELECT * FROM partners WHERE id=?').get(r.lastInsertRowid))});}
  catch(e){if(String(e.message).includes('UNIQUE'))return res.status(409).json({error:'Реферальный код уже занят'});console.error(e);res.status(500).json({error:'Не удалось создать партнёра'});}
 });
 app.patch('/api/admin/partners/:id',auth,adminOnly,(req,res)=>{
  const id=Number(req.params.id),b=req.body||{},p=db.prepare('SELECT * FROM partners WHERE id=?').get(id);if(!p)return res.status(404).json({error:'Партнёр не найден'});
  const status=['active','paused','rejected','pending'].includes(b.status)?b.status:p.status,discount=b.discountPercent===undefined?p.discount_percent:Math.max(0,Math.min(100,Math.round(Number(b.discountPercent)||0))),reward=b.rewardPercent===undefined?p.reward_percent:Math.max(0,Math.min(50,Number(b.rewardPercent)||0));
- db.prepare('UPDATE partners SET status=?,discount_percent=?,reward_percent=?,updated_at=? WHERE id=?').run(status,discount,reward,Date.now(),id);res.json({ok:true});
+ let linkedUserId=p.partner_user_id||null;
+ if(b.accountEmail!==undefined){const email=String(b.accountEmail||'').trim().toLowerCase();if(email){const u=db.prepare('SELECT id,email_verified FROM users WHERE email=?').get(email);if(!u||u.email_verified!==1)return res.status(400).json({error:'Аккаунт не найден или email не подтверждён'});linkedUserId=u.id;}else linkedUserId=null;}
+ db.prepare('UPDATE partners SET status=?,discount_percent=?,reward_percent=?,partner_user_id=?,updated_at=? WHERE id=?').run(status,discount,reward,linkedUserId,Date.now(),id);res.json({ok:true});
 });
 app.post('/api/admin/partners/:id/promos',auth,adminOnly,(req,res)=>{
  const id=Number(req.params.id),p=db.prepare('SELECT * FROM partners WHERE id=?').get(id),b=req.body||{};if(!p)return res.status(404).json({error:'Партнёр не найден'});
@@ -2111,22 +2122,60 @@ app.post('/api/admin/partner-ledger/:id/:action',auth,adminOnly,(req,res)=>{
  } else return res.status(400).json({error:'Неизвестное действие'});
  res.json({ok:true});
 });
+app.get('/api/partner/me',auth,(req,res)=>{
+ const p=db.prepare("SELECT * FROM partners WHERE partner_user_id=? AND status='active'").get(req.user.id);
+ if(!p)return res.status(403).json({error:'К этому аккаунту не привязан активный партнёр. Обратитесь к администратору.'});
+ const stats=db.prepare("SELECT COUNT(*) orders,COALESCE(SUM(CASE WHEN status='pending' THEN reward_amount ELSE 0 END),0) pending,COALESCE(SUM(CASE WHEN status='approved' THEN reward_amount ELSE 0 END),0) approved,COALESCE(SUM(CASE WHEN status='paid' THEN reward_amount ELSE 0 END),0) paid,COALESCE(SUM(CASE WHEN status='reversed' THEN reward_amount ELSE 0 END),0) reversed FROM partner_ledger WHERE partner_id=?").get(p.id);
+ const clicks=db.prepare('SELECT COUNT(*) n FROM partner_clicks WHERE partner_id=?').get(p.id).n;
+ const registrations=db.prepare('SELECT COUNT(*) n FROM users WHERE partner_id=?').get(p.id).n;
+ const adjustments=db.prepare('SELECT COALESCE(SUM(amount),0) n FROM partner_balance_adjustments WHERE partner_id=?').get(p.id).n;
+ const reserved=db.prepare("SELECT COALESCE(SUM(amount),0) n FROM partner_payout_requests WHERE partner_id=? AND status IN ('pending','approved')").get(p.id).n;
+ const available=Number(stats.approved)-Number(adjustments)-Number(reserved);
+ const payouts=db.prepare('SELECT id,amount,status,comment,created_at,reviewed_at FROM partner_payout_requests WHERE partner_id=? ORDER BY created_at DESC LIMIT 30').all(p.id);
+ const ledger=db.prepare('SELECT id,project_id,order_amount,reward_amount,status,created_at,reviewed_at FROM partner_ledger WHERE partner_id=? ORDER BY created_at DESC LIMIT 50').all(p.id);
+ res.json({partner:partnerRow(p),stats:{clicks:Number(clicks),registrations:Number(registrations),orders:Number(stats.orders),pending:Number(stats.pending),approved:Number(stats.approved),paid:Number(stats.paid),reversed:Number(stats.reversed),available},payouts,ledger});
+});
+app.post('/api/partner/payouts',auth,(req,res)=>{
+ const p=db.prepare("SELECT * FROM partners WHERE partner_user_id=? AND status='active'").get(req.user.id);
+ if(!p)return res.status(403).json({error:'Активный партнёрский аккаунт не найден'});
+ const details=String(req.body?.paymentDetails||'').trim();
+ if(details.length<5||details.length>500)return res.status(400).json({error:'Укажите корректные платёжные реквизиты'});
+ const create=db.transaction(()=>{
+  const approved=Number(db.prepare("SELECT COALESCE(SUM(reward_amount),0) n FROM partner_ledger WHERE partner_id=? AND status='approved'").get(p.id).n);
+  const adjustments=Number(db.prepare('SELECT COALESCE(SUM(amount),0) n FROM partner_balance_adjustments WHERE partner_id=?').get(p.id).n);
+  const reserved=Number(db.prepare("SELECT COALESCE(SUM(amount),0) n FROM partner_payout_requests WHERE partner_id=? AND status IN ('pending','approved')").get(p.id).n);
+  const available=approved-adjustments-reserved;
+  if(available<Number(p.payout_minimum||100))throw new Error('Недостаточно средств для выплаты. Доступно '+(Math.max(0,available)/100).toFixed(2)+' ₽');
+  const result=db.prepare("INSERT INTO partner_payout_requests(partner_id,amount,payment_details,status,created_at) VALUES(?,?,?,'pending',?)").run(p.id,available,details,Date.now());
+  return Number(result.lastInsertRowid);
+ });
+ try{const id=create();res.status(201).json({ok:true,id,message:'Заявка на выплату отправлена администратору'});}catch(e){res.status(400).json({error:e.message||'Не удалось создать заявку'});}
+});
 app.post('/api/admin/partners/:id/payouts',auth,adminOnly,(req,res)=>{
  const id=Number(req.params.id),p=db.prepare("SELECT * FROM partners WHERE id=? AND status='active'").get(id),b=req.body||{};
  if(!p)return res.status(404).json({error:'Активный партнёр не найден'});
  const amount=Math.round(Number(b.amountRub)*100),details=String(b.paymentDetails||'').trim();
  if(!Number.isSafeInteger(amount)||amount<100||details.length<5||details.length>500)return res.status(400).json({error:'Проверьте сумму и реквизиты'});
- const approved=db.prepare("SELECT COALESCE(SUM(reward_amount),0) total FROM partner_ledger WHERE partner_id=? AND status='approved'").get(id).total;
- const reserved=db.prepare("SELECT COALESCE(SUM(amount),0) total FROM partner_payout_requests WHERE partner_id=? AND status IN ('pending','approved')").get(id).total;
- if(amount!==approved-reserved)return res.status(400).json({error:'Заявку можно создать только на всю доступную подтверждённую сумму: '+((approved-reserved)/100).toFixed(2)+' ₽'});
+ const approved=Number(db.prepare("SELECT COALESCE(SUM(reward_amount),0) total FROM partner_ledger WHERE partner_id=? AND status='approved'").get(id).total);
+ const adjustments=Number(db.prepare('SELECT COALESCE(SUM(amount),0) total FROM partner_balance_adjustments WHERE partner_id=?').get(id).total);
+ const reserved=Number(db.prepare("SELECT COALESCE(SUM(amount),0) total FROM partner_payout_requests WHERE partner_id=? AND status IN ('pending','approved')").get(id).total);
+ if(amount!==approved-adjustments-reserved)return res.status(400).json({error:'Сумма должна совпадать с доступным остатком: '+((approved-adjustments-reserved)/100).toFixed(2)+' ₽'});
  db.prepare("INSERT INTO partner_payout_requests(partner_id,amount,payment_details,status,created_at) VALUES(?,?,?,'pending',?)").run(id,amount,details,Date.now());
  res.status(201).json({ok:true});
 });
 app.patch('/api/admin/partner-payouts/:id',auth,adminOnly,(req,res)=>{
  const id=Number(req.params.id),status=String(req.body?.status||''),row=db.prepare('SELECT * FROM partner_payout_requests WHERE id=?').get(id);if(!row)return res.status(404).json({error:'Заявка не найдена'});
  if(!['approved','rejected','paid'].includes(status)||!(row.status==='pending'||(row.status==='approved'&&status==='paid')))return res.status(409).json({error:'Недопустимый статус заявки'});
- db.prepare('UPDATE partner_payout_requests SET status=?,comment=?,reviewed_at=?,reviewed_by=? WHERE id=?').run(status,String(req.body?.comment||'').slice(0,500),Date.now(),req.user.id,id);
- if(status==='paid')db.prepare("UPDATE partner_ledger SET status='paid',reviewed_at=?,reviewed_by=? WHERE partner_id=? AND status='approved'").run(Date.now(),req.user.id,row.partner_id);
+ const now=Date.now();
+ const update=db.transaction(()=>{
+  db.prepare('UPDATE partner_payout_requests SET status=?,comment=?,reviewed_at=?,reviewed_by=? WHERE id=?').run(status,String(req.body?.comment||'').slice(0,500),now,req.user.id,id);
+  if(status==='paid'){
+   const available=Number(db.prepare("SELECT COALESCE(SUM(reward_amount),0) n FROM partner_ledger WHERE partner_id=? AND status='approved'").get(row.partner_id).n);
+   if(available<Number(row.amount))throw new Error('Недостаточно одобренных начислений для закрытия выплаты');
+   db.prepare("UPDATE partner_ledger SET status='paid',reviewed_at=?,reviewed_by=? WHERE partner_id=? AND status='approved'").run(now,req.user.id,row.partner_id);
+  }
+ });
+ try{update();}catch(e){return res.status(409).json({error:e.message});}
  res.json({ok:true});
 });
 
