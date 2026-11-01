@@ -280,7 +280,7 @@ function getRefFromUrl() {
 }
 
 async function logout() {
-    setToken(null); state.user = null; state.chats = []; state.chatMessages = {}; state.currentChatId = null;
+    setToken(null); localStorage.removeItem('paw_partner_token'); localStorage.removeItem('paw_ref'); localStorage.removeItem('paw_ref_at'); state.user = null; state.chats = []; state.chatMessages = {}; state.currentChatId = null;
     if (state.socket) { state.socket.disconnect(); state.socket = null; }
     closeDashboard(); closeAdminPanel(); closeMessenger(); closeProfileEditor(); closeMyPortfolio(); closeUserFull(); closeContentEditor();
     updateUI(); loadProjects(); loadAllPortfolio();
@@ -1854,8 +1854,9 @@ async function loadPublicPartners(){
 /* INIT */
 async function init() {
     // Реферальный трекинг
+    const urlRef = new URLSearchParams(location.search).get('ref');
     const ref = getRefFromUrl();
-    if (ref) {
+    if (urlRef && ref) {
         localStorage.removeItem('paw_partner_token');
         partnerAttributionPromise = fetch('/api/referrals/click/' + encodeURIComponent(ref)).then(r => r.ok ? r.json() : null)
           .then(data => { if (data?.partnerToken) localStorage.setItem('paw_partner_token', data.partnerToken); })
