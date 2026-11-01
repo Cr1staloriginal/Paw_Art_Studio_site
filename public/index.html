@@ -609,7 +609,7 @@
         <div class="admin-panel hidden" id="adminPartners">
           <h4>Добавить официального партнёра</h4>
           <form id="partnerCreateForm" onsubmit="createPartner(event)" style="display:grid;gap:10px;margin:12px 0">
-            <input name="name" required maxlength="100" placeholder="Название Discord-сервера">
+            <input name="name" required maxlength="100" placeholder="Название Discord-сервера">\n            <input name="accountEmail" type="email" placeholder="Email аккаунта партнёра на сайте (для кабинета)">
             <input name="referralCode" required minlength="3" maxlength="24" placeholder="Код ссылки, например FLUFFY">
             <input name="ownerName" placeholder="Владелец / контакт"><input name="contactEmail" type="email" placeholder="Email">
             <input name="discordUrl" type="url" placeholder="Discord invite URL"><input name="logoUrl" type="url" placeholder="URL логотипа">
