@@ -2038,17 +2038,23 @@ app.post('/api/admin/partner-ledger/:id/:action',auth,adminOnly,(req,res)=>{
  if(!row)return res.status(404).json({error:'Начисление не найдено'});if(!next||!['pending','approved'].includes(row.status))return res.status(409).json({error:'Недопустимый переход статуса'});
  db.prepare('UPDATE partner_ledger SET status=?,reviewed_at=?,reviewed_by=? WHERE id=?').run(next,Date.now(),req.user.id,id);res.json({ok:true});
 });
-app.post('/api/partners/:code/payout-requests',(req,res)=>{
- const code=String(req.params.code||'').trim().toUpperCase(),p=db.prepare("SELECT * FROM partners WHERE referral_code=? AND status='active'").get(code),b=req.body||{};if(!p)return res.status(404).json({error:'Партнёр не найден'});
- const amount=Math.round(Number(b.amountRub)*100),details=String(b.paymentDetails||'').trim();if(!Number.isSafeInteger(amount)||amount<100||details.length<5||details.length>500)return res.status(400).json({error:'Проверьте сумму и реквизиты'});
- const earned=db.prepare("SELECT COALESCE(SUM(reward_amount),0) total FROM partner_ledger WHERE partner_id=? AND status IN ('pending','approved')").get(p.id).total,reserved=db.prepare("SELECT COALESCE(SUM(amount),0) total FROM partner_payout_requests WHERE partner_id=? AND status IN ('pending','approved')").get(p.id).total;
- if(amount>earned-reserved)return res.status(400).json({error:'Недостаточно доступного вознаграждения'});
- db.prepare("INSERT INTO partner_payout_requests(partner_id,amount,payment_details,status,created_at) VALUES(?,?,?,'pending',?)").run(p.id,amount,details,Date.now());res.status(201).json({ok:true});
+app.post('/api/admin/partners/:id/payouts',auth,adminOnly,(req,res)=>{
+ const id=Number(req.params.id),p=db.prepare("SELECT * FROM partners WHERE id=? AND status='active'").get(id),b=req.body||{};
+ if(!p)return res.status(404).json({error:'Активный партнёр не найден'});
+ const amount=Math.round(Number(b.amountRub)*100),details=String(b.paymentDetails||'').trim();
+ if(!Number.isSafeInteger(amount)||amount<100||details.length<5||details.length>500)return res.status(400).json({error:'Проверьте сумму и реквизиты'});
+ const approved=db.prepare("SELECT COALESCE(SUM(reward_amount),0) total FROM partner_ledger WHERE partner_id=? AND status='approved'").get(id).total;
+ const reserved=db.prepare("SELECT COALESCE(SUM(amount),0) total FROM partner_payout_requests WHERE partner_id=? AND status IN ('pending','approved')").get(id).total;
+ if(amount!==approved-reserved)return res.status(400).json({error:'Заявку можно создать только на всю доступную подтверждённую сумму: '+((approved-reserved)/100).toFixed(2)+' ₽'});
+ db.prepare("INSERT INTO partner_payout_requests(partner_id,amount,payment_details,status,created_at) VALUES(?,?,?,'pending',?)").run(id,amount,details,Date.now());
+ res.status(201).json({ok:true});
 });
 app.patch('/api/admin/partner-payouts/:id',auth,adminOnly,(req,res)=>{
  const id=Number(req.params.id),status=String(req.body?.status||''),row=db.prepare('SELECT * FROM partner_payout_requests WHERE id=?').get(id);if(!row)return res.status(404).json({error:'Заявка не найдена'});
  if(!['approved','rejected','paid'].includes(status)||!(row.status==='pending'||(row.status==='approved'&&status==='paid')))return res.status(409).json({error:'Недопустимый статус заявки'});
- db.prepare('UPDATE partner_payout_requests SET status=?,comment=?,reviewed_at=?,reviewed_by=? WHERE id=?').run(status,String(req.body?.comment||'').slice(0,500),Date.now(),req.user.id,id);res.json({ok:true});
+ db.prepare('UPDATE partner_payout_requests SET status=?,comment=?,reviewed_at=?,reviewed_by=? WHERE id=?').run(status,String(req.body?.comment||'').slice(0,500),Date.now(),req.user.id,id);
+ if(status==='paid')db.prepare("UPDATE partner_ledger SET status='paid',reviewed_at=?,reviewed_by=? WHERE partner_id=? AND status='approved'").run(Date.now(),req.user.id,row.partner_id);
+ res.json({ok:true});
 });
 
 /* ==================== SERVER ==================== */
