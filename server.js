@@ -911,7 +911,7 @@ app.post('/api/payments/create', auth, async (req, res) => {
 
 app.post('/api/payments/webhook', async (req, res) => {
   const { event, object } = req.body || {};
-  if (event !== 'payment.succeeded' || !object?.id) return res.status(200).send('OK');
+  if (!['payment.succeeded','payment.canceled'].includes(event) || !object?.id) return res.status(200).send('OK');
 
   // Never trust the webhook payload alone: fetch the payment from YooKassa.
   // Unknown payments, mismatched users and mismatched amounts are ignored.
@@ -934,6 +934,17 @@ app.post('/api/payments/webhook', async (req, res) => {
     }
 
     const verified = await verifyResponse.json();
+    if(event==='payment.canceled'&&verified.status==='canceled'){
+      const canceled=db.transaction(()=>{
+        const row=db.prepare('SELECT id,project_id,purpose,status FROM payments WHERE payment_id=?').get(String(verified.id));
+        if(!row||row.status!=='pending')return false;
+        db.prepare("UPDATE payments SET status='canceled' WHERE id=?").run(row.id);
+        if(row.purpose==='project'&&row.project_id)db.prepare("UPDATE projects SET payment_status='unpaid' WHERE id=? AND payment_status='pending'").run(row.project_id);
+        return true;
+      })();
+      if(canceled)console.log('ℹ️ Платёж отменён в ЮKassa:',String(verified.id));
+      return res.status(200).send('OK');
+    }
     if (verified.status !== 'succeeded' || verified.paid !== true) {
       console.warn('⚠️ YooKassa webhook ignored: payment is not succeeded');
       return res.status(200).send('OK');
