@@ -1566,16 +1566,37 @@ app.get('/api/projects', auth, (req, res) => {
 });
 
 app.post('/api/projects', auth, (req, res) => {
-  const { title, description, category, budget } = req.body || {};
-  if (!title || !description || !category)
-    return res.status(400).json({ error: 'Заполните поля' });
-  const now = Date.now();
-  const info = db.prepare(`INSERT INTO projects
-    (title, description, category, budget, status, client_id, created_at, updated_at)
-    VALUES (?, ?, ?, ?, 'open', ?, ?, ?)`)
-    .run(title, description, category, Math.round(Number(budget) * 100) || 0, req.user.id, now, now);
-  const project = db.prepare('SELECT * FROM projects WHERE id = ?').get(info.lastInsertRowid);
-  res.json({ project });
+  const b=req.body||{},title=String(b.title||'').trim(),description=String(b.description||'').trim(),category=String(b.category||'').trim();
+  if(!title||!description||!category)return res.status(400).json({error:'Заполните поля'});
+  if(title.length>120||description.length>2000||category.length>80)return res.status(400).json({error:'Превышена допустимая длина полей'});
+  const rawBudget=Number(b.budget||0),baseBudget=Math.round(rawBudget*100);
+  if(!Number.isFinite(rawBudget)||rawBudget<0||!Number.isSafeInteger(baseBudget)||baseBudget>1000000000)return res.status(400).json({error:'Некорректный бюджет'});
+  const promoCode=String(b.promoCode||'').trim().toUpperCase();
+  let promo=null;
+  if(promoCode){
+    promo=db.prepare('SELECT * FROM promocodes WHERE code=?').get(promoCode);
+    if(!promo||!promo.active)return res.status(400).json({error:'Промокод не найден или неактивен'});
+    if(promo.partner_id&&!db.prepare("SELECT id FROM partners WHERE id=? AND status='active'").get(promo.partner_id))return res.status(400).json({error:'Промокод партнёра временно недоступен'});
+    if(promo.expires_at&&Date.now()>promo.expires_at)return res.status(400).json({error:'Срок действия промокода истёк'});
+    if(promo.max_uses&&promo.uses>=promo.max_uses)return res.status(400).json({error:'Лимит использований промокода исчерпан'});
+    if(!promo.discount)return res.status(400).json({error:'Этот промокод не даёт скидку на заказ'});
+    if(db.prepare('SELECT id FROM promo_redemptions WHERE promo_id=? AND user_id=?').get(promo.id,req.user.id))return res.status(400).json({error:'Вы уже использовали этот промокод'});
+  }
+  const discount=promo?Number(promo.discount):0,finalBudget=Math.round(baseBudget*(100-discount)/100);
+  const partnerId=promo?.partner_id||req.user.partner_id||null,now=Date.now();
+  try{
+    const create=db.transaction(()=>{
+      if(promo){
+        db.prepare('INSERT INTO promo_redemptions(promo_id,user_id,created_at) VALUES(?,?,?)').run(promo.id,req.user.id,now);
+        db.prepare('UPDATE promocodes SET uses=uses+1 WHERE id=?').run(promo.id);
+      }
+      const info=db.prepare(`INSERT INTO projects(title,description,category,budget,status,client_id,created_at,updated_at,base_budget,discount_percent,promo_code,partner_id)
+        VALUES(?,?,?,?,'open',?,?,?,?,?,?,?)`).run(title,description,category,finalBudget,req.user.id,now,now,baseBudget,discount,promo?promo.code:null,partnerId);
+      return Number(info.lastInsertRowid);
+    });
+    const id=create(),project=db.prepare('SELECT * FROM projects WHERE id=?').get(id);
+    res.status(201).json({project,pricing:{baseBudget,discountPercent:discount,finalBudget,saved:baseBudget-finalBudget}});
+  }catch(e){if(String(e.message).includes('UNIQUE'))return res.status(409).json({error:'Промокод уже использован'});console.error('[projects:create]',e);res.status(500).json({error:'Не удалось создать заказ'});}
 });
 
 
