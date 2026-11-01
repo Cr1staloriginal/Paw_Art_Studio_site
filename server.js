@@ -2158,11 +2158,17 @@ app.patch('/api/admin/partners/:id',auth,adminOnly,(req,res)=>{
  db.prepare('UPDATE partners SET status=?,discount_percent=?,reward_percent=?,partner_user_id=?,payout_minimum=?,updated_at=? WHERE id=?').run(status,discount,reward,linkedUserId,payoutMinimum,Date.now(),id);res.json({ok:true});
 });
 app.post('/api/admin/partners/:id/promos',auth,adminOnly,(req,res)=>{
- const id=Number(req.params.id),p=db.prepare('SELECT * FROM partners WHERE id=?').get(id),b=req.body||{};if(!p)return res.status(404).json({error:'Партнёр не найден'});
+ const id=Number(req.params.id),p=db.prepare('SELECT * FROM partners WHERE id=?').get(id),b=req.body||{};
+ if(!p)return res.status(404).json({error:'Партнёр не найден'});
  const code=String(b.code||'').trim().toUpperCase().replace(/[^A-Z0-9_-]/g,''),discount=Math.max(0,Math.min(100,Math.round(Number(b.discountPercent)||p.discount_percent||0))),bonus=Math.max(0,Math.round(Number(b.bonusRub)||0)*100);
+ const rawExpiry=String(b.expiresAt||'').trim(),expiresAt=rawExpiry?Date.parse(rawExpiry):null,maxUses=b.maxUses===''||b.maxUses==null?null:Number(b.maxUses);
  if(!/^[A-Z0-9_-]{3,32}$/.test(code)||(!discount&&!bonus))return res.status(400).json({error:'Укажите код и скидку или бонус'});
- try{db.prepare('INSERT INTO promocodes(code,bonus,discount,active,created_at,partner_id) VALUES(?,?,?,1,?,?)').run(code,bonus,discount,Date.now(),id);res.status(201).json({ok:true,code});}
- catch(e){if(String(e.message).includes('UNIQUE'))return res.status(409).json({error:'Промокод уже существует'});res.status(500).json({error:'Не удалось создать промокод'});}
+ if(rawExpiry&&(!Number.isFinite(expiresAt)||expiresAt<=Date.now()))return res.status(400).json({error:'Дата окончания должна быть в будущем'});
+ if(maxUses!==null&&(!Number.isSafeInteger(maxUses)||maxUses<1||maxUses>1000000))return res.status(400).json({error:'Лимит использований должен быть от 1 до 1 000 000'});
+ try{
+  const created=db.prepare('INSERT INTO promocodes(code,bonus,discount,active,created_at,partner_id,expires_at,max_uses) VALUES(?,?,?,1,?,?,?,?)').run(code,bonus,discount,Date.now(),id,expiresAt,maxUses);
+  res.status(201).json({ok:true,id:Number(created.lastInsertRowid),code,expiresAt,maxUses});
+ }catch(e){if(String(e.message).includes('UNIQUE'))return res.status(409).json({error:'Промокод уже существует'});res.status(500).json({error:'Не удалось создать промокод'});}
 });
 app.patch('/api/admin/partners/:id/promos/:promoId',auth,adminOnly,(req,res)=>{
  const partnerId=Number(req.params.id),promoId=Number(req.params.promoId),b=req.body||{};
