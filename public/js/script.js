@@ -1796,6 +1796,12 @@ async function partnerAd(id){
  try{await api('/api/admin/partners/'+id+'/ads',{method:'POST',body:{title:title,targetUrl:targetUrl}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}
 }
 async function partnerLedgerAction(id,action){try{await api('/api/admin/partner-ledger/'+id+'/'+action,{method:'POST',body:{}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}}
+async function partnerPayoutCreate(id){
+ const amountRub=Number(prompt('Сумма подтверждённого вознаграждения к выплате, ₽:','')||0);if(!amountRub)return;
+ const paymentDetails=prompt('Реквизиты партнёра (полученные напрямую):');if(!paymentDetails)return;
+ try{await api('/api/admin/partners/'+id+'/payouts',{method:'POST',body:{amountRub:amountRub,paymentDetails:paymentDetails}});showToast('Заявка на выплату зарегистрирована');await loadPartnerAdmin();}
+ catch(e){showToast('❌ '+e.message,'error');}
+}
 async function partnerPayoutAction(id,status){
  const comment=prompt('Комментарий:','');if(comment===null)return;
  try{await api('/api/admin/partner-payouts/'+id,{method:'PATCH',body:{status:status,comment:comment}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}
@@ -1810,7 +1816,7 @@ function renderPartnerAdmin(){
    '<p>К выплате: '+formatMoney(p.payable)+' · Выплачено: '+formatMoney(p.paid)+'</p>'+
    '<p><code>'+location.origin+'/?ref='+encodeURIComponent(p.referralCode)+'</code></p>'+
    '<div class="request-actions"><button class="admin-act-btn" onclick="partnerPromo('+p.id+')">Промокод</button>'+
-   '<button class="admin-act-btn" onclick="partnerContest('+p.id+')">Конкурс</button><button class="admin-act-btn" onclick="partnerAd('+p.id+')">Реклама</button>'+
+   '<button class="admin-act-btn" onclick="partnerContest('+p.id+')">Конкурс</button><button class="admin-act-btn" onclick="partnerAd('+p.id+')">Реклама</button>'+'<button class="admin-act-btn" onclick="partnerPayoutCreate('+p.id+')">Заявка на выплату</button>'+
    '<button class="admin-act-btn" onclick="partnerStatus('+p.id+',\''+next+'\')">'+label+'</button></div></article>';
  }).join('')||'<p class="admin-empty">Партнёров пока нет.</p>';
  if(extra)extra.innerHTML='<h5>Промокоды</h5>'+((d.promos||[]).map(x=>'<p>'+escapeHtml(x.code)+' · '+escapeHtml(x.partner_name)+' · '+x.discount+'% · использовано '+x.uses+'</p>').join('')||'<p>Нет промокодов.</p>')+
@@ -1826,7 +1832,9 @@ function renderPartnerAdmin(){
 }
 async function loadPublicPartners(){
  const box=document.getElementById('partnersGrid');if(!box)return;
- try{const d=await fetch('/api/partners').then(r=>r.json());box.innerHTML=(d.partners||[]).map(p=>'<article class="service-card visible" style="opacity:1;transform:none"><div class="service-icon"><i class="fas fa-handshake"></i></div><h3>'+escapeHtml(p.name)+'</h3><p>'+escapeHtml(p.description||'Официальный партнёр Paw Art Studio')+'</p>'+(p.discordUrl?'<a class="btn btn-outline" href="'+escapeHtml(p.discordUrl)+'" target="_blank" rel="noopener">Перейти на сервер ↗</a>':'')+'</article>').join('')||'<p class="empty-state small">Скоро здесь появятся наши партнёры.</p>';}
+ try{const d=await fetch('/api/partners').then(r=>r.json());box.innerHTML=(d.partners||[]).map(p=>'<article class="service-card visible" style="opacity:1;transform:none"><div class="service-icon"><i class="fas fa-handshake"></i></div><h3>'+escapeHtml(p.name)+'</h3><p>'+escapeHtml(p.description||'Официальный партнёр Paw Art Studio')+'</p>'+(p.discordUrl?'<a class="btn btn-outline" href="'+escapeHtml(p.discordUrl)+'" target="_blank" rel="noopener">Перейти на сервер ↗</a>':'')+
+ (p.contests||[]).map(c=>'<p class="wd-date">🎉 '+escapeHtml(c.title)+' · '+escapeHtml(c.prize||'Совместный конкурс')+'</p>').join('')+
+ (p.ads||[]).map(a=>'<p class="wd-date">📢 <a href="'+escapeHtml(a.target_url)+'" target="_blank" rel="noopener">'+escapeHtml(a.title)+'</a></p>').join('')+'</article>').join('')||'<p class="empty-state small">Скоро здесь появятся наши партнёры.</p>';}
  catch(e){box.textContent='Не удалось загрузить партнёров.';}
 }
 

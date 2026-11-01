@@ -1993,9 +1993,14 @@ app.use((req, res) => {
 
 /* ==================== PARTNERS ==================== */
 function partnerRow(p){return{id:Number(p.id),name:p.name,description:p.description||'',discordUrl:p.discord_url||'',logoUrl:p.logo_url||'',ownerName:p.owner_name||'',contactEmail:p.contact_email||'',referralCode:p.referral_code,discountPercent:Number(p.discount_percent||0),rewardPercent:Number(p.reward_percent||0),status:p.status};}
-app.get('/api/partners',(req,res)=>res.json({partners:db.prepare("SELECT * FROM partners WHERE status='active' ORDER BY name").all().map(partnerRow)}));
+app.get('/api/partners',(req,res)=>{
+ const partners=db.prepare("SELECT * FROM partners WHERE status='active' ORDER BY name").all();
+ const ads=db.prepare("SELECT a.*,p.referral_code FROM partner_ads a JOIN partners p ON p.id=a.partner_id WHERE a.active=1 AND p.status='active' ORDER BY a.created_at DESC").all();
+ const contests=db.prepare("SELECT c.*,p.referral_code FROM partner_contests c JOIN partners p ON p.id=c.partner_id WHERE c.status='active' AND p.status='active' ORDER BY c.created_at DESC").all();
+ res.json({partners:partners.map(p=>({...partnerRow(p),ads:ads.filter(a=>a.referral_code===p.referral_code),contests:contests.filter(c=>c.referral_code===p.referral_code)}))});
+});
 app.get('/api/admin/partners',auth,adminOnly,(req,res)=>{
- const partners=db.prepare("SELECT p.*,(SELECT COUNT(*) FROM partner_clicks c WHERE c.partner_id=p.id) clicks,(SELECT COUNT(*) FROM users u WHERE u.partner_id=p.id) registrations,(SELECT COUNT(*) FROM partner_ledger l WHERE l.partner_id=p.id) orders,(SELECT COALESCE(SUM(reward_amount),0) FROM partner_ledger l WHERE l.partner_id=p.id AND l.status IN ('pending','approved')) payable,(SELECT COALESCE(SUM(reward_amount),0) FROM partner_ledger l WHERE l.partner_id=p.id AND l.status='paid') paid FROM partners p ORDER BY p.created_at DESC").all().map(p=>({...partnerRow(p),clicks:Number(p.clicks),registrations:Number(p.registrations),orders:Number(p.orders),payable:Number(p.payable),paid:Number(p.paid)}));
+ const partners=db.prepare("SELECT p.*,(SELECT COUNT(*) FROM partner_clicks c WHERE c.partner_id=p.id) clicks,(SELECT COUNT(*) FROM users u WHERE u.partner_id=p.id) registrations,(SELECT COUNT(*) FROM partner_ledger l WHERE l.partner_id=p.id) orders,(SELECT COALESCE(SUM(reward_amount),0) FROM partner_ledger l WHERE l.partner_id=p.id AND l.status='approved') payable,(SELECT COALESCE(SUM(reward_amount),0) FROM partner_ledger l WHERE l.partner_id=p.id AND l.status='paid') paid FROM partners p ORDER BY p.created_at DESC").all().map(p=>({...partnerRow(p),clicks:Number(p.clicks),registrations:Number(p.registrations),orders:Number(p.orders),payable:Number(p.payable),paid:Number(p.paid)}));
  const promos=db.prepare("SELECT c.*,p.name partner_name FROM promocodes c JOIN partners p ON p.id=c.partner_id ORDER BY c.created_at DESC").all();
  const contests=db.prepare("SELECT c.*,p.name partner_name FROM partner_contests c JOIN partners p ON p.id=c.partner_id ORDER BY c.created_at DESC").all();
  const ads=db.prepare("SELECT a.*,p.name partner_name FROM partner_ads a JOIN partners p ON p.id=a.partner_id ORDER BY a.created_at DESC").all();
@@ -2026,7 +2031,7 @@ app.post('/api/admin/partners/:id/promos',auth,adminOnly,(req,res)=>{
 app.post('/api/admin/partners/:id/contests',auth,adminOnly,(req,res)=>{
  const id=Number(req.params.id),b=req.body||{},title=String(b.title||'').trim();if(!db.prepare('SELECT id FROM partners WHERE id=?').get(id))return res.status(404).json({error:'Партнёр не найден'});
  if(!title||title.length>120)return res.status(400).json({error:'Укажите название конкурса'});
- const r=db.prepare("INSERT INTO partner_contests(partner_id,title,description,prize,status,created_at) VALUES(?,?,?,?,?,?)").run(id,title,String(b.description||'').slice(0,2000),String(b.prize||'').slice(0,300),'draft',Date.now());res.status(201).json({ok:true,id:Number(r.lastInsertRowid)});
+ const r=db.prepare("INSERT INTO partner_contests(partner_id,title,description,prize,status,created_at) VALUES(?,?,?,?,?,?)").run(id,title,String(b.description||'').slice(0,2000),String(b.prize||'').slice(0,300),'active',Date.now());res.status(201).json({ok:true,id:Number(r.lastInsertRowid)});
 });
 app.post('/api/admin/partners/:id/ads',auth,adminOnly,(req,res)=>{
  const id=Number(req.params.id),b=req.body||{},title=String(b.title||'').trim(),url=String(b.targetUrl||'').trim();if(!db.prepare('SELECT id FROM partners WHERE id=?').get(id))return res.status(404).json({error:'Партнёр не найден'});
