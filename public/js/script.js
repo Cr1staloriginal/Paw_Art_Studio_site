@@ -1836,7 +1836,7 @@ function renderPartnerAdmin(){
   '<p>Заказ #'+x.project_id+' · Клиент: '+escapeHtml(x.customer_name||'—')+'</p>'+
   (x.status==='pending'&&!x.payment_verified_at?'<button class="admin-act-btn" onclick="partnerConfirmPayment('+x.project_id+')">Подтвердить оплату</button>':'')+
   (x.status==='pending'&&x.payment_verified_at?'<button class="admin-act-btn" onclick="partnerLedgerAction('+x.id+',\'approve\')">Одобрить начисление</button>':'')+
-  (x.status==='approved'?'<button class="admin-act-btn" onclick="partnerLedgerAction('+x.id+',\'paid\')">Отметить выплаченным</button>':'')+'</div>').join('')||'<p>Начислений пока нет.</p>';
+  (x.status==='approved'?'<span class="wd-date">К выплате через заявку партнёра</span>':'')+'</div>').join('')||'<p>Начислений пока нет.</p>';
 }
 async function loadPublicPartners(){
  const box=document.getElementById('partnersGrid');if(!box)return;
