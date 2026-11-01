@@ -948,26 +948,37 @@ app.post('/api/payments/webhook', async (req, res) => {
 
     const applyPayment = db.transaction(() => {
       const payment = db.prepare(
-        'SELECT id, user_id, amount, status FROM payments WHERE payment_id = ?'
+        'SELECT id,user_id,amount,status,project_id,purpose FROM payments WHERE payment_id=?'
       ).get(String(verified.id));
-
-      // Only credit a payment created by this application, once, to its original user.
-      if (!payment || Number(payment.user_id) !== userId ||
-          Number(payment.amount) !== amount || payment.status === 'succeeded') return false;
-
-      const user = db.prepare('SELECT id FROM users WHERE id = ?').get(userId);
-      if (!user) return false;
-
-      db.prepare("UPDATE payments SET status = 'succeeded' WHERE id = ?").run(payment.id);
-      db.prepare('UPDATE users SET balance = balance + ? WHERE id = ?').run(amount, userId);
-      db.prepare(`INSERT INTO transactions (user_id, title, amount, type, created_at)
-                  VALUES (?, 'Пополнение через ЮKassa', ?, 'in', ?)`)
-        .run(userId, amount, Date.now());
-      return true;
+      if (!payment || Number(payment.user_id)!==userId || Number(payment.amount)!==amount || payment.status==='succeeded') return false;
+      const user=db.prepare('SELECT id FROM users WHERE id=?').get(userId);
+      if(!user)return false;
+      const now=Date.now();
+      if(payment.purpose==='project'){
+        const projectId=Number(verified.metadata?.projectId);
+        if(!projectId||Number(payment.project_id)!==projectId)return false;
+        const project=db.prepare('SELECT id,client_id,status FROM projects WHERE id=?').get(projectId);
+        if(!project||Number(project.client_id)!==userId)return false;
+        db.prepare("UPDATE payments SET status='succeeded' WHERE id=?").run(payment.id);
+        if(project.status==='cancelled'){
+          db.prepare("UPDATE projects SET payment_status='refund_required',partner_payment_reference=? WHERE id=?").run(String(verified.id),projectId);
+          return 'refund_required';
+        }
+        db.prepare("UPDATE projects SET payment_status='paid',partner_paid_at=?,partner_payment_reference=? WHERE id=?").run(now,String(verified.id),projectId);
+        db.prepare("UPDATE partner_ledger SET payment_verified_at=?,payment_reference=? WHERE project_id=? AND status IN ('pending','approved')").run(now,String(verified.id),projectId);
+        ensurePartnerLedgerForPaidProject(projectId,now);
+        return 'project';
+      }
+      db.prepare("UPDATE payments SET status='succeeded' WHERE id=?").run(payment.id);
+      db.prepare('UPDATE users SET balance=balance+? WHERE id=?').run(amount,userId);
+      db.prepare(`INSERT INTO transactions(user_id,title,amount,type,created_at) VALUES(?,'Пополнение через ЮKassa',?,'in',?)`).run(userId,amount,now);
+      return 'wallet';
     });
 
-    const credited = applyPayment();
-    if (credited) console.log(`✅ Проверенный платёж ЮKassa зачислен: ${amount / 100} ₽ → #${userId}`);
+    const applied=applyPayment();
+    if(applied==='wallet')console.log(`✅ Проверенное пополнение ЮKassa: ${amount/100} ₽ → #${userId}`);
+    else if(applied==='project')console.log(`✅ Заказ #${verified.metadata.projectId} оплачен через ЮKassa`);
+    else if(applied==='refund_required')console.warn(`⚠️ Платёж по отменённому заказу #${verified.metadata.projectId} требует возврата`);
     return res.status(200).send('OK');
   } catch (err) {
     console.error('❌ Ошибка проверки webhook YooKassa:', err?.message || err);
