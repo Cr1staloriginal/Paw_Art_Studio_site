@@ -1867,6 +1867,7 @@ async function init() {
           .then(data => { if (data?.partnerToken) localStorage.setItem('paw_partner_token', data.partnerToken); })
           .catch(() => null);
         localStorage.setItem('paw_ref', ref);
+        const cleanReferralUrl=new URL(location.href);cleanReferralUrl.searchParams.delete('ref');history.replaceState({},'',cleanReferralUrl.pathname+cleanReferralUrl.search+cleanReferralUrl.hash);
     }
     await loadPublicPartners();
     await loadAndApplyContent();
