@@ -1513,6 +1513,7 @@ async function openContactRequest(id) {
             `Услуга: ${r.service}`, `Бюджет: ${r.budget || '—'}`,
             `Способ связи: ${r.contactMethod}`, `Контакт: ${r.contactDetail || '—'}`,
             `Референсы: ${r.reference || '—'}`,
+            `Промокод: ${r.promoCode || '—'} · Скидка: ${r.discountPercent || 0}%`,
             `Дата: ${new Date(r.createdAt).toLocaleString('ru-RU')}`,
             r.account ? `Аккаунт: ${r.account.name} (${r.account.email})` : 'Гость без аккаунта'
         ];
@@ -1786,6 +1787,7 @@ async function createPartner(e){
  try{await api('/api/admin/partners',{method:'POST',body:b});f.reset();showToast('Партнёр добавлен');await loadPartnerAdmin();}
  catch(x){showToast('❌ '+x.message,'error');}
 }
+async function partnerLinkAccount(id){const accountEmail=prompt('Email зарегистрированного и подтверждённого аккаунта партнёра (пусто — отвязать):');if(accountEmail===null)return;try{await api('/api/admin/partners/'+id,{method:'PATCH',body:{accountEmail:accountEmail.trim()}});await loadPartnerAdmin();showToast('Аккаунт партнёра обновлён');}catch(e){showToast('❌ '+e.message,'error');}}
 async function partnerStatus(id,status){try{await api('/api/admin/partners/'+id,{method:'PATCH',body:{status:status}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}}
 async function partnerPromo(id){
  const code=prompt('Код промокода:');if(!code)return;const discount=Number(prompt('Скидка, %','10')||0);
@@ -1818,11 +1820,11 @@ function renderPartnerAdmin(){
  if(box)box.innerHTML=(d.partners||[]).map(p=>{
   const next=p.status==='active'?'paused':'active',label=p.status==='active'?'Приостановить':'Активировать';
   return '<article class="request-card" style="margin:12px 0"><b>'+escapeHtml(p.name)+'</b> · '+escapeHtml(p.status)+
-   '<p>Код: <b>'+escapeHtml(p.referralCode)+'</b> · Скидка '+p.discountPercent+'% · Вознаграждение '+p.rewardPercent+'%</p>'+
+   '<p>Код: <b>'+escapeHtml(p.referralCode)+'</b> · Скидка '+p.discountPercent+'% · Вознаграждение '+p.rewardPercent+'% · Аккаунт: '+(p.partnerUserId?'#'+p.partnerUserId:'не привязан')+'</p>'+
    '<p>Переходы: '+p.clicks+' · Регистрации: '+p.registrations+' · Заказы: '+p.orders+'</p>'+
    '<p>Доступно к выплате: '+formatMoney(p.available)+' · Ожидает: '+formatMoney(p.pending)+' · Выплачено: '+formatMoney(p.paid)+'</p>'+
    '<p><code>'+location.origin+'/?ref='+encodeURIComponent(p.referralCode)+'</code></p>'+
-   '<div class="request-actions"><button class="admin-act-btn" onclick="partnerPromo('+p.id+')">Промокод</button>'+
+   '<div class="request-actions"><button class="admin-act-btn" onclick="partnerLinkAccount('+p.id+')">Привязать аккаунт</button><button class="admin-act-btn" onclick="partnerPromo('+p.id+')">Промокод</button>'+
    '<button class="admin-act-btn" onclick="partnerContest('+p.id+')">Конкурс</button><button class="admin-act-btn" onclick="partnerAd('+p.id+')">Реклама</button>'+'<button class="admin-act-btn" onclick="partnerPayoutCreate('+p.id+')">Заявка на выплату</button>'+
    '<button class="admin-act-btn" onclick="partnerStatus('+p.id+',\''+next+'\')">'+label+'</button></div></article>';
  }).join('')||'<p class="admin-empty">Партнёров пока нет.</p>';
