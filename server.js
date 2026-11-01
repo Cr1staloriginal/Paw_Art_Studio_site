@@ -499,14 +499,14 @@ function generateReferralCode() {
 }
 
 function ensurePartnerLedgerForPaidProject(projectId, now = Date.now()) {
-  const project = db.prepare("SELECT id,client_id,budget,partner_id,status,payment_status FROM projects WHERE id=?").get(projectId);
+  const project = db.prepare("SELECT id,client_id,budget,partner_id,status,payment_status,partner_paid_at,partner_payment_reference FROM projects WHERE id=?").get(projectId);
   if (!project || project.status !== 'completed' || project.payment_status !== 'paid' || !project.partner_id || Number(project.budget) <= 0) return false;
   const partner = db.prepare('SELECT id,reward_percent FROM partners WHERE id=?').get(project.partner_id);
   if (!partner || Number(partner.reward_percent) <= 0) return false;
   const reward = Math.floor(Number(project.budget) * Number(partner.reward_percent) / 100);
   if (reward <= 0) return false;
-  const result = db.prepare("INSERT OR IGNORE INTO partner_ledger(partner_id,project_id,user_id,order_amount,reward_amount,status,created_at) VALUES(?,?,?,?,?,'pending',?)")
-    .run(partner.id,project.id,project.client_id,project.budget,reward,now);
+  const result = db.prepare("INSERT OR IGNORE INTO partner_ledger(partner_id,project_id,user_id,order_amount,reward_amount,status,created_at,payment_verified_at,payment_reference) VALUES(?,?,?,?,?,'pending',?,?,?)")
+    .run(partner.id,project.id,project.client_id,project.budget,reward,now,project.partner_paid_at||now,project.partner_payment_reference||'');
   return result.changes > 0;
 }
 
@@ -2118,13 +2118,15 @@ app.post('/api/admin/partners/:id/ads',auth,adminOnly,(req,res)=>{
 app.post('/api/admin/projects/:id/confirm-payment',auth,adminOnly,(req,res)=>{
  const projectId=Number(req.params.id),reference=String(req.body?.reference||'').trim();
  if(!Number.isSafeInteger(projectId)||projectId<=0||reference.length<3||reference.length>120)return res.status(400).json({error:'Укажите корректный заказ и подтверждение оплаты'});
- const project=db.prepare('SELECT id,status FROM projects WHERE id=?').get(projectId);
+ const project=db.prepare('SELECT id,status,payment_status FROM projects WHERE id=?').get(projectId);
  if(!project)return res.status(404).json({error:'Заказ не найден'});
  if(project.status!=='completed')return res.status(409).json({error:'Сначала заказ должен получить статус «Завершён»'});
+ if(project.payment_status==='paid')return res.status(409).json({error:'Оплата этого заказа уже подтверждена'});
  const now=Date.now();
  db.transaction(()=>{
-  db.prepare('UPDATE projects SET partner_paid_at=?,partner_payment_reference=? WHERE id=?').run(now,reference,projectId);
+  db.prepare("UPDATE projects SET partner_paid_at=?,partner_payment_reference=?,payment_status='paid' WHERE id=?").run(now,reference,projectId);
   db.prepare("UPDATE partner_ledger SET payment_verified_at=?,payment_reference=? WHERE project_id=? AND status IN ('pending','approved')").run(now,reference,projectId);
+  ensurePartnerLedgerForPaidProject(projectId,now);
  })();
  res.json({ok:true,confirmedAt:now});
 });
