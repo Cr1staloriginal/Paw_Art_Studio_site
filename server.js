@@ -1075,6 +1075,13 @@ app.get('/api/referrals/me', auth, (req, res) => {
   });
 });
 
+app.get('/api/referrals/partner-token/:code',(req,res)=>{
+ const code=String(req.params.code||'').trim().toUpperCase();
+ const partner=db.prepare("SELECT id FROM partners WHERE referral_code=? AND status='active'").get(code);
+ if(!partner)return res.status(404).json({error:'Активный партнёр не найден'});
+ const partnerToken=jwt.sign({type:'partner_referral',code},JWT_SECRET,{expiresIn:PARTNER_ATTRIBUTION_DAYS*86400});
+ res.json({partnerToken,attributionDays:PARTNER_ATTRIBUTION_DAYS});
+});
 app.get('/api/referrals/click/:code', (req, res) => {
   const code = String(req.params.code || '').trim().toUpperCase();
   if (!code) return res.status(400).json({ error: 'Нет кода' });
