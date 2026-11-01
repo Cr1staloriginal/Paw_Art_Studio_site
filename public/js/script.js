@@ -1828,7 +1828,7 @@ function renderPartnerAdmin(){
   const next=p.status==='active'?'paused':'active',label=p.status==='active'?'Приостановить':'Активировать';
   return '<article class="request-card" style="margin:12px 0"><b>'+escapeHtml(p.name)+'</b> · '+escapeHtml(p.status)+
    '<p>Код: <b>'+escapeHtml(p.referralCode)+'</b> · Скидка '+p.discountPercent+'% · Вознаграждение '+p.rewardPercent+'% · Аккаунт: '+(p.partnerUserId?'#'+p.partnerUserId:'не привязан')+'</p>'+
-   '<p>Переходы: '+p.clicks+' · Регистрации: '+p.registrations+' · Заказы: '+p.orders+'</p>'+
+   '<p>Переходы: '+p.clicks+' · Регистрации: '+p.registrations+' · Заказы: '+p.orders+' · Оплачено: '+p.paidOrders+' · Конверсия: '+p.conversionPercent+'%</p>'+
    '<p>Доступно к выплате: '+formatMoney(p.available)+' · Ожидает: '+formatMoney(p.pending)+' · Выплачено: '+formatMoney(p.paid)+'</p>'+
    '<p><code>'+location.origin+'/?ref='+encodeURIComponent(p.referralCode)+'</code></p>'+
    '<div class="request-actions"><button class="admin-act-btn" onclick="partnerLinkAccount('+p.id+')">Привязать аккаунт</button><button class="admin-act-btn" onclick="partnerPromo('+p.id+')">Промокод</button>'+
