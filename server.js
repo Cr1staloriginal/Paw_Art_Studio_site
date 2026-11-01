@@ -532,9 +532,9 @@ app.post('/api/auth/register', async (req, res) => {
 
     const tx = db.transaction(() => {
       if (existing && existing.email_verified === 0) {
-        db.prepare(`UPDATE users SET name = ?, password = ?, verification_code = ?, verification_expires = ?
+        db.prepare(`UPDATE users SET name = ?, password = ?, verification_code = ?, verification_expires = ?, partner_id = COALESCE(partner_id, ?)
                     WHERE id = ?`)
-          .run(String(name).trim(), hash, code, expires, existing.id);
+          .run(String(name).trim(), hash, code, expires, referredPartner ? referredPartner.id : null, existing.id);
         return existing.id;
       }
       const myRefCode = generateReferralCode();

@@ -269,8 +269,10 @@ async function resendCode() {
 
 function getRefFromUrl() {
  const value=new URLSearchParams(location.search).get('ref');
- if(value){localStorage.setItem('paw_ref',value.trim().toUpperCase());return value.trim().toUpperCase();}
- return localStorage.getItem('paw_ref')||null;
+ if(value){localStorage.setItem('paw_ref',value.trim().toUpperCase());localStorage.setItem('paw_ref_at',String(Date.now()));return value.trim().toUpperCase();}
+ const saved=localStorage.getItem('paw_ref'),savedAt=Number(localStorage.getItem('paw_ref_at')||0);
+ if(saved&&savedAt&&Date.now()-savedAt<30*24*60*60*1000)return saved;
+ localStorage.removeItem('paw_ref');localStorage.removeItem('paw_ref_at');return null;
 }
 
 async function logout() {
@@ -1718,8 +1720,8 @@ async function handleSubmit(e) {
     };
     if (button) { button.disabled = true; button.textContent = 'Отправляем...'; }
     try {
-        await api('/api/requests', { method: 'POST', body: payload });
-        showToast(`🎉 ${payload.name}, заявка успешно отправлена!`);
+        const result = await api('/api/requests', { method: 'POST', body: payload });
+        showToast(result.message || `🎉 ${payload.name}, заявка успешно отправлена!`);
         form.reset();
         updateContactDetailField();
         const selectedPlan = document.getElementById('selectedPlan');
@@ -1785,8 +1787,8 @@ async function createPartner(e){
 }
 async function partnerStatus(id,status){try{await api('/api/admin/partners/'+id,{method:'PATCH',body:{status:status}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}}
 async function partnerPromo(id){
- const code=prompt('Код промокода:');if(!code)return;const discount=Number(prompt('Скидка, %','10')||0),bonus=Number(prompt('Бонус на баланс, ₽','0')||0);
- try{await api('/api/admin/partners/'+id+'/promos',{method:'POST',body:{code,discountPercent:discount,bonusRub:bonus}});await loadPartnerAdmin();showToast('Промокод создан');}catch(e){showToast('❌ '+e.message,'error');}
+ const code=prompt('Код промокода:');if(!code)return;const discount=Number(prompt('Скидка, %','10')||0);
+ try{await api('/api/admin/partners/'+id+'/promos',{method:'POST',body:{code,discountPercent:discount}});await loadPartnerAdmin();showToast('Промокод создан');}catch(e){showToast('❌ '+e.message,'error');}
 }
 async function partnerContest(id){
  const title=prompt('Название конкурса:');if(!title)return;const prize=prompt('Приз:','Сертификат Paw Art Studio')||'';
