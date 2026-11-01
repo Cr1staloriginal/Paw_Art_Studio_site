@@ -1806,6 +1806,7 @@ async function partnerPayoutCreate(id){
  catch(e){showToast('❌ '+e.message,'error');}
 }
 async function partnerPayoutAction(id,status){
+ if(status==='paid'&&prompt('Подтвердите фактический перевод. Введите ПЕРЕВЕДЕНО:')!=='ПЕРЕВЕДЕНО')return;
  const comment=prompt('Комментарий:','');if(comment===null)return;
  try{await api('/api/admin/partner-payouts/'+id,{method:'PATCH',body:{status:status,comment:comment}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}
 }
