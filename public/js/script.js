@@ -189,7 +189,7 @@ async function handleRegister(e) {
     const password = document.getElementById('regPassword').value;
     const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
     try {
-        const ref = getRefFromUrl() || localStorage.getItem('paw_ref');
+        const ref = localStorage.getItem('paw_ref') || null;
         await partnerAttributionPromise.catch(() => {});
         const partnerToken = localStorage.getItem('paw_partner_token') || null;
         const data = await api('/api/auth/register', { method: 'POST', body: { name, email, password, ref, partnerToken } });
