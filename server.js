@@ -833,6 +833,35 @@ app.post('/api/admin/content/upload', auth, siteEditorOnly, (req, res, next) => 
 });
 
 /* ==================== YOOKASSA ==================== */
+app.post('/api/projects/:id/pay',auth,async(req,res)=>{
+ const id=Number(req.params.id);
+ if(!Number.isSafeInteger(id)||id<=0)return res.status(400).json({error:'Некорректный ID заказа'});
+ if(!yookassa)return res.status(503).json({error:'ЮKassa не настроена. Оплата заказа пока недоступна.'});
+ const project=db.prepare('SELECT id,client_id,budget,status,payment_status FROM projects WHERE id=?').get(id);
+ if(!project)return res.status(404).json({error:'Заказ не найден'});
+ if(Number(project.client_id)!==Number(req.user.id))return res.status(403).json({error:'Оплатить заказ может только его заказчик'});
+ if(project.status==='cancelled'||project.payment_status==='refunded'||project.payment_status==='refund_required')return res.status(409).json({error:'Этот заказ нельзя оплатить: он отменён или ожидает возврата'});
+ if(project.payment_status==='paid')return res.status(409).json({error:'Заказ уже оплачен'});
+ const amount=Number(project.budget);
+ if(!Number.isSafeInteger(amount)||amount<100)return res.status(400).json({error:'У заказа не указана корректная сумма (минимум 1 ₽)'});
+ const pending=db.prepare("SELECT id FROM payments WHERE project_id=? AND purpose='project' AND status='pending' ORDER BY created_at DESC LIMIT 1").get(id);
+ if(pending)return res.status(409).json({error:'Для этого заказа уже создан платёж. Завершите оплату или дождитесь отмены платежа.'});
+ try{
+  const payment=await yookassa.payments.create({
+   amount:{value:(amount/100).toFixed(2),currency:'RUB'},capture:true,
+   confirmation:{type:'redirect',return_url:SITE_URL+'/dashboard?projectPayment=success&projectId='+id},
+   description:'Оплата заказа Paw Art Studio #'+id,
+   metadata:{userId:String(req.user.id),projectId:String(id),paymentType:'project'}
+  },crypto.randomUUID());
+  db.prepare("INSERT INTO payments(user_id,payment_id,amount,status,created_at,project_id,purpose) VALUES(?,?,?,'pending',?,?,'project')").run(req.user.id,payment.id,amount,Date.now(),id);
+  db.prepare("UPDATE projects SET payment_status='pending' WHERE id=?").run(id);
+  res.json({paymentId:payment.id,confirmationUrl:payment.confirmation.confirmation_url});
+ }catch(err){
+  console.error('❌ ЮKassa: создание оплаты заказа отклонено',{message:String(err?.description||err?.message||'unknown'),code:err?.code||null});
+  res.status(502).json({error:'Не удалось создать платёж за заказ через ЮKassa. Попробуйте позже.'});
+ }
+});
+
 app.post('/api/payments/create', auth, async (req, res) => {
   if (!yookassa)
     return res.status(503).json({ error: 'ЮKassa не настроена. Обратитесь к админу.' });
