@@ -1656,17 +1656,11 @@ app.post('/api/projects/:id/status', auth, (req, res) => {
       db.prepare('UPDATE projects SET status=?,updated_at=? WHERE id=?').run(status,now,id);
       if(status==='cancelled') {
         const ledger=db.prepare('SELECT * FROM partner_ledger WHERE project_id=?').get(id);
-        if(ledger&&ledger.status==='paid')db.prepare('INSERT OR IGNORE INTO partner_balance_adjustments(partner_id,project_id,amount,reason,created_at,created_by) VALUES(?,?,?,?,?,?)').run(ledger.partner_id,id,ledger.reward_amount,'Возврат/отмена уже выплаченного партнёрского заказа',now,req.user.id);
+        if(ledger&&ledger.status==='paid')db.prepare('INSERT OR IGNORE INTO partner_balance_adjustments(partner_id,project_id,amount,reason,created_at,created_by) VALUES(?,?,?,?,?,?)').run(ledger.partner_id,id,ledger.paid_amount||ledger.reward_amount,'Возврат/отмена уже выплаченного партнёрского заказа',now,req.user.id);
         db.prepare("UPDATE partner_ledger SET status=CASE WHEN status='pending' THEN 'rejected' ELSE 'reversed' END,reviewed_at=?,reviewed_by=? WHERE project_id=? AND status IN ('pending','approved','paid')").run(now,req.user.id,id);
+        db.prepare("UPDATE projects SET payment_status=CASE WHEN payment_status='paid' THEN 'refund_required' ELSE payment_status END WHERE id=?").run(id);
       }
-      if(status==='completed'){
-        const project=db.prepare('SELECT id,client_id,budget FROM projects WHERE id=?').get(id);
-        const partner=db.prepare("SELECT p.id,p.reward_percent FROM users u JOIN partners p ON p.id=u.partner_id WHERE u.id=? AND p.status='active'").get(project.client_id);
-        if(partner&&Number(partner.reward_percent)>0&&Number(project.budget)>0){
-          const reward=Math.floor(Number(project.budget)*Number(partner.reward_percent)/100);
-          if(reward>0)db.prepare("INSERT OR IGNORE INTO partner_ledger(partner_id,project_id,user_id,order_amount,reward_amount,status,created_at) VALUES(?,?,?,?,?,'pending',?)").run(partner.id,project.id,project.client_id,project.budget,reward,now);
-        }
-      }
+      if(status==='completed')ensurePartnerLedgerForPaidProject(id,now);
     });
     finish();
     return res.json({ok:true});
