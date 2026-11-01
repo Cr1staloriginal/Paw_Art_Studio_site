@@ -300,6 +300,11 @@ safeAddColumn('users', 'referral_code', 'TEXT');
 safeAddColumn('users', 'referred_by', 'INTEGER');
 safeAddColumn('users', 'partner_id', 'INTEGER');
 safeAddColumn('promocodes', 'partner_id', 'INTEGER');
+safeAddColumn('projects', 'partner_paid_at', 'INTEGER');
+safeAddColumn('projects', 'partner_payment_reference', 'TEXT');
+safeAddColumn('partner_ledger', 'payment_verified_at', 'INTEGER');
+safeAddColumn('partner_ledger', 'payment_reference', 'TEXT');
+const PARTNER_ATTRIBUTION_DAYS = Math.max(1, Math.min(365, Number(process.env.PARTNER_ATTRIBUTION_DAYS) || 30));
 safeAddColumn('requests', 'promo_code', 'TEXT');
 safeAddColumn('requests', 'discount_percent', 'INTEGER NOT NULL DEFAULT 0');
 safeAddColumn('requests', 'partner_id', 'INTEGER');
@@ -520,7 +525,12 @@ app.post('/api/auth/register', async (req, res) => {
   if (ref) {
     const referralCode = String(ref).trim().toUpperCase();
     referrer = db.prepare('SELECT id FROM users WHERE referral_code = ?').get(referralCode);
-    if (!referrer) referredPartner = db.prepare("SELECT id FROM partners WHERE referral_code = ? AND status = 'active'").get(referralCode);
+  }
+  if (req.body?.partnerToken) {
+    try {
+      const claim = jwt.verify(String(req.body.partnerToken), JWT_SECRET);
+      if (claim.type === 'partner_referral' && claim.code) referredPartner = db.prepare("SELECT id FROM partners WHERE referral_code = ? AND status = 'active'").get(String(claim.code).toUpperCase());
+    } catch { /* expired or invalid partner attribution is ignored */ }
   }
 
   const code = generateCode();
@@ -1073,7 +1083,8 @@ app.get('/api/referrals/click/:code', (req, res) => {
   if (partner) {
     const ipHash = crypto.createHash('sha256').update(String(req.ip || '') + ':' + String(process.env.REFERRAL_HASH_SALT || JWT_SECRET)).digest('hex');
     db.prepare('INSERT INTO partner_clicks (partner_id,ip_hash,user_agent,created_at) VALUES (?,?,?,?)').run(partner.id,ipHash,String(req.headers['user-agent']||'').slice(0,300),Date.now());
-    return res.json({ok:true,code,partner:true});
+    const partnerToken = jwt.sign({ type: 'partner_referral', code }, JWT_SECRET, { expiresIn: PARTNER_ATTRIBUTION_DAYS * 86400 });
+    return res.json({ok:true,code,partner:true,partnerToken,attributionDays:PARTNER_ATTRIBUTION_DAYS});
   }
   const owner = db.prepare('SELECT id FROM users WHERE referral_code = ?').get(code);
   if (!owner) return res.status(404).json({ error: 'Реферал не найден' });
@@ -1597,6 +1608,10 @@ app.post('/api/projects/:id/status', auth, (req, res) => {
     const now=Date.now();
     const finish=db.transaction(()=>{
       db.prepare('UPDATE projects SET status=?,updated_at=? WHERE id=?').run(status,now,id);
+      if(status==='cancelled') {
+        db.prepare("UPDATE partner_ledger SET status='rejected',reviewed_at=? WHERE project_id=? AND status='pending'").run(now,id);
+        db.prepare("UPDATE partner_ledger SET status='reversed',reviewed_at=? WHERE project_id=? AND status='approved'").run(now,id);
+      }
       if(status==='completed'){
         const project=db.prepare('SELECT id,client_id,budget FROM projects WHERE id=?').get(id);
         const partner=db.prepare("SELECT p.id,p.reward_percent FROM users u JOIN partners p ON p.id=u.partner_id WHERE u.id=? AND p.status='active'").get(project.client_id);
@@ -2061,11 +2076,31 @@ app.post('/api/admin/partners/:id/ads',auth,adminOnly,(req,res)=>{
  if(!title||title.length>120||!/^https:\/\//i.test(url))return res.status(400).json({error:'Нужны заголовок и HTTPS-ссылка'});
  const r=db.prepare('INSERT INTO partner_ads(partner_id,title,description,target_url,created_at) VALUES(?,?,?,?,?)').run(id,title,String(b.description||'').slice(0,1000),url,Date.now());res.status(201).json({ok:true,id:Number(r.lastInsertRowid)});
 });
+app.post('/api/admin/projects/:id/confirm-payment',auth,adminOnly,(req,res)=>{
+ const projectId=Number(req.params.id),reference=String(req.body?.reference||'').trim();
+ if(!Number.isSafeInteger(projectId)||projectId<=0||reference.length<3||reference.length>120)return res.status(400).json({error:'Укажите корректный заказ и подтверждение оплаты'});
+ const project=db.prepare('SELECT id,status FROM projects WHERE id=?').get(projectId);
+ if(!project)return res.status(404).json({error:'Заказ не найден'});
+ if(project.status!=='completed')return res.status(409).json({error:'Сначала заказ должен получить статус «Завершён»'});
+ const now=Date.now();
+ db.transaction(()=>{
+  db.prepare('UPDATE projects SET partner_paid_at=?,partner_payment_reference=? WHERE id=?').run(now,reference,projectId);
+  db.prepare("UPDATE partner_ledger SET payment_verified_at=?,payment_reference=? WHERE project_id=? AND status IN ('pending','approved')").run(now,reference,projectId);
+ })();
+ res.json({ok:true,confirmedAt:now});
+});
 app.post('/api/admin/partner-ledger/:id/:action',auth,adminOnly,(req,res)=>{
- const id=Number(req.params.id),row=db.prepare('SELECT * FROM partner_ledger WHERE id=?').get(id),next=req.params.action==='approve'?'approved':req.params.action==='paid'?'paid':null;
+ const id=Number(req.params.id),row=db.prepare('SELECT l.*,p.status project_status,p.partner_paid_at FROM partner_ledger l JOIN projects p ON p.id=l.project_id WHERE l.id=?').get(id),action=req.params.action;
  if(!row)return res.status(404).json({error:'Начисление не найдено'});
- if((req.params.action==='approve'&&row.status!=='pending')||(req.params.action==='paid'&&row.status!=='approved')||!next)return res.status(409).json({error:'Недопустимый переход статуса'});
- db.prepare('UPDATE partner_ledger SET status=?,reviewed_at=?,reviewed_by=? WHERE id=?').run(next,Date.now(),req.user.id,id);res.json({ok:true});
+ if(action==='approve'){
+  if(row.status!=='pending')return res.status(409).json({error:'Начисление уже обработано'});
+  if(row.project_status!=='completed'||!row.partner_paid_at||!row.payment_verified_at)return res.status(409).json({error:'Нельзя одобрить: заказ не завершён или оплата не подтверждена администратором'});
+  db.prepare("UPDATE partner_ledger SET status='approved',reviewed_at=?,reviewed_by=? WHERE id=? AND status='pending'").run(Date.now(),req.user.id,id);
+ } else if(action==='paid'){
+  if(row.status!=='approved')return res.status(409).json({error:'Сначала одобрите начисление'});
+  db.prepare("UPDATE partner_ledger SET status='paid',reviewed_at=?,reviewed_by=? WHERE id=? AND status='approved'").run(Date.now(),req.user.id,id);
+ } else return res.status(400).json({error:'Неизвестное действие'});
+ res.json({ok:true});
 });
 app.post('/api/admin/partners/:id/payouts',auth,adminOnly,(req,res)=>{
  const id=Number(req.params.id),p=db.prepare("SELECT * FROM partners WHERE id=? AND status='active'").get(id),b=req.body||{};
