@@ -273,6 +273,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,partner_id INTEGER NOT NULL,project_id INTEGER,amount INTEGER NOT NULL,reason TEXT NOT NULL,created_at INTEGER NOT NULL,created_by INTEGER,
     FOREIGN KEY(partner_id) REFERENCES partners(id) ON DELETE CASCADE
   );
+  CREATE UNIQUE INDEX IF NOT EXISTS idx_partner_adjustment_project ON partner_balance_adjustments(project_id) WHERE project_id IS NOT NULL;
   CREATE TABLE IF NOT EXISTS referral_clicks (
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     referral_code TEXT NOT NULL,
@@ -1081,13 +1082,6 @@ app.get('/api/referrals/me', auth, (req, res) => {
   });
 });
 
-app.get('/api/referrals/partner-token/:code',(req,res)=>{
- const code=String(req.params.code||'').trim().toUpperCase();
- const partner=db.prepare("SELECT id FROM partners WHERE referral_code=? AND status='active'").get(code);
- if(!partner)return res.status(404).json({error:'Активный партнёр не найден'});
- const partnerToken=jwt.sign({type:'partner_referral',code},JWT_SECRET,{expiresIn:PARTNER_ATTRIBUTION_DAYS*86400});
- res.json({partnerToken,attributionDays:PARTNER_ATTRIBUTION_DAYS});
-});
 app.get('/api/referrals/click/:code', (req, res) => {
   const code = String(req.params.code || '').trim().toUpperCase();
   if (!code) return res.status(400).json({ error: 'Нет кода' });
@@ -1095,7 +1089,8 @@ app.get('/api/referrals/click/:code', (req, res) => {
   const partner = db.prepare("SELECT id FROM partners WHERE referral_code = ? AND status = 'active'").get(code);
   if (partner) {
     const ipHash = crypto.createHash('sha256').update(String(req.ip || '') + ':' + String(process.env.REFERRAL_HASH_SALT || JWT_SECRET)).digest('hex');
-    db.prepare('INSERT INTO partner_clicks (partner_id,ip_hash,user_agent,created_at) VALUES (?,?,?,?)').run(partner.id,ipHash,String(req.headers['user-agent']||'').slice(0,300),Date.now());
+    const recentClick=db.prepare('SELECT id FROM partner_clicks WHERE partner_id=? AND ip_hash=? AND created_at>? LIMIT 1').get(partner.id,ipHash,Date.now()-24*60*60*1000);
+    if(!recentClick)db.prepare('INSERT INTO partner_clicks (partner_id,ip_hash,user_agent,created_at) VALUES (?,?,?,?)').run(partner.id,ipHash,String(req.headers['user-agent']||'').slice(0,300),Date.now());
     const partnerToken = jwt.sign({ type: 'partner_referral', code }, JWT_SECRET, { expiresIn: PARTNER_ATTRIBUTION_DAYS * 86400 });
     return res.json({ok:true,code,partner:true,partnerToken,attributionDays:PARTNER_ATTRIBUTION_DAYS});
   }
@@ -1624,8 +1619,9 @@ app.post('/api/projects/:id/status', auth, (req, res) => {
     const finish=db.transaction(()=>{
       db.prepare('UPDATE projects SET status=?,updated_at=? WHERE id=?').run(status,now,id);
       if(status==='cancelled') {
-        db.prepare("UPDATE partner_ledger SET status='rejected',reviewed_at=? WHERE project_id=? AND status='pending'").run(now,id);
-        db.prepare("UPDATE partner_ledger SET status='reversed',reviewed_at=? WHERE project_id=? AND status='approved'").run(now,id);
+        const ledger=db.prepare('SELECT * FROM partner_ledger WHERE project_id=?').get(id);
+        if(ledger&&ledger.status==='paid')db.prepare('INSERT OR IGNORE INTO partner_balance_adjustments(partner_id,project_id,amount,reason,created_at,created_by) VALUES(?,?,?,?,?,?)').run(ledger.partner_id,id,ledger.reward_amount,'Возврат/отмена уже выплаченного партнёрского заказа',now,req.user.id);
+        db.prepare("UPDATE partner_ledger SET status=CASE WHEN status='pending' THEN 'rejected' ELSE 'reversed' END,reviewed_at=?,reviewed_by=? WHERE project_id=? AND status IN ('pending','approved','paid')").run(now,req.user.id,id);
       }
       if(status==='completed'){
         const project=db.prepare('SELECT id,client_id,budget FROM projects WHERE id=?').get(id);
@@ -2039,7 +2035,7 @@ app.use((req, res) => {
 
 
 /* ==================== PARTNERS ==================== */
-function partnerRow(p){return{id:Number(p.id),name:p.name,description:p.description||'',discordUrl:p.discord_url||'',logoUrl:p.logo_url||'',ownerName:p.owner_name||'',contactEmail:p.contact_email||'',referralCode:p.referral_code,discountPercent:Number(p.discount_percent||0),rewardPercent:Number(p.reward_percent||0),status:p.status};}
+function partnerRow(p){return{id:Number(p.id),name:p.name,description:p.description||'',discordUrl:p.discord_url||'',logoUrl:p.logo_url||'',ownerName:p.owner_name||'',contactEmail:p.contact_email||'',partnerUserId:p.partner_user_id==null?null:Number(p.partner_user_id),referralCode:p.referral_code,discountPercent:Number(p.discount_percent||0),rewardPercent:Number(p.reward_percent||0),status:p.status};}
 app.get('/api/partners',(req,res)=>{
  const partners=db.prepare("SELECT * FROM partners WHERE status='active' ORDER BY name").all();
  const ads=db.prepare("SELECT a.*,p.referral_code FROM partner_ads a JOIN partners p ON p.id=a.partner_id WHERE a.active=1 AND p.status='active' ORDER BY a.created_at DESC").all();
@@ -2062,14 +2058,14 @@ app.get('/api/admin/partners',auth,adminOnly,(req,res)=>{
 });
 app.post('/api/admin/partners',auth,adminOnly,(req,res)=>{
  const b=req.body||{},name=String(b.name||'').trim(),code=String(b.referralCode||'').trim().toUpperCase().replace(/[^A-Z0-9_-]/g,'');
- const accountEmail=String(b.accountEmail||b.contactEmail||'').trim().toLowerCase();
+ const accountEmail=String(b.accountEmail||'').trim().toLowerCase();
  const linkedUser=accountEmail?db.prepare('SELECT id,email_verified FROM users WHERE email=?').get(accountEmail):null;
  if(accountEmail&&(!linkedUser||linkedUser.email_verified!==1))return res.status(400).json({error:'Аккаунт партнёра не найден или email не подтверждён. Попросите партнёра сначала зарегистрироваться.'});
  const discount=Math.max(0,Math.min(100,Math.round(Number(b.discountPercent)||0))),reward=Math.max(0,Math.min(50,Number(b.rewardPercent)||0)),discord=String(b.discordUrl||'').trim();
  if(!name||name.length>100||!/^[A-Z0-9_-]{3,24}$/.test(code))return res.status(400).json({error:'Проверьте название и код партнёра (3–24 символа)'});
  if(db.prepare('SELECT id FROM users WHERE referral_code=?').get(code))return res.status(409).json({error:'Этот код уже занят личной реферальной системой'});
  if(discord&&!/^https:\/\/(discord\.gg|discord\.com)\//i.test(discord))return res.status(400).json({error:'Некорректная Discord-ссылка'});
- try{const now=Date.now(),r=db.prepare("INSERT INTO partners(name,description,discord_url,logo_url,owner_name,contact_email,referral_code,discount_percent,reward_percent,status,created_at,updated_at,partner_user_id) VALUES(?,?,?,?,?,?,?,?,?,'active',?,?,?)").run(name,String(b.description||'').slice(0,1000),discord,String(b.logoUrl||'').slice(0,500),String(b.ownerName||'').slice(0,100),accountEmail,code,discount,reward,now,now,linkedUser?.id||null);res.status(201).json({partner:partnerRow(db.prepare('SELECT * FROM partners WHERE id=?').get(r.lastInsertRowid))});}
+ try{const now=Date.now(),r=db.prepare("INSERT INTO partners(name,description,discord_url,logo_url,owner_name,contact_email,referral_code,discount_percent,reward_percent,status,created_at,updated_at,partner_user_id) VALUES(?,?,?,?,?,?,?,?,?,'active',?,?,?)").run(name,String(b.description||'').slice(0,1000),discord,String(b.logoUrl||'').slice(0,500),String(b.ownerName||'').slice(0,100),String(b.contactEmail||'').trim().slice(0,160),code,discount,reward,now,now,linkedUser?.id||null);res.status(201).json({partner:partnerRow(db.prepare('SELECT * FROM partners WHERE id=?').get(r.lastInsertRowid))});}
  catch(e){if(String(e.message).includes('UNIQUE'))return res.status(409).json({error:'Реферальный код уже занят'});console.error(e);res.status(500).json({error:'Не удалось создать партнёра'});}
 });
 app.patch('/api/admin/partners/:id',auth,adminOnly,(req,res)=>{
@@ -2150,6 +2146,14 @@ app.post('/api/partner/payouts',auth,(req,res)=>{
   return Number(result.lastInsertRowid);
  });
  try{const id=create();res.status(201).json({ok:true,id,message:'Заявка на выплату отправлена администратору'});}catch(e){res.status(400).json({error:e.message||'Не удалось создать заявку'});}
+});
+app.patch('/api/admin/partners/:id/campaigns/:kind/:campaignId',auth,adminOnly,(req,res)=>{
+ const partnerId=Number(req.params.id),campaignId=Number(req.params.campaignId),kind=req.params.kind,active=req.body?.active===true?1:req.body?.active===false?0:null;
+ if(!Number.isSafeInteger(partnerId)||!Number.isSafeInteger(campaignId)||active===null||!['ads','contests'].includes(kind))return res.status(400).json({error:'Некорректные параметры кампании'});
+ const table=kind==='ads'?'partner_ads':'partner_contests';
+ const result=db.prepare('UPDATE '+table+' SET '+(kind==='ads'?'active':'status')+'=? WHERE id=? AND partner_id=?').run(kind==='ads'?active:(active?'active':'paused'),campaignId,partnerId);
+ if(!result.changes)return res.status(404).json({error:'Кампания не найдена'});
+ res.json({ok:true});
 });
 app.post('/api/admin/partners/:id/payouts',auth,adminOnly,(req,res)=>{
  const id=Number(req.params.id),p=db.prepare("SELECT * FROM partners WHERE id=? AND status='active'").get(id),b=req.body||{};
