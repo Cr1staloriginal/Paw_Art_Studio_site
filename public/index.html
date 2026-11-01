@@ -330,7 +330,8 @@
 
 <section class="section" id="partnersSection" style="padding-top:35px">
  <div class="container"><div class="section-head"><span class="section-kicker">COMMUNITY</span><h2>Наши партнёры 🐾</h2><p>Сообщества, с которыми Paw Art Studio развивает творческую фурри-среду.</p></div>
- <div id="partnersGrid" class="grid grid-3"><div class="admin-empty">Загружаем партнёров…</div></div></div>
+ <div id="partnersGrid" class="grid grid-3"><div class="admin-empty">Загружаем партнёров…</div></div>
+ <p style="text-align:center;margin-top:18px"><a href="/partner.html">Уже являетесь партнёром? Открыть партнёрский кабинет ↗</a></p></div>
 </section>
 <footer>
     <div class="container footer-grid">
@@ -497,7 +498,9 @@
                 <option value="Арт">Арт</option><option value="Анимация">Анимация</option>
                 <option value="3D арт">3D арт</option><option value="Другое">Другое</option>
             </select>
-<button type="submit" class="btn">Создать заказ</button>
+<label>Бюджет заказа, ₽</label><input type="number" id="projBudget" min="0" step="0.01" placeholder="Например, 1500" />
+            <label>Промокод партнёра</label><input type="text" id="projPromoCode" maxlength="32" placeholder="Например, FLUFFY10" autocomplete="off" />
+            <button type="submit" class="btn">Создать заказ</button>
         </form>
     </div>
 </div>
@@ -610,6 +613,8 @@
           <h4>Добавить официального партнёра</h4>
           <form id="partnerCreateForm" onsubmit="createPartner(event)" style="display:grid;gap:10px;margin:12px 0">
             <input name="name" required maxlength="100" placeholder="Название Discord-сервера">
+            <input name="accountEmail" type="email" placeholder="Email аккаунта партнёра на сайте (для кабинета)">
+
             <input name="referralCode" required minlength="3" maxlength="24" placeholder="Код ссылки, например FLUFFY">
             <input name="ownerName" placeholder="Владелец / контакт"><input name="contactEmail" type="email" placeholder="Email">
             <input name="discordUrl" type="url" placeholder="Discord invite URL"><input name="logoUrl" type="url" placeholder="URL логотипа">

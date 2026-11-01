@@ -7,6 +7,8 @@ const STATUS_LABELS = { open: 'Открыт', in_progress: 'В работе', re
 const WD_STATUS = { pending: 'На рассмотрении', approved: 'Выплачено', rejected: 'Отклонено' };
 const WD_STATUS_CLASS = { pending: 'status-review', approved: 'status-completed', rejected: 'status-cancelled' };
 
+let partnerAttributionPromise = Promise.resolve();
+
 const state = {
     user: null, transactions: [], userWithdrawals: [],
     adminUsers: [], adminRequests: [], adminContactRequests: [], adminStats: null, adminWithdrawals: [],
@@ -187,14 +189,9 @@ async function handleRegister(e) {
     const password = document.getElementById('regPassword').value;
     const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
     try {
-        const ref = getRefFromUrl() || localStorage.getItem('paw_ref');
-        let partnerToken = localStorage.getItem('paw_partner_token') || null;
-        if (ref && !partnerToken) {
-            try {
-                const tokenResponse = await fetch('/api/referrals/partner-token/' + encodeURIComponent(ref));
-                if (tokenResponse.ok) { const tokenData = await tokenResponse.json(); partnerToken = tokenData.partnerToken; localStorage.setItem('paw_partner_token', partnerToken); }
-            } catch { /* personal referral registration remains available */ }
-        }
+        const ref = localStorage.getItem('paw_ref') || null;
+        await partnerAttributionPromise.catch(() => {});
+        const partnerToken = localStorage.getItem('paw_partner_token') || null;
         const data = await api('/api/auth/register', { method: 'POST', body: { name, email, password, ref, partnerToken } });
         state.pendingEmail = data.email;
 
@@ -283,7 +280,7 @@ function getRefFromUrl() {
 }
 
 async function logout() {
-    setToken(null); state.user = null; state.chats = []; state.chatMessages = {}; state.currentChatId = null;
+    setToken(null); localStorage.removeItem('paw_partner_token'); localStorage.removeItem('paw_ref'); localStorage.removeItem('paw_ref_at'); state.user = null; state.chats = []; state.chatMessages = {}; state.currentChatId = null;
     if (state.socket) { state.socket.disconnect(); state.socket = null; }
     closeDashboard(); closeAdminPanel(); closeMessenger(); closeProfileEditor(); closeMyPortfolio(); closeUserFull(); closeContentEditor();
     updateUI(); loadProjects(); loadAllPortfolio();
@@ -939,11 +936,10 @@ async function handleProjectCreate(e) {
     const title = document.getElementById('projTitle').value.trim();
     const description = document.getElementById('projDescription').value.trim();
     const category = document.getElementById('projCategory').value;
-    // Бюджет больше не запрашивается в форме; поле оставлено необязательным для API-совместимости.
-    const budgetInput = document.getElementById('projBudget');
-    const budget = budgetInput ? (Number(budgetInput.value) || 0) : 0;
+    const budget = Number(document.getElementById('projBudget')?.value || 0);
+    const promoCode = document.getElementById('projPromoCode')?.value.trim().toUpperCase() || '';
     const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
-    try { await api('/api/projects', { method: 'POST', body: { title, description, category, budget } }); closeProjectCreator(); e.target.reset(); await loadProjects(); showToast('✅ Заказ создан'); }
+    try { const result = await api('/api/projects', { method: 'POST', body: { title, description, category, budget, promoCode } }); closeProjectCreator(); e.target.reset(); await loadProjects(); showToast('✅ Заказ создан'); }
     catch (err) { showToast('❌ ' + err.message, 'error'); }
     finally { btn.disabled = false; }
 }
@@ -976,12 +972,16 @@ function renderProjectDetail(p) {
         <div class="pd-row"><span class="pd-label">Заказчик</span><span class="pd-value">${escapeHtml(clientName)}</span></div>
         <div class="pd-row"><span class="pd-label">Категория</span><span class="pd-value">${escapeHtml(p.category)}</span></div>
         <div class="pd-row"><span class="pd-label">Бюджет</span><span class="pd-value">${p.budget > 0 ? formatMoney(p.budget) : '—'}</span></div>
+        ${Number(p.discount_percent)>0?`<div class="pd-row"><span class="pd-label">Промокод</span><span class="pd-value">${escapeHtml(p.promo_code)} · скидка ${Number(p.discount_percent)}%</span></div><div class="pd-row"><span class="pd-label">До скидки</span><span class="pd-value">${formatMoney(p.base_budget||p.budget)}</span></div>`:''}
+        ${p.payment_status==='paid'?'<div class="pd-row"><span class="pd-label">Оплата</span><span class="pd-value">Оплачен</span></div>':p.payment_status==='refund_required'?'<div class="pd-row"><span class="pd-label">Оплата</span><span class="pd-value">Требуется возврат</span></div>':p.payment_status==='pending'?'<div class="pd-row"><span class="pd-label">Оплата</span><span class="pd-value">Ожидает подтверждения ЮKassa</span></div>':''}
         ${p.executor ? `<div class="pd-row"><span class="pd-label">Исполнитель</span><span class="pd-value">${escapeHtml(p.executor.name)}</span></div>` : ''}
         <div class="pd-desc">${escapeHtml(p.description)}</div>
-        <div class="pd-actions">${p.executor ? `<button class="btn btn-outline" onclick="openChatWith(${p.executor.id})"><i class="fas fa-comments"></i> Написать</button>` : ''}</div>
+        <div class="pd-actions">${p.executor ? `<button class="btn btn-outline" onclick="openChatWith(${p.executor.id})"><i class="fas fa-comments"></i> Написать</button>` : ''}${isClient&&Number(p.budget)>0&&p.payment_status!=='paid'&&p.payment_status!=='pending'&&p.payment_status!=='refund_required'&&p.payment_status!=='refunded'?`<button class="btn" onclick="payProject(${p.id})"><i class="fas fa-credit-card"></i> Оплатить заказ</button>`:''}${isAdmin&&p.payment_status==='refund_required'?`<button class="btn btn-outline" onclick="adminRefundProject(${p.id})">Зафиксировать возврат</button>`:''}</div>
         ${canChangeStatus ? `<div class="section-divider"><span>Изменить статус</span></div><div class="pd-actions" style="flex-wrap:wrap">${statuses.filter(s => s !== p.status).map(s => `<button class="project-act-btn" onclick="changeStatus(${p.id}, '${s}')">${STATUS_LABELS[s]}</button>`).join('')}</div>` : ''}
     `;
 }
+async function adminRefundProject(id){const reference=prompt('Подтверждение фактического возврата клиенту (номер операции):');if(!reference)return;const comment=prompt('Комментарий:','')||'';try{await api('/api/admin/projects/'+id+'/refund',{method:'POST',body:{reference,comment}});await openProjectDetail(id);showToast('Возврат зафиксирован');}catch(e){showToast('❌ '+e.message,'error');}}
+async function payProject(id){try{const result=await api('/api/projects/'+id+'/pay',{method:'POST',body:{}});if(result.confirmationUrl)location.href=result.confirmationUrl;else showToast('Не удалось получить ссылку на оплату','error');}catch(e){showToast('❌ '+e.message,'error');}}
 async function changeStatus(id, status) { try { await api(`/api/projects/${id}/status`, { method: 'POST', body: { status } }); closeProjectDetail(); await loadProjects(); showToast('✅ Статус обновлён'); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 
 /* PORTFOLIO */
@@ -1519,6 +1519,7 @@ async function openContactRequest(id) {
             `Услуга: ${r.service}`, `Бюджет: ${r.budget || '—'}`,
             `Способ связи: ${r.contactMethod}`, `Контакт: ${r.contactDetail || '—'}`,
             `Референсы: ${r.reference || '—'}`,
+            `Промокод: ${r.promoCode || '—'} · Скидка: ${r.discountPercent || 0}%`,
             `Дата: ${new Date(r.createdAt).toLocaleString('ru-RU')}`,
             r.account ? `Аккаунт: ${r.account.name} (${r.account.email})` : 'Гость без аккаунта'
         ];
@@ -1792,10 +1793,14 @@ async function createPartner(e){
  try{await api('/api/admin/partners',{method:'POST',body:b});f.reset();showToast('Партнёр добавлен');await loadPartnerAdmin();}
  catch(x){showToast('❌ '+x.message,'error');}
 }
+async function partnerTerms(id,currentDiscount,currentReward,currentMinimum){const discountPercent=Number(prompt('Скидка по умолчанию, %:',String(currentDiscount)));if(!Number.isFinite(discountPercent)||discountPercent<0||discountPercent>100)return;const rewardPercent=Number(prompt('Вознаграждение, %:',String(currentReward)));if(!Number.isFinite(rewardPercent)||rewardPercent<0||rewardPercent>50)return;const minimumRub=Number(prompt('Минимальная сумма заявки на выплату, ₽:',String((currentMinimum||100)/100)));if(!Number.isFinite(minimumRub)||minimumRub<1)return;try{await api('/api/admin/partners/'+id,{method:'PATCH',body:{discountPercent,rewardPercent,payoutMinimum:Math.round(minimumRub*100)}});await loadPartnerAdmin();showToast('Условия партнёра обновлены');}catch(e){showToast('❌ '+e.message,'error');}}
+async function partnerPromoStatus(partnerId,promoId,active){try{await api('/api/admin/partners/'+partnerId+'/promos/'+promoId,{method:'PATCH',body:{active}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}}
+async function partnerLinkAccount(id){const accountEmail=prompt('Email зарегистрированного и подтверждённого аккаунта партнёра (пусто — отвязать):');if(accountEmail===null)return;try{await api('/api/admin/partners/'+id,{method:'PATCH',body:{accountEmail:accountEmail.trim()}});await loadPartnerAdmin();showToast('Аккаунт партнёра обновлён');}catch(e){showToast('❌ '+e.message,'error');}}
 async function partnerStatus(id,status){try{await api('/api/admin/partners/'+id,{method:'PATCH',body:{status:status}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}}
 async function partnerPromo(id){
  const code=prompt('Код промокода:');if(!code)return;const discount=Number(prompt('Скидка, %','10')||0);
- try{await api('/api/admin/partners/'+id+'/promos',{method:'POST',body:{code,discountPercent:discount}});await loadPartnerAdmin();showToast('Промокод создан');}catch(e){showToast('❌ '+e.message,'error');}
+ const expiresAt=prompt('Дата окончания (YYYY-MM-DD), пусто — без срока:','')||'';const maxUsesRaw=prompt('Максимум использований, пусто — без лимита:','')||'';
+ try{await api('/api/admin/partners/'+id+'/promos',{method:'POST',body:{code,discountPercent:discount,expiresAt:expiresAt?expiresAt+'T23:59:59':null,maxUses:maxUsesRaw?Number(maxUsesRaw):null}});await loadPartnerAdmin();showToast('Промокод создан');}catch(e){showToast('❌ '+e.message,'error');}
 }
 async function partnerContest(id){
  const title=prompt('Название конкурса:');if(!title)return;const prize=prompt('Приз:','Сертификат Paw Art Studio')||'';
@@ -1805,6 +1810,8 @@ async function partnerAd(id){
  const title=prompt('Название рекламного размещения:');if(!title)return;const targetUrl=prompt('HTTPS-ссылка:');if(!targetUrl)return;
  try{await api('/api/admin/partners/'+id+'/ads',{method:'POST',body:{title:title,targetUrl:targetUrl}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}
 }
+async function partnerCampaign(partnerId,kind,campaignId,active){try{await api('/api/admin/partners/'+partnerId+'/campaigns/'+kind+'/'+campaignId,{method:'PATCH',body:{active:active}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}}
+async function partnerRefundProject(projectId){const reference=prompt('Номер/подтверждение фактического возврата клиенту:');if(!reference)return;const comment=prompt('Комментарий к возврату:','')||'';try{await api('/api/admin/projects/'+projectId+'/refund',{method:'POST',body:{reference,comment}});await loadPartnerAdmin();showToast('Возврат зафиксирован');}catch(e){showToast('❌ '+e.message,'error');}}
 async function partnerConfirmPayment(projectId){const reference=prompt('Укажите подтверждение оплаты (номер перевода/платежа):');if(!reference)return;try{await api('/api/admin/projects/'+projectId+'/confirm-payment',{method:'POST',body:{reference}});await loadPartnerAdmin();showToast('Оплата заказа подтверждена');}catch(e){showToast('❌ '+e.message,'error');}}
 async function partnerLedgerAction(id,action){try{await api('/api/admin/partner-ledger/'+id+'/'+action,{method:'POST',body:{}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}}
 async function partnerPayoutCreate(id){
@@ -1823,25 +1830,26 @@ function renderPartnerAdmin(){
  if(box)box.innerHTML=(d.partners||[]).map(p=>{
   const next=p.status==='active'?'paused':'active',label=p.status==='active'?'Приостановить':'Активировать';
   return '<article class="request-card" style="margin:12px 0"><b>'+escapeHtml(p.name)+'</b> · '+escapeHtml(p.status)+
-   '<p>Код: <b>'+escapeHtml(p.referralCode)+'</b> · Скидка '+p.discountPercent+'% · Вознаграждение '+p.rewardPercent+'%</p>'+
-   '<p>Переходы: '+p.clicks+' · Регистрации: '+p.registrations+' · Заказы: '+p.orders+'</p>'+
-   '<p>К выплате: '+formatMoney(p.payable)+' · Выплачено: '+formatMoney(p.paid)+'</p>'+
+   '<p>Код: <b>'+escapeHtml(p.referralCode)+'</b> · Скидка '+p.discountPercent+'% · Вознаграждение '+p.rewardPercent+'% · Аккаунт: '+(p.partnerUserId?'#'+p.partnerUserId:'не привязан')+'</p>'+
+   '<p>Переходы: '+p.clicks+' · Регистрации: '+p.registrations+' · Заказы: '+p.orders+' · Оплачено: '+p.paidOrders+' · Конверсия: '+p.conversionPercent+'%</p>'+
+   '<p>Доступно к выплате: '+formatMoney(p.available)+' · Ожидает: '+formatMoney(p.pending)+' · Выплачено: '+formatMoney(p.paid)+'</p>'+
    '<p><code>'+location.origin+'/?ref='+encodeURIComponent(p.referralCode)+'</code></p>'+
-   '<div class="request-actions"><button class="admin-act-btn" onclick="partnerPromo('+p.id+')">Промокод</button>'+
+   '<div class="request-actions"><button class="admin-act-btn" onclick="partnerLinkAccount('+p.id+')">Привязать аккаунт</button><button class="admin-act-btn" onclick="partnerTerms('+p.id+','+p.discountPercent+','+p.rewardPercent+','+(p.payoutMinimum||100)+')">Условия</button><button class="admin-act-btn" onclick="partnerPromo('+p.id+')">Промокод</button>'+
    '<button class="admin-act-btn" onclick="partnerContest('+p.id+')">Конкурс</button><button class="admin-act-btn" onclick="partnerAd('+p.id+')">Реклама</button>'+'<button class="admin-act-btn" onclick="partnerPayoutCreate('+p.id+')">Заявка на выплату</button>'+
    '<button class="admin-act-btn" onclick="partnerStatus('+p.id+',\''+next+'\')">'+label+'</button></div></article>';
  }).join('')||'<p class="admin-empty">Партнёров пока нет.</p>';
- if(extra)extra.innerHTML='<h5>Промокоды</h5>'+((d.promos||[]).map(x=>'<p>'+escapeHtml(x.code)+' · '+escapeHtml(x.partner_name)+' · '+x.discount+'% · использовано '+x.uses+'</p>').join('')||'<p>Нет промокодов.</p>')+
-  '<h5>Конкурсы</h5>'+((d.contests||[]).map(x=>'<p>'+escapeHtml(x.title)+' · '+escapeHtml(x.partner_name)+' · '+escapeHtml(x.status)+'</p>').join('')||'<p>Нет конкурсов.</p>')+
-  '<h5>Реклама</h5>'+((d.ads||[]).map(x=>'<p>'+escapeHtml(x.title)+' · '+escapeHtml(x.partner_name)+' · <a href="'+escapeHtml(x.target_url)+'" target="_blank" rel="noopener">ссылка</a></p>').join('')||'<p>Нет размещений.</p>')+
+ if(extra)extra.innerHTML='<h5>Промокоды</h5>'+((d.promos||[]).map(x=>'<p>'+escapeHtml(x.code)+' · '+escapeHtml(x.partner_name)+' · '+x.discount+'% · '+(x.active?'активен':'выключен')+' · использовано '+x.uses+(x.max_uses?' / '+x.max_uses:'')+(x.expires_at?' · до '+new Date(x.expires_at).toLocaleDateString('ru-RU'):'')+' <button class="admin-act-btn" onclick="partnerPromoStatus('+x.partner_id+','+x.id+','+(x.active?'false':'true')+')">'+(x.active?'Выключить':'Включить')+'</button></p>').join('')||'<p>Нет промокодов.</p>')+
+  '<h5>Конкурсы</h5>'+((d.contests||[]).map(x=>'<p>'+escapeHtml(x.title)+' · '+escapeHtml(x.partner_name)+' · '+escapeHtml(x.status)+' <button class="admin-act-btn" onclick="partnerCampaign('+x.partner_id+',\'contests\','+x.id+','+(x.status==='active'?'false':'true')+')">'+(x.status==='active'?'Скрыть':'Опубликовать')+'</button></p>').join('')||'<p>Нет конкурсов.</p>')+
+  '<h5>Реклама</h5>'+((d.ads||[]).map(x=>'<p>'+escapeHtml(x.title)+' · '+escapeHtml(x.partner_name)+' · '+(x.active?'активно':'выключено')+' · <a href="'+escapeHtml(x.target_url)+'" target="_blank" rel="noopener">ссылка</a> <button class="admin-act-btn" onclick="partnerCampaign('+x.partner_id+',\'ads\','+x.id+','+(x.active?'false':'true')+')">'+(x.active?'Скрыть':'Опубликовать')+'</button></p>').join('')||'<p>Нет размещений.</p>')+
   '<h5>Заявки на выплаты</h5>'+((d.payouts||[]).map(x=>'<div class="request-card">'+escapeHtml(x.partner_name)+' · '+formatMoney(x.amount)+' · '+escapeHtml(x.status)+'<p>'+escapeHtml(x.payment_details)+'</p>'+
    (x.status==='pending'?'<button class="admin-act-btn" onclick="partnerPayoutAction('+x.id+',\'approved\')">Одобрить</button> <button class="admin-act-btn danger" onclick="partnerPayoutAction('+x.id+',\'rejected\')">Отклонить</button>':'')+
-   (x.status==='approved'?'<button class="admin-act-btn" onclick="partnerPayoutAction('+x.id+',\'paid\')">Отметить выплаченным</button>':'')+'</div>').join('')||'<p>Заявок нет.</p>');
+   (x.status==='approved'?'<button class="admin-act-btn" onclick="partnerPayoutAction('+x.id+',\'paid\')">Отметить выплаченным</button> <button class="admin-act-btn danger" onclick="partnerPayoutAction('+x.id+',\'rejected\')">Отменить заявку</button>':'')+'</div>').join('')||'<p>Заявок нет.</p>');
  if(ledger)ledger.innerHTML=(d.ledger||[]).map(x=>'<div class="request-card"><b>'+escapeHtml(x.partner_name)+'</b> · '+formatMoney(x.reward_amount)+' · '+escapeHtml(x.status)+
   '<p>Заказ #'+x.project_id+' · Клиент: '+escapeHtml(x.customer_name||'—')+'</p>'+
   (x.status==='pending'&&!x.payment_verified_at?'<button class="admin-act-btn" onclick="partnerConfirmPayment('+x.project_id+')">Подтвердить оплату</button>':'')+
   (x.status==='pending'&&x.payment_verified_at?'<button class="admin-act-btn" onclick="partnerLedgerAction('+x.id+',\'approve\')">Одобрить начисление</button>':'')+
-  (x.status==='approved'?'<button class="admin-act-btn" onclick="partnerLedgerAction('+x.id+',\'paid\')">Отметить выплаченным</button>':'')+'</div>').join('')||'<p>Начислений пока нет.</p>';
+  (x.project_payment_status==='refund_required'?'<button class="admin-act-btn danger" onclick="partnerRefundProject('+x.project_id+')">Подтвердить возврат</button>':'')+
+  (x.status==='approved'?'<span class="wd-date">К выплате через заявку партнёра</span>':'')+'</div>').join('')||'<p>Начислений пока нет.</p>';
 }
 async function loadPublicPartners(){
  const box=document.getElementById('partnersGrid');if(!box)return;
@@ -1854,16 +1862,40 @@ async function loadPublicPartners(){
 /* INIT */
 async function init() {
     // Реферальный трекинг
+    const urlRef = new URLSearchParams(location.search).get('ref');
     const ref = getRefFromUrl();
-    if (ref) {
-        fetch('/api/referrals/click/' + encodeURIComponent(ref)).then(r => r.ok ? r.json() : null)
+    if (urlRef && ref) {
+        localStorage.removeItem('paw_partner_token');
+        partnerAttributionPromise = fetch('/api/referrals/click/' + encodeURIComponent(ref)).then(r => r.ok ? r.json() : null)
           .then(data => { if (data?.partnerToken) localStorage.setItem('paw_partner_token', data.partnerToken); })
-          .catch(() => {});
+          .catch(() => null);
         localStorage.setItem('paw_ref', ref);
+        const cleanReferralUrl=new URL(location.href);cleanReferralUrl.searchParams.delete('ref');history.replaceState({},'',cleanReferralUrl.pathname+cleanReferralUrl.search+cleanReferralUrl.hash);
     }
     await loadPublicPartners();
     await loadAndApplyContent();
     await fetchMe();
+    const paymentParams=new URLSearchParams(location.search);
+    if(paymentParams.get('projectPayment')==='success'){
+        const paidProjectId=Number(paymentParams.get('projectId'));
+        if(Number.isSafeInteger(paidProjectId)&&paidProjectId>0&&state.user){
+            try{
+                let result=null;
+                for(let attempt=0;attempt<6;attempt++){
+                    result=await api('/api/projects/'+paidProjectId);
+                    if(result.project?.payment_status!=='pending')break;
+                    await new Promise(resolve=>setTimeout(resolve,1200));
+                }
+                if(result.project?.payment_status==='paid')showToast('Оплата заказа подтверждена ЮKassa');
+                else if(result.project?.payment_status==='refund_required')showToast('Платёж получен, но заказ отменён. Администратор должен оформить возврат.','error');
+                else showToast('Платёж обрабатывается. Статус заказа можно проверить в личном кабинете.');
+                if(result.project){state.currentProject=normalizeProject(result.project);renderProjectDetail(state.currentProject);document.getElementById('projectDetailModal')?.classList.add('open');document.body.style.overflow='hidden';}
+            }catch(e){showToast('Не удалось проверить статус оплаты: '+e.message,'error');}
+        }else showToast('Возврат из ЮKassa выполнен. Войдите в аккаунт, чтобы проверить заказ.');
+        paymentParams.delete('projectPayment');paymentParams.delete('projectId');
+        const suffix=paymentParams.toString();
+        history.replaceState({},'',location.pathname+(suffix?'?'+suffix:'')+location.hash);
+    }
     if (!state.user) { await loadProjects(); await loadAllPortfolio(); }
     setTimeout(onScroll, 200);
     console.log('🐾 Paw Art Studio v3.8 (hybrid) ready');
