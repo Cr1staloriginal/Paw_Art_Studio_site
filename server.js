@@ -2146,13 +2146,14 @@ app.post('/api/admin/partners',auth,adminOnly,(req,res)=>{
  if(db.prepare('SELECT id FROM users WHERE referral_code=?').get(code))return res.status(409).json({error:'Этот код уже занят личной реферальной системой'});
  if(discord&&!/^https:\/\/(discord\.gg|discord\.com)\//i.test(discord))return res.status(400).json({error:'Некорректная Discord-ссылка'});
  try{const now=Date.now(),r=db.prepare("INSERT INTO partners(name,description,discord_url,logo_url,owner_name,contact_email,referral_code,discount_percent,reward_percent,status,created_at,updated_at,partner_user_id) VALUES(?,?,?,?,?,?,?,?,?,'active',?,?,?)").run(name,String(b.description||'').slice(0,1000),discord,String(b.logoUrl||'').slice(0,500),String(b.ownerName||'').slice(0,100),String(b.contactEmail||'').trim().slice(0,160),code,discount,reward,now,now,linkedUser?.id||null);res.status(201).json({partner:partnerRow(db.prepare('SELECT * FROM partners WHERE id=?').get(r.lastInsertRowid))});}
- catch(e){if(String(e.message).includes('UNIQUE'))return res.status(409).json({error:'Реферальный код уже занят'});console.error(e);res.status(500).json({error:'Не удалось создать партнёра'});}
+ catch(e){if(String(e.message).includes('UNIQUE'))return res.status(409).json({error:'Реферальный код уже занят или аккаунт уже привязан к другому партнёру'});console.error(e);res.status(500).json({error:'Не удалось создать партнёра'});}
 });
 app.patch('/api/admin/partners/:id',auth,adminOnly,(req,res)=>{
  const id=Number(req.params.id),b=req.body||{},p=db.prepare('SELECT * FROM partners WHERE id=?').get(id);if(!p)return res.status(404).json({error:'Партнёр не найден'});
  const status=['active','paused','rejected','pending'].includes(b.status)?b.status:p.status,discount=b.discountPercent===undefined?p.discount_percent:Math.max(0,Math.min(100,Math.round(Number(b.discountPercent)||0))),reward=b.rewardPercent===undefined?p.reward_percent:Math.max(0,Math.min(50,Number(b.rewardPercent)||0));
  let linkedUserId=p.partner_user_id||null;
  if(b.accountEmail!==undefined){const email=String(b.accountEmail||'').trim().toLowerCase();if(email){const u=db.prepare('SELECT id,email_verified FROM users WHERE email=?').get(email);if(!u||u.email_verified!==1)return res.status(400).json({error:'Аккаунт не найден или email не подтверждён'});linkedUserId=u.id;}else linkedUserId=null;}
+ if(linkedUserId&&db.prepare('SELECT id FROM partners WHERE partner_user_id=? AND id<>?').get(linkedUserId,id))return res.status(409).json({error:'Этот аккаунт уже привязан к другому партнёру'});
  db.prepare('UPDATE partners SET status=?,discount_percent=?,reward_percent=?,partner_user_id=?,updated_at=? WHERE id=?').run(status,discount,reward,linkedUserId,Date.now(),id);res.json({ok:true});
 });
 app.post('/api/admin/partners/:id/promos',auth,adminOnly,(req,res)=>{
