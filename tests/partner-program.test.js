@@ -75,12 +75,18 @@ test('partner referral, discount, verified reward and payout lifecycle', async t
   const duplicatePromo=await request('/api/requests',{method:'POST',token:customerToken,body:{
     name:'Customer',service:'Mascot',promoCode:'TEST10',contactMethod:'Сайт'
   }});
-  assert.equal(duplicatePromo.status,400);
+  assert.equal(duplicatePromo.status,201);
 
   const project=await request('/api/projects',{method:'POST',token:customerToken,body:{
-    title:'Test order',description:'Integration test',category:'Mascot',budget:1000
+    title:'Test order',description:'Integration test',category:'Mascot',budget:1000,promoCode:'TEST10'
   }});
-  assert.equal(project.status,200);
+  assert.equal(project.status,201,JSON.stringify(project.data));
+  assert.equal(project.data.project.base_budget,100000);
+  assert.equal(project.data.project.budget,90000);
+  assert.equal(project.data.project.discount_percent,10);
+  const duplicateProject=await request('/api/projects',{method:'POST',token:customerToken,body:{title:'Duplicate',description:'Duplicate promo test',category:'Mascot',budget:1000,promoCode:'TEST10'}});
+  assert.equal(duplicateProject.status,400);
+  assert.equal((await request('/api/projects/'+project.data.project.id+'/pay',{method:'POST',token:customerToken,body:{}})).status,503);
   const projectId=project.data.project.id;
   assert.equal((await request('/api/projects/'+projectId+'/status',{method:'POST',token:customerToken,body:{status:'completed'}})).status,200);
   let adminData=(await request('/api/admin/partners',{token:adminToken})).data;
@@ -91,7 +97,7 @@ test('partner referral, discount, verified reward and payout lifecycle', async t
   assert.equal((await request('/api/admin/projects/'+projectId+'/confirm-payment',{method:'POST',token:adminToken,body:{reference:'TEST-TRANSFER-001'}})).status,200);
   assert.equal((await request('/api/admin/partner-ledger/'+ledger.id+'/approve',{method:'POST',token:adminToken,body:{}})).status,200);
   let partnerData=(await request('/api/partner/me',{token:partnerToken})).data;
-  assert.equal(partnerData.stats.available,5000);
+  assert.equal(partnerData.stats.available,4500);
 
   const payout=await request('/api/partner/payouts',{method:'POST',token:partnerToken,body:{paymentDetails:'Test bank account 0001'}});
   assert.equal(payout.status,201,JSON.stringify(payout.data));
@@ -102,12 +108,14 @@ test('partner referral, discount, verified reward and payout lifecycle', async t
   assert.equal((await request('/api/admin/partner-payouts/'+payout.data.id,{method:'PATCH',token:adminToken,body:{status:'paid',comment:'Transferred'}})).status,200);
   partnerData=(await request('/api/partner/me',{token:partnerToken})).data;
   assert.equal(partnerData.stats.available,0);
-  assert.equal(partnerData.stats.paid,5000);
+  assert.equal(partnerData.stats.paid,4500);
 
   assert.equal((await request('/api/projects/'+projectId+'/status',{method:'POST',token:customerToken,body:{status:'cancelled'}})).status,200);
   partnerData=(await request('/api/partner/me',{token:partnerToken})).data;
-  assert.equal(partnerData.stats.available,-5000);
-  assert.equal(partnerData.stats.paid,5000);
+  assert.equal(partnerData.stats.available,-4500);
+  assert.equal(partnerData.stats.paid,4500);
+  const refund=await request('/api/admin/projects/'+projectId+'/refund',{method:'POST',token:adminToken,body:{reference:'REFUND-TEST-001',comment:'Returned to customer'}});
+  assert.equal(refund.status,200,JSON.stringify(refund.data));
 
   const contest=await request('/api/admin/partners/'+partnerId+'/contests',{method:'POST',token:adminToken,body:{title:'Community Art Contest',prize:'Gift card'}});
   assert.equal(contest.status,201);
