@@ -853,7 +853,7 @@ app.post('/api/projects/:id/pay',auth,async(req,res)=>{
  try{
   const payment=await yookassa.payments.create({
    amount:{value:(amount/100).toFixed(2),currency:'RUB'},capture:true,
-   confirmation:{type:'redirect',return_url:SITE_URL+'/dashboard?projectPayment=success&projectId='+id},
+   confirmation:{type:'redirect',return_url:SITE_URL+'/?projectPayment=success&projectId='+id},
    description:'Оплата заказа Paw Art Studio #'+id,
    metadata:{userId:String(req.user.id),projectId:String(id),paymentType:'project'}
   },crypto.randomUUID());
