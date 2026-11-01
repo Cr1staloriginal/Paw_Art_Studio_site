@@ -2246,7 +2246,8 @@ app.get('/api/partner/me',auth,(req,res)=>{
  const available=Number(stats.approved)-Number(adjustments)-Number(reserved);
  const payouts=db.prepare('SELECT id,amount,status,comment,created_at,reviewed_at FROM partner_payout_requests WHERE partner_id=? ORDER BY created_at DESC LIMIT 30').all(p.id);
  const ledger=db.prepare('SELECT id,project_id,order_amount,reward_amount,paid_amount,status,created_at,reviewed_at FROM partner_ledger WHERE partner_id=? ORDER BY created_at DESC LIMIT 50').all(p.id);
- res.json({partner:partnerRow(p),stats:{clicks:Number(clicks),registrations:Number(registrations),orders:Number(stats.orders),paidOrders:Number(stats.paid_orders),conversionPercent:Number(clicks)>0?Math.round(Number(registrations)/Number(clicks)*1000)/10:0,pending:Number(stats.pending),approved:Number(stats.approved),paid:Number(stats.paid),reversed:Number(stats.reversed),available},payouts,ledger});
+ const promos=db.prepare('SELECT id,code,discount,uses,max_uses,expires_at FROM promocodes WHERE partner_id=? AND active=1 ORDER BY created_at DESC').all(p.id);
+ res.json({partner:partnerRow(p),promos,stats:{clicks:Number(clicks),registrations:Number(registrations),orders:Number(stats.orders),paidOrders:Number(stats.paid_orders),conversionPercent:Number(clicks)>0?Math.round(Number(registrations)/Number(clicks)*1000)/10:0,pending:Number(stats.pending),approved:Number(stats.approved),paid:Number(stats.paid),reversed:Number(stats.reversed),available},payouts,ledger});
 });
 app.post('/api/partner/payouts',auth,(req,res)=>{
  const p=db.prepare("SELECT * FROM partners WHERE partner_user_id=? AND status='active'").get(req.user.id);
