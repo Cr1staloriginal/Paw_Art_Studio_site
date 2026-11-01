@@ -2169,7 +2169,7 @@ app.post('/api/admin/partners/:id/payouts',auth,adminOnly,(req,res)=>{
 });
 app.patch('/api/admin/partner-payouts/:id',auth,adminOnly,(req,res)=>{
  const id=Number(req.params.id),status=String(req.body?.status||''),row=db.prepare('SELECT * FROM partner_payout_requests WHERE id=?').get(id);if(!row)return res.status(404).json({error:'Заявка не найдена'});
- if(!['approved','rejected','paid'].includes(status)||!(row.status==='pending'||(row.status==='approved'&&status==='paid')))return res.status(409).json({error:'Недопустимый статус заявки'});
+ if(!['approved','rejected','paid'].includes(status)||!(row.status==='pending'||(row.status==='approved'&&(status==='paid'||status==='rejected'))))return res.status(409).json({error:'Недопустимый статус заявки'});
  const now=Date.now();
  const update=db.transaction(()=>{
   db.prepare('UPDATE partner_payout_requests SET status=?,comment=?,reviewed_at=?,reviewed_by=? WHERE id=?').run(status,String(req.body?.comment||'').slice(0,500),now,req.user.id,id);
