@@ -495,7 +495,10 @@ function generateCode() {
 }
 
 function generateReferralCode() {
-  return 'PAW' + Math.random().toString(36).slice(2, 8).toUpperCase();
+  let code;
+  do { code='PAW'+Math.random().toString(36).slice(2,8).toUpperCase(); }
+  while(db.prepare('SELECT 1 FROM users WHERE referral_code=?').get(code)||db.prepare('SELECT 1 FROM partners WHERE referral_code=?').get(code));
+  return code;
 }
 
 function ensurePartnerLedgerForCompletedProject(projectId, now = Date.now()) {
@@ -1620,6 +1623,7 @@ app.post('/api/projects', auth, (req, res) => {
   const promoCode=String(b.promoCode||'').trim().toUpperCase();
   let promo=null;
   if(promoCode){
+    if(baseBudget<100)return res.status(400).json({error:'Чтобы применить скидку, укажите бюджет заказа не менее 1 ₽'});
     promo=db.prepare('SELECT * FROM promocodes WHERE code=?').get(promoCode);
     if(!promo||!promo.active)return res.status(400).json({error:'Промокод не найден или неактивен'});
     if(promo.partner_id&&!db.prepare("SELECT id FROM partners WHERE id=? AND status='active'").get(promo.partner_id))return res.status(400).json({error:'Промокод партнёра временно недоступен'});
@@ -1633,8 +1637,9 @@ app.post('/api/projects', auth, (req, res) => {
   try{
     const create=db.transaction(()=>{
       if(promo){
+        const used=db.prepare('UPDATE promocodes SET uses=uses+1 WHERE id=? AND active=1 AND (max_uses IS NULL OR max_uses=0 OR uses<max_uses) AND (expires_at IS NULL OR expires_at>=?)').run(promo.id,now);
+        if(!used.changes)throw new Error('Лимит использований промокода исчерпан или срок его действия закончился');
         db.prepare('INSERT INTO promo_redemptions(promo_id,user_id,created_at) VALUES(?,?,?)').run(promo.id,req.user.id,now);
-        db.prepare('UPDATE promocodes SET uses=uses+1 WHERE id=?').run(promo.id);
       }
       const info=db.prepare(`INSERT INTO projects(title,description,category,budget,status,client_id,created_at,updated_at,base_budget,discount_percent,promo_code,partner_id)
         VALUES(?,?,?,?,'open',?,?,?,?,?,?,?)`).run(title,description,category,finalBudget,req.user.id,now,now,baseBudget,discount,promo?promo.code:null,partnerId);
