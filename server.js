@@ -307,9 +307,16 @@ safeAddColumn('users', 'partner_id', 'INTEGER');
 safeAddColumn('promocodes', 'partner_id', 'INTEGER');
 safeAddColumn('projects', 'partner_paid_at', 'INTEGER');
 safeAddColumn('projects', 'partner_payment_reference', 'TEXT');
+safeAddColumn('projects', 'base_budget', 'INTEGER NOT NULL DEFAULT 0');
+safeAddColumn('projects', 'discount_percent', 'INTEGER NOT NULL DEFAULT 0');
+safeAddColumn('projects', 'promo_code', 'TEXT');
+safeAddColumn('projects', 'partner_id', 'INTEGER');
+safeAddColumn('projects', 'payment_status', "TEXT NOT NULL DEFAULT 'unpaid'");
 safeAddColumn('partner_ledger', 'payment_verified_at', 'INTEGER');
 safeAddColumn('partner_ledger', 'payment_reference', 'TEXT');
 safeAddColumn('partner_ledger', 'paid_amount', 'INTEGER NOT NULL DEFAULT 0');
+safeAddColumn('payments', 'project_id', 'INTEGER');
+safeAddColumn('payments', 'purpose', "TEXT NOT NULL DEFAULT 'wallet_topup'");
 safeAddColumn('partners', 'partner_user_id', 'INTEGER');
 safeAddColumn('partners', 'payout_minimum', 'INTEGER NOT NULL DEFAULT 100');
 db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_partners_user_id ON partners(partner_user_id) WHERE partner_user_id IS NOT NULL');
@@ -489,6 +496,18 @@ function generateCode() {
 
 function generateReferralCode() {
   return 'PAW' + Math.random().toString(36).slice(2, 8).toUpperCase();
+}
+
+function ensurePartnerLedgerForPaidProject(projectId, now = Date.now()) {
+  const project = db.prepare("SELECT id,client_id,budget,partner_id,status,payment_status FROM projects WHERE id=?").get(projectId);
+  if (!project || project.status !== 'completed' || project.payment_status !== 'paid' || !project.partner_id || Number(project.budget) <= 0) return false;
+  const partner = db.prepare('SELECT id,reward_percent FROM partners WHERE id=?').get(project.partner_id);
+  if (!partner || Number(partner.reward_percent) <= 0) return false;
+  const reward = Math.floor(Number(project.budget) * Number(partner.reward_percent) / 100);
+  if (reward <= 0) return false;
+  const result = db.prepare("INSERT OR IGNORE INTO partner_ledger(partner_id,project_id,user_id,order_amount,reward_amount,status,created_at) VALUES(?,?,?,?,?,'pending',?)")
+    .run(partner.id,project.id,project.client_id,project.budget,reward,now);
+  return result.changes > 0;
 }
 
 async function sendVerificationEmail(email, code) {
