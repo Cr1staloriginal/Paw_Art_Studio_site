@@ -1807,6 +1807,7 @@ async function partnerAd(id){
  try{await api('/api/admin/partners/'+id+'/ads',{method:'POST',body:{title:title,targetUrl:targetUrl}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}
 }
 async function partnerCampaign(partnerId,kind,campaignId,active){try{await api('/api/admin/partners/'+partnerId+'/campaigns/'+kind+'/'+campaignId,{method:'PATCH',body:{active:active}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}}
+async function partnerRefundProject(projectId){const reference=prompt('Номер/подтверждение фактического возврата клиенту:');if(!reference)return;const comment=prompt('Комментарий к возврату:','')||'';try{await api('/api/admin/projects/'+projectId+'/refund',{method:'POST',body:{reference,comment}});await loadPartnerAdmin();showToast('Возврат зафиксирован');}catch(e){showToast('❌ '+e.message,'error');}}
 async function partnerConfirmPayment(projectId){const reference=prompt('Укажите подтверждение оплаты (номер перевода/платежа):');if(!reference)return;try{await api('/api/admin/projects/'+projectId+'/confirm-payment',{method:'POST',body:{reference}});await loadPartnerAdmin();showToast('Оплата заказа подтверждена');}catch(e){showToast('❌ '+e.message,'error');}}
 async function partnerLedgerAction(id,action){try{await api('/api/admin/partner-ledger/'+id+'/'+action,{method:'POST',body:{}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}}
 async function partnerPayoutCreate(id){
@@ -1843,6 +1844,7 @@ function renderPartnerAdmin(){
   '<p>Заказ #'+x.project_id+' · Клиент: '+escapeHtml(x.customer_name||'—')+'</p>'+
   (x.status==='pending'&&!x.payment_verified_at?'<button class="admin-act-btn" onclick="partnerConfirmPayment('+x.project_id+')">Подтвердить оплату</button>':'')+
   (x.status==='pending'&&x.payment_verified_at?'<button class="admin-act-btn" onclick="partnerLedgerAction('+x.id+',\'approve\')">Одобрить начисление</button>':'')+
+  (x.project_payment_status==='refund_required'?'<button class="admin-act-btn danger" onclick="partnerRefundProject('+x.project_id+')">Подтвердить возврат</button>':'')+
   (x.status==='approved'?'<span class="wd-date">К выплате через заявку партнёра</span>':'')+'</div>').join('')||'<p>Начислений пока нет.</p>';
 }
 async function loadPublicPartners(){
