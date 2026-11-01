@@ -188,13 +188,7 @@ async function handleRegister(e) {
     const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
     try {
         const ref = getRefFromUrl() || localStorage.getItem('paw_ref');
-        let partnerToken = localStorage.getItem('paw_partner_token') || null;
-        if (ref && !partnerToken) {
-            try {
-                const tokenResponse = await fetch('/api/referrals/partner-token/' + encodeURIComponent(ref));
-                if (tokenResponse.ok) { const tokenData = await tokenResponse.json(); partnerToken = tokenData.partnerToken; localStorage.setItem('paw_partner_token', partnerToken); }
-            } catch { /* personal referral registration remains available */ }
-        }
+        const partnerToken = localStorage.getItem('paw_partner_token') || null;
         const data = await api('/api/auth/register', { method: 'POST', body: { name, email, password, ref, partnerToken } });
         state.pendingEmail = data.email;
 
