@@ -22,6 +22,7 @@
       notice.classList.add('hidden'); dashboard.classList.remove('hidden');
       document.getElementById('partnerName').textContent=p.name;
       document.getElementById('partnerDescription').textContent=p.description || 'Официальный партнёр Paw Art Studio';
+      document.getElementById('partnerTerms').textContent='Скидка по промокодам: '+Number(p.discountPercent||0)+'% · Вознаграждение: '+Number(p.rewardPercent||0)+'% · Минимальная выплата: '+money(p.payoutMinimum||100);
       const link=location.origin+'/?ref='+encodeURIComponent(p.referralCode);
       const linkEl=document.getElementById('partnerLink');linkEl.href=link;linkEl.textContent=link;
       for(const [id,value] of Object.entries({clicks:s.clicks,registrations:s.registrations,orders:s.orders,paidOrders:s.paidOrders,conversion:s.conversionPercent+'%',pending:money(s.pending),approved:money(s.approved),available:money(s.available),paid:money(s.paid)}))document.getElementById(id).textContent=value;
