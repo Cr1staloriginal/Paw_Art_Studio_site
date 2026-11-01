@@ -936,11 +936,10 @@ async function handleProjectCreate(e) {
     const title = document.getElementById('projTitle').value.trim();
     const description = document.getElementById('projDescription').value.trim();
     const category = document.getElementById('projCategory').value;
-    // Бюджет больше не запрашивается в форме; поле оставлено необязательным для API-совместимости.
-    const budgetInput = document.getElementById('projBudget');
-    const budget = budgetInput ? (Number(budgetInput.value) || 0) : 0;
+    const budget = Number(document.getElementById('projBudget')?.value || 0);
+    const promoCode = document.getElementById('projPromoCode')?.value.trim().toUpperCase() || '';
     const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
-    try { await api('/api/projects', { method: 'POST', body: { title, description, category, budget } }); closeProjectCreator(); e.target.reset(); await loadProjects(); showToast('✅ Заказ создан'); }
+    try { const result = await api('/api/projects', { method: 'POST', body: { title, description, category, budget, promoCode } }); closeProjectCreator(); e.target.reset(); await loadProjects(); showToast('✅ Заказ создан'); }
     catch (err) { showToast('❌ ' + err.message, 'error'); }
     finally { btn.disabled = false; }
 }
@@ -973,12 +972,15 @@ function renderProjectDetail(p) {
         <div class="pd-row"><span class="pd-label">Заказчик</span><span class="pd-value">${escapeHtml(clientName)}</span></div>
         <div class="pd-row"><span class="pd-label">Категория</span><span class="pd-value">${escapeHtml(p.category)}</span></div>
         <div class="pd-row"><span class="pd-label">Бюджет</span><span class="pd-value">${p.budget > 0 ? formatMoney(p.budget) : '—'}</span></div>
+        ${Number(p.discount_percent)>0?`<div class="pd-row"><span class="pd-label">Промокод</span><span class="pd-value">${escapeHtml(p.promo_code)} · скидка ${Number(p.discount_percent)}%</span></div><div class="pd-row"><span class="pd-label">До скидки</span><span class="pd-value">${formatMoney(p.base_budget||p.budget)}</span></div>`:''}
+        ${p.payment_status==='paid'?'<div class="pd-row"><span class="pd-label">Оплата</span><span class="pd-value">Оплачен</span></div>':p.payment_status==='refund_required'?'<div class="pd-row"><span class="pd-label">Оплата</span><span class="pd-value">Требуется возврат</span></div>':p.payment_status==='pending'?'<div class="pd-row"><span class="pd-label">Оплата</span><span class="pd-value">Ожидает подтверждения ЮKassa</span></div>':''}
         ${p.executor ? `<div class="pd-row"><span class="pd-label">Исполнитель</span><span class="pd-value">${escapeHtml(p.executor.name)}</span></div>` : ''}
         <div class="pd-desc">${escapeHtml(p.description)}</div>
-        <div class="pd-actions">${p.executor ? `<button class="btn btn-outline" onclick="openChatWith(${p.executor.id})"><i class="fas fa-comments"></i> Написать</button>` : ''}</div>
+        <div class="pd-actions">${p.executor ? `<button class="btn btn-outline" onclick="openChatWith(${p.executor.id})"><i class="fas fa-comments"></i> Написать</button>` : ''}${isClient&&Number(p.budget)>0&&p.payment_status!=='paid'&&p.payment_status!=='pending'&&p.payment_status!=='refund_required'&&p.payment_status!=='refunded'?`<button class="btn" onclick="payProject(${p.id})"><i class="fas fa-credit-card"></i> Оплатить заказ</button>`:''}</div>
         ${canChangeStatus ? `<div class="section-divider"><span>Изменить статус</span></div><div class="pd-actions" style="flex-wrap:wrap">${statuses.filter(s => s !== p.status).map(s => `<button class="project-act-btn" onclick="changeStatus(${p.id}, '${s}')">${STATUS_LABELS[s]}</button>`).join('')}</div>` : ''}
     `;
 }
+async function payProject(id){try{const result=await api('/api/projects/'+id+'/pay',{method:'POST',body:{}});if(result.confirmationUrl)location.href=result.confirmationUrl;else showToast('Не удалось получить ссылку на оплату','error');}catch(e){showToast('❌ '+e.message,'error');}}
 async function changeStatus(id, status) { try { await api(`/api/projects/${id}/status`, { method: 'POST', body: { status } }); closeProjectDetail(); await loadProjects(); showToast('✅ Статус обновлён'); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 
 /* PORTFOLIO */
