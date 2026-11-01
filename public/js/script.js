@@ -1811,18 +1811,18 @@ function renderPartnerAdmin(){
    '<p><code>'+location.origin+'/?ref='+encodeURIComponent(p.referralCode)+'</code></p>'+
    '<div class="request-actions"><button class="admin-act-btn" onclick="partnerPromo('+p.id+')">Промокод</button>'+
    '<button class="admin-act-btn" onclick="partnerContest('+p.id+')">Конкурс</button><button class="admin-act-btn" onclick="partnerAd('+p.id+')">Реклама</button>'+
-   '<button class="admin-act-btn" onclick="partnerStatus('+p.id+',\\''+next+'\\')">'+label+'</button></div></article>';
+   '<button class="admin-act-btn" onclick="partnerStatus('+p.id+',\''+next+'\')">'+label+'</button></div></article>';
  }).join('')||'<p class="admin-empty">Партнёров пока нет.</p>';
  if(extra)extra.innerHTML='<h5>Промокоды</h5>'+((d.promos||[]).map(x=>'<p>'+escapeHtml(x.code)+' · '+escapeHtml(x.partner_name)+' · '+x.discount+'% · использовано '+x.uses+'</p>').join('')||'<p>Нет промокодов.</p>')+
   '<h5>Конкурсы</h5>'+((d.contests||[]).map(x=>'<p>'+escapeHtml(x.title)+' · '+escapeHtml(x.partner_name)+' · '+escapeHtml(x.status)+'</p>').join('')||'<p>Нет конкурсов.</p>')+
   '<h5>Реклама</h5>'+((d.ads||[]).map(x=>'<p>'+escapeHtml(x.title)+' · '+escapeHtml(x.partner_name)+' · <a href="'+escapeHtml(x.target_url)+'" target="_blank" rel="noopener">ссылка</a></p>').join('')||'<p>Нет размещений.</p>')+
   '<h5>Заявки на выплаты</h5>'+((d.payouts||[]).map(x=>'<div class="request-card">'+escapeHtml(x.partner_name)+' · '+formatMoney(x.amount)+' · '+escapeHtml(x.status)+'<p>'+escapeHtml(x.payment_details)+'</p>'+
-   (x.status==='pending'?'<button class="admin-act-btn" onclick="partnerPayoutAction('+x.id+',\\'approved\\')">Одобрить</button> <button class="admin-act-btn danger" onclick="partnerPayoutAction('+x.id+',\\'rejected\\')">Отклонить</button>':'')+
-   (x.status==='approved'?'<button class="admin-act-btn" onclick="partnerPayoutAction('+x.id+',\\'paid\\')">Отметить выплаченным</button>':'')+'</div>').join('')||'<p>Заявок нет.</p>');
+   (x.status==='pending'?'<button class="admin-act-btn" onclick="partnerPayoutAction('+x.id+',\'approved\')">Одобрить</button> <button class="admin-act-btn danger" onclick="partnerPayoutAction('+x.id+',\'rejected\')">Отклонить</button>':'')+
+   (x.status==='approved'?'<button class="admin-act-btn" onclick="partnerPayoutAction('+x.id+',\'paid\')">Отметить выплаченным</button>':'')+'</div>').join('')||'<p>Заявок нет.</p>');
  if(ledger)ledger.innerHTML=(d.ledger||[]).map(x=>'<div class="request-card"><b>'+escapeHtml(x.partner_name)+'</b> · '+formatMoney(x.reward_amount)+' · '+escapeHtml(x.status)+
   '<p>Заказ #'+x.project_id+' · Клиент: '+escapeHtml(x.customer_name||'—')+'</p>'+
-  (x.status==='pending'?'<button class="admin-act-btn" onclick="partnerLedgerAction('+x.id+',\\'approve\\')">Подтвердить</button>':'')+
-  (x.status==='approved'?'<button class="admin-act-btn" onclick="partnerLedgerAction('+x.id+',\\'paid\\')">Отметить выплаченным</button>':'')+'</div>').join('')||'<p>Начислений пока нет.</p>';
+  (x.status==='pending'?'<button class="admin-act-btn" onclick="partnerLedgerAction('+x.id+',\'approve\')">Подтвердить</button>':'')+
+  (x.status==='approved'?'<button class="admin-act-btn" onclick="partnerLedgerAction('+x.id+',\'paid\')">Отметить выплаченным</button>':'')+'</div>').join('')||'<p>Начислений пока нет.</p>';
 }
 async function loadPublicPartners(){
  const box=document.getElementById('partnersGrid');if(!box)return;
