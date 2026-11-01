@@ -7,6 +7,8 @@ const STATUS_LABELS = { open: 'Открыт', in_progress: 'В работе', re
 const WD_STATUS = { pending: 'На рассмотрении', approved: 'Выплачено', rejected: 'Отклонено' };
 const WD_STATUS_CLASS = { pending: 'status-review', approved: 'status-completed', rejected: 'status-cancelled' };
 
+let partnerAttributionPromise = Promise.resolve();
+
 const state = {
     user: null, transactions: [], userWithdrawals: [],
     adminUsers: [], adminRequests: [], adminContactRequests: [], adminStats: null, adminWithdrawals: [],
@@ -188,6 +190,7 @@ async function handleRegister(e) {
     const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
     try {
         const ref = getRefFromUrl() || localStorage.getItem('paw_ref');
+        await partnerAttributionPromise.catch(() => {});
         const partnerToken = localStorage.getItem('paw_partner_token') || null;
         const data = await api('/api/auth/register', { method: 'POST', body: { name, email, password, ref, partnerToken } });
         state.pendingEmail = data.email;
@@ -1853,9 +1856,10 @@ async function init() {
     // Реферальный трекинг
     const ref = getRefFromUrl();
     if (ref) {
-        fetch('/api/referrals/click/' + encodeURIComponent(ref)).then(r => r.ok ? r.json() : null)
+        localStorage.removeItem('paw_partner_token');
+        partnerAttributionPromise = fetch('/api/referrals/click/' + encodeURIComponent(ref)).then(r => r.ok ? r.json() : null)
           .then(data => { if (data?.partnerToken) localStorage.setItem('paw_partner_token', data.partnerToken); })
-          .catch(() => {});
+          .catch(() => null);
         localStorage.setItem('paw_ref', ref);
     }
     await loadPublicPartners();
