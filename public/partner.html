@@ -17,6 +17,7 @@ main{width:min(1100px,calc(100% - 32px));margin:38px auto 70px}.top{display:flex
 <div class="stats">
 <div class="stat">Переходы<b id="clicks">0</b></div><div class="stat">Регистрации<b id="registrations">0</b></div><div class="stat">Заказы<b id="orders">0</b></div><div class="stat">Оплачено заказов<b id="paidOrders">0</b></div><div class="stat">Конверсия<b id="conversion">0%</b></div><div class="stat">Ожидает проверки<b id="pending">0 ₽</b></div><div class="stat">Одобрено<b id="approved">0 ₽</b></div><div class="stat">Доступно к выплате<b id="available">0 ₽</b></div><div class="stat">Выплачено<b id="paid">0 ₽</b></div>
 </div>
+<section class="panel" style="margin:16px 0"><h2>Ваши промокоды</h2><div id="promoList" class="muted">Промокодов пока нет.</div></section>
 <div class="grid">
 <section class="panel"><h2>Запросить выплату</h2><p class="muted">Укажите реквизиты. Заявка поступит администратору, перевод выполняется вручную после проверки.</p><form id="payoutForm"><label for="paymentDetails">Платёжные реквизиты</label><textarea id="paymentDetails" required minlength="5" maxlength="500" placeholder="Способ и реквизиты для перевода"></textarea><button type="submit">Отправить заявку на выплату</button></form></section>
 <section class="panel"><h2>История выплат</h2><div id="payoutHistory" class="muted">Пока нет заявок.</div></section>
