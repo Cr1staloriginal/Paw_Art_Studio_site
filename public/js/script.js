@@ -1879,7 +1879,7 @@ async function init() {
                 const result=await api('/api/projects/'+paidProjectId);
                 if(result.project?.payment_status==='paid')showToast('Оплата заказа подтверждена ЮKassa');
                 else showToast('ЮKassa вернула вас на сайт. Подтверждение платежа ещё обрабатывается.');
-                if(result.project)renderProjectDetail(normalizeProject(result.project));
+                if(result.project){state.currentProject=normalizeProject(result.project);renderProjectDetail(state.currentProject);document.getElementById('projectDetailModal')?.classList.add('open');document.body.style.overflow='hidden';}
             }catch(e){showToast('Не удалось проверить статус оплаты: '+e.message,'error');}
         }else showToast('Возврат из ЮKassa выполнен. Войдите в аккаунт, чтобы проверить заказ.');
         paymentParams.delete('projectPayment');paymentParams.delete('projectId');
