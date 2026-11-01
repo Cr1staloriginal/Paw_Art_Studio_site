@@ -2116,7 +2116,7 @@ io.on('connection', (socket) => {
 });
 
 /* ==================== PARTNERS ==================== */
-function partnerRow(p){return{id:Number(p.id),name:p.name,description:p.description||'',discordUrl:p.discord_url||'',logoUrl:p.logo_url||'',ownerName:p.owner_name||'',contactEmail:p.contact_email||'',partnerUserId:p.partner_user_id==null?null:Number(p.partner_user_id),referralCode:p.referral_code,discountPercent:Number(p.discount_percent||0),rewardPercent:Number(p.reward_percent||0),status:p.status};}
+function partnerRow(p){return{id:Number(p.id),name:p.name,description:p.description||'',discordUrl:p.discord_url||'',logoUrl:p.logo_url||'',ownerName:p.owner_name||'',contactEmail:p.contact_email||'',partnerUserId:p.partner_user_id==null?null:Number(p.partner_user_id),payoutMinimum:Number(p.payout_minimum||100),referralCode:p.referral_code,discountPercent:Number(p.discount_percent||0),rewardPercent:Number(p.reward_percent||0),status:p.status};}
 app.get('/api/partners',(req,res)=>{
  const partners=db.prepare("SELECT * FROM partners WHERE status='active' ORDER BY name").all();
  const ads=db.prepare("SELECT a.*,p.referral_code FROM partner_ads a JOIN partners p ON p.id=a.partner_id WHERE a.active=1 AND p.status='active' ORDER BY a.created_at DESC").all();
