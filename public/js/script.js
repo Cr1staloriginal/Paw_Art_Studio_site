@@ -1877,9 +1877,15 @@ async function init() {
         const paidProjectId=Number(paymentParams.get('projectId'));
         if(Number.isSafeInteger(paidProjectId)&&paidProjectId>0&&state.user){
             try{
-                const result=await api('/api/projects/'+paidProjectId);
+                let result=null;
+                for(let attempt=0;attempt<6;attempt++){
+                    result=await api('/api/projects/'+paidProjectId);
+                    if(result.project?.payment_status!=='pending')break;
+                    await new Promise(resolve=>setTimeout(resolve,1200));
+                }
                 if(result.project?.payment_status==='paid')showToast('Оплата заказа подтверждена ЮKassa');
-                else showToast('ЮKassa вернула вас на сайт. Подтверждение платежа ещё обрабатывается.');
+                else if(result.project?.payment_status==='refund_required')showToast('Платёж получен, но заказ отменён. Администратор должен оформить возврат.','error');
+                else showToast('Платёж обрабатывается. Статус заказа можно проверить в личном кабинете.');
                 if(result.project){state.currentProject=normalizeProject(result.project);renderProjectDetail(state.currentProject);document.getElementById('projectDetailModal')?.classList.add('open');document.body.style.overflow='hidden';}
             }catch(e){showToast('Не удалось проверить статус оплаты: '+e.message,'error');}
         }else showToast('Возврат из ЮKassa выполнен. Войдите в аккаунт, чтобы проверить заказ.');
