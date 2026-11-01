@@ -67,6 +67,10 @@ test('partner referral, discount, verified reward and payout lifecycle', async t
 
   const promo=await request('/api/admin/partners/'+partnerId+'/promos',{method:'POST',token:adminToken,body:{code:'TEST10',discountPercent:10,maxUses:1,expiresAt:'2099-12-31T23:59:59'}});
   assert.equal(promo.status,201);
+  assert.equal((await request('/api/admin/partners/'+partnerId+'/promos/'+promo.data.id,{method:'PATCH',token:adminToken,body:{active:false}})).status,200);
+  const disabledPromoProject=await request('/api/projects',{method:'POST',token:customerToken,body:{title:'Disabled promo',description:'Must not apply disabled promo',category:'Mascot',budget:1000,promoCode:'TEST10'}});
+  assert.equal(disabledPromoProject.status,400);
+  assert.equal((await request('/api/admin/partners/'+partnerId+'/promos/'+promo.data.id,{method:'PATCH',token:adminToken,body:{active:true}})).status,200);
   const inquiry=await request('/api/requests',{method:'POST',token:customerToken,body:{
     name:'Customer',service:'Mascot',promoCode:'TEST10',contactMethod:'Сайт'
   }});
