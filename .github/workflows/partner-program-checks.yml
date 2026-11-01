@@ -1,0 +1,27 @@
+name: Partner program checks
+
+on:
+  push:
+    branches:
+      - feature/partners-program
+  pull_request:
+    branches:
+      - main
+
+jobs:
+  syntax:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 20
+      - name: Check server syntax
+        run: node --check server.js
+      - name: Check browser scripts
+        run: |
+          node --check public/js/script.js
+          node --check public/js/paw-upgrade.js
+          node --check public/js/service-details.js

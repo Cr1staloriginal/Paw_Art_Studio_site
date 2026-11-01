@@ -188,7 +188,14 @@ async function handleRegister(e) {
     const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
     try {
         const ref = getRefFromUrl() || localStorage.getItem('paw_ref');
-        const data = await api('/api/auth/register', { method: 'POST', body: { name, email, password, ref } });
+        let partnerToken = localStorage.getItem('paw_partner_token') || null;
+        if (ref && !partnerToken) {
+            try {
+                const tokenResponse = await fetch('/api/referrals/partner-token/' + encodeURIComponent(ref));
+                if (tokenResponse.ok) { const tokenData = await tokenResponse.json(); partnerToken = tokenData.partnerToken; localStorage.setItem('paw_partner_token', partnerToken); }
+            } catch { /* personal referral registration remains available */ }
+        }
+        const data = await api('/api/auth/register', { method: 'POST', body: { name, email, password, ref, partnerToken } });
         state.pendingEmail = data.email;
 
         // Показать панель верификации, скрыть остальные
@@ -268,7 +275,11 @@ async function resendCode() {
 }
 
 function getRefFromUrl() {
-    return new URLSearchParams(location.search).get('ref') || null;
+ const value=new URLSearchParams(location.search).get('ref');
+ if(value){localStorage.setItem('paw_ref',value.trim().toUpperCase());localStorage.setItem('paw_ref_at',String(Date.now()));localStorage.removeItem('paw_partner_token');return value.trim().toUpperCase();}
+ const saved=localStorage.getItem('paw_ref'),savedAt=Number(localStorage.getItem('paw_ref_at')||0);
+ if(saved&&savedAt&&Date.now()-savedAt<30*24*60*60*1000)return saved;
+ localStorage.removeItem('paw_ref');localStorage.removeItem('paw_ref_at');return null;
 }
 
 async function logout() {
@@ -1344,7 +1355,12 @@ document.addEventListener('input', (e) => { if (e.target.id === 'chatInput' && s
 /* ADMIN */
 async function openAdminPanel() { if (!state.user || state.user.role !== 'admin') return showToast('⛔ Нет доступа', 'error'); document.getElementById('adminModal').classList.add('open'); document.body.style.overflow = 'hidden'; document.getElementById('userMenu').classList.add('hidden'); await loadAdminData(); switchAdminTab('dashboard'); }
 function closeAdminPanel() { document.getElementById('adminModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
-function switchAdminTab(tab) { document.querySelectorAll('.admin-tab').forEach(t => t.classList.toggle('active', t.dataset.atab === tab)); document.getElementById('adminDashboard').classList.toggle('hidden', tab !== 'dashboard'); document.getElementById('adminWithdrawals').classList.toggle('hidden', tab !== 'withdrawals'); document.getElementById('adminRequests').classList.toggle('hidden', tab !== 'requests'); document.getElementById('adminUsers').classList.toggle('hidden', tab !== 'users'); }
+function switchAdminTab(tab) {
+ document.querySelectorAll('.admin-tab').forEach(t=>t.classList.toggle('active',t.dataset.atab===tab));
+ const ids={dashboard:'adminDashboard',withdrawals:'adminWithdrawals',requests:'adminRequests',users:'adminUsers',partners:'adminPartners'};
+ Object.entries(ids).forEach(([key,id])=>document.getElementById(id)?.classList.toggle('hidden',key!==tab));
+ if(tab==='partners')loadPartnerAdmin();
+}
 
 async function loadAdminData() {
     const usersList = document.getElementById('usersList');
@@ -1488,7 +1504,7 @@ function renderAdminRequests() {
     }).join('');
     const contactHtml = contactRequests.map(r => {
         const dateStr = new Date(Number(r.createdAt) || 0).toLocaleString('ru-RU');
-        const details = [['Проект',r.project],['Услуга',r.service],['Бюджет',r.budget],['Способ связи',r.contactMethod],['Контакт',r.contactDetail],['Референсы',r.reference],['Email аккаунта',r.userEmail]].filter(([,v]) => String(v || '').trim());
+        const details = [['Проект',r.project],['Услуга',r.service],['Бюджет',r.budget],['Способ связи',r.contactMethod],['Контакт',r.contactDetail],['Референсы',r.reference],['Промокод',r.promo_code],['Скидка',r.discount_percent ? (r.discount_percent+'%') : ''],['Email аккаунта',r.userEmail]].filter(([,v]) => String(v || '').trim());
         return `<div class="request-card"><div class="request-head"><div class="admin-user-avatar">✉</div><div class="request-info"><div class="request-name">${escapeHtml(r.name || 'Без имени')}</div><div class="request-role">Заявка с сайта #${Number(r.id)}</div><div class="request-date">${escapeHtml(dateStr)}</div></div></div><div style="display:grid;gap:6px;margin-top:12px">${details.map(([label,value]) => `<div><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</div>`).join('')}</div><div class="request-actions"><button class="admin-act-btn" onclick="openContactRequest(${Number(r.id)})"><i class="fas fa-eye"></i> Подробности</button></div></div>`;
     }).join('');
     list.innerHTML = (roleHtml ? '<h3 style="margin:16px 0 10px">Заявки на роли</h3>' + roleHtml : '') +
@@ -1706,12 +1722,13 @@ async function handleSubmit(e) {
         service: document.getElementById('formService').value,
         reference: document.getElementById('formMessage').value.trim(),
         contactMethod: document.getElementById('formContactMethod').value,
-        contactDetail: document.getElementById('formContactDetail').value.trim()
+        contactDetail: document.getElementById('formContactDetail').value.trim(),
+        promoCode: document.getElementById('formPromoCode')?.value.trim().toUpperCase() || ''
     };
     if (button) { button.disabled = true; button.textContent = 'Отправляем...'; }
     try {
-        await api('/api/requests', { method: 'POST', body: payload });
-        showToast(`🎉 ${payload.name}, заявка успешно отправлена!`);
+        const result = await api('/api/requests', { method: 'POST', body: payload });
+        showToast(result.message || `🎉 ${payload.name}, заявка успешно отправлена!`);
         form.reset();
         updateContactDetailField();
         const selectedPlan = document.getElementById('selectedPlan');
@@ -1763,14 +1780,88 @@ document.getElementById('backToRegisterBtn')?.addEventListener('click', () => {
     const vErr = document.getElementById('verifyError'); if (vErr) vErr.textContent = '';
 });
 
+
+let partnerAdminData=null;
+async function loadPartnerAdmin(){
+ const el=document.getElementById('partnersAdminList');if(el)el.innerHTML='<p>Загрузка партнёров…</p>';
+ try{partnerAdminData=await api('/api/admin/partners');renderPartnerAdmin();}
+ catch(e){if(el)el.textContent='Ошибка: '+e.message;}
+}
+async function createPartner(e){
+ e.preventDefault();const f=e.currentTarget,b=Object.fromEntries(new FormData(f).entries());b.discountPercent=Number(b.discountPercent);b.rewardPercent=Number(b.rewardPercent);
+ try{await api('/api/admin/partners',{method:'POST',body:b});f.reset();showToast('Партнёр добавлен');await loadPartnerAdmin();}
+ catch(x){showToast('❌ '+x.message,'error');}
+}
+async function partnerStatus(id,status){try{await api('/api/admin/partners/'+id,{method:'PATCH',body:{status:status}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}}
+async function partnerPromo(id){
+ const code=prompt('Код промокода:');if(!code)return;const discount=Number(prompt('Скидка, %','10')||0);
+ try{await api('/api/admin/partners/'+id+'/promos',{method:'POST',body:{code,discountPercent:discount}});await loadPartnerAdmin();showToast('Промокод создан');}catch(e){showToast('❌ '+e.message,'error');}
+}
+async function partnerContest(id){
+ const title=prompt('Название конкурса:');if(!title)return;const prize=prompt('Приз:','Сертификат Paw Art Studio')||'';
+ try{await api('/api/admin/partners/'+id+'/contests',{method:'POST',body:{title:title,prize:prize}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}
+}
+async function partnerAd(id){
+ const title=prompt('Название рекламного размещения:');if(!title)return;const targetUrl=prompt('HTTPS-ссылка:');if(!targetUrl)return;
+ try{await api('/api/admin/partners/'+id+'/ads',{method:'POST',body:{title:title,targetUrl:targetUrl}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}
+}
+async function partnerConfirmPayment(projectId){const reference=prompt('Укажите подтверждение оплаты (номер перевода/платежа):');if(!reference)return;try{await api('/api/admin/projects/'+projectId+'/confirm-payment',{method:'POST',body:{reference}});await loadPartnerAdmin();showToast('Оплата заказа подтверждена');}catch(e){showToast('❌ '+e.message,'error');}}
+async function partnerLedgerAction(id,action){try{await api('/api/admin/partner-ledger/'+id+'/'+action,{method:'POST',body:{}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}}
+async function partnerPayoutCreate(id){
+ const amountRub=Number(prompt('Сумма подтверждённого вознаграждения к выплате, ₽:','')||0);if(!amountRub)return;
+ const paymentDetails=prompt('Реквизиты партнёра (полученные напрямую):');if(!paymentDetails)return;
+ try{await api('/api/admin/partners/'+id+'/payouts',{method:'POST',body:{amountRub:amountRub,paymentDetails:paymentDetails}});showToast('Заявка на выплату зарегистрирована');await loadPartnerAdmin();}
+ catch(e){showToast('❌ '+e.message,'error');}
+}
+async function partnerPayoutAction(id,status){
+ if(status==='paid'&&prompt('Подтвердите фактический перевод. Введите ПЕРЕВЕДЕНО:')!=='ПЕРЕВЕДЕНО')return;
+ const comment=prompt('Комментарий:','');if(comment===null)return;
+ try{await api('/api/admin/partner-payouts/'+id,{method:'PATCH',body:{status:status,comment:comment}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}
+}
+function renderPartnerAdmin(){
+ const d=partnerAdminData||{},box=document.getElementById('partnersAdminList'),extra=document.getElementById('partnerExtras'),ledger=document.getElementById('partnerLedger');
+ if(box)box.innerHTML=(d.partners||[]).map(p=>{
+  const next=p.status==='active'?'paused':'active',label=p.status==='active'?'Приостановить':'Активировать';
+  return '<article class="request-card" style="margin:12px 0"><b>'+escapeHtml(p.name)+'</b> · '+escapeHtml(p.status)+
+   '<p>Код: <b>'+escapeHtml(p.referralCode)+'</b> · Скидка '+p.discountPercent+'% · Вознаграждение '+p.rewardPercent+'%</p>'+
+   '<p>Переходы: '+p.clicks+' · Регистрации: '+p.registrations+' · Заказы: '+p.orders+'</p>'+
+   '<p>К выплате: '+formatMoney(p.payable)+' · Выплачено: '+formatMoney(p.paid)+'</p>'+
+   '<p><code>'+location.origin+'/?ref='+encodeURIComponent(p.referralCode)+'</code></p>'+
+   '<div class="request-actions"><button class="admin-act-btn" onclick="partnerPromo('+p.id+')">Промокод</button>'+
+   '<button class="admin-act-btn" onclick="partnerContest('+p.id+')">Конкурс</button><button class="admin-act-btn" onclick="partnerAd('+p.id+')">Реклама</button>'+'<button class="admin-act-btn" onclick="partnerPayoutCreate('+p.id+')">Заявка на выплату</button>'+
+   '<button class="admin-act-btn" onclick="partnerStatus('+p.id+',\''+next+'\')">'+label+'</button></div></article>';
+ }).join('')||'<p class="admin-empty">Партнёров пока нет.</p>';
+ if(extra)extra.innerHTML='<h5>Промокоды</h5>'+((d.promos||[]).map(x=>'<p>'+escapeHtml(x.code)+' · '+escapeHtml(x.partner_name)+' · '+x.discount+'% · использовано '+x.uses+'</p>').join('')||'<p>Нет промокодов.</p>')+
+  '<h5>Конкурсы</h5>'+((d.contests||[]).map(x=>'<p>'+escapeHtml(x.title)+' · '+escapeHtml(x.partner_name)+' · '+escapeHtml(x.status)+'</p>').join('')||'<p>Нет конкурсов.</p>')+
+  '<h5>Реклама</h5>'+((d.ads||[]).map(x=>'<p>'+escapeHtml(x.title)+' · '+escapeHtml(x.partner_name)+' · <a href="'+escapeHtml(x.target_url)+'" target="_blank" rel="noopener">ссылка</a></p>').join('')||'<p>Нет размещений.</p>')+
+  '<h5>Заявки на выплаты</h5>'+((d.payouts||[]).map(x=>'<div class="request-card">'+escapeHtml(x.partner_name)+' · '+formatMoney(x.amount)+' · '+escapeHtml(x.status)+'<p>'+escapeHtml(x.payment_details)+'</p>'+
+   (x.status==='pending'?'<button class="admin-act-btn" onclick="partnerPayoutAction('+x.id+',\'approved\')">Одобрить</button> <button class="admin-act-btn danger" onclick="partnerPayoutAction('+x.id+',\'rejected\')">Отклонить</button>':'')+
+   (x.status==='approved'?'<button class="admin-act-btn" onclick="partnerPayoutAction('+x.id+',\'paid\')">Отметить выплаченным</button>':'')+'</div>').join('')||'<p>Заявок нет.</p>');
+ if(ledger)ledger.innerHTML=(d.ledger||[]).map(x=>'<div class="request-card"><b>'+escapeHtml(x.partner_name)+'</b> · '+formatMoney(x.reward_amount)+' · '+escapeHtml(x.status)+
+  '<p>Заказ #'+x.project_id+' · Клиент: '+escapeHtml(x.customer_name||'—')+'</p>'+
+  (x.status==='pending'&&!x.payment_verified_at?'<button class="admin-act-btn" onclick="partnerConfirmPayment('+x.project_id+')">Подтвердить оплату</button>':'')+
+  (x.status==='pending'&&x.payment_verified_at?'<button class="admin-act-btn" onclick="partnerLedgerAction('+x.id+',\'approve\')">Одобрить начисление</button>':'')+
+  (x.status==='approved'?'<button class="admin-act-btn" onclick="partnerLedgerAction('+x.id+',\'paid\')">Отметить выплаченным</button>':'')+'</div>').join('')||'<p>Начислений пока нет.</p>';
+}
+async function loadPublicPartners(){
+ const box=document.getElementById('partnersGrid');if(!box)return;
+ try{const d=await fetch('/api/partners').then(r=>r.json());box.innerHTML=(d.partners||[]).map(p=>'<article class="service-card visible" style="opacity:1;transform:none"><div class="service-icon"><i class="fas fa-handshake"></i></div><h3>'+escapeHtml(p.name)+'</h3><p>'+escapeHtml(p.description||'Официальный партнёр Paw Art Studio')+'</p>'+(p.discordUrl?'<a class="btn btn-outline" href="'+escapeHtml(p.discordUrl)+'" target="_blank" rel="noopener">Перейти на сервер ↗</a>':'')+
+ (p.contests||[]).map(c=>'<p class="wd-date">🎉 '+escapeHtml(c.title)+' · '+escapeHtml(c.prize||'Совместный конкурс')+'</p>').join('')+
+ (p.ads||[]).map(a=>'<p class="wd-date">📢 <a href="'+escapeHtml(a.target_url)+'" target="_blank" rel="noopener">'+escapeHtml(a.title)+'</a></p>').join('')+'</article>').join('')||'<p class="empty-state small">Скоро здесь появятся наши партнёры.</p>';}
+ catch(e){box.textContent='Не удалось загрузить партнёров.';}
+}
+
 /* INIT */
 async function init() {
     // Реферальный трекинг
     const ref = getRefFromUrl();
     if (ref) {
-        fetch('/api/referrals/click/' + encodeURIComponent(ref)).catch(() => {});
+        fetch('/api/referrals/click/' + encodeURIComponent(ref)).then(r => r.ok ? r.json() : null)
+          .then(data => { if (data?.partnerToken) localStorage.setItem('paw_partner_token', data.partnerToken); })
+          .catch(() => {});
         localStorage.setItem('paw_ref', ref);
     }
+    await loadPublicPartners();
     await loadAndApplyContent();
     await fetchMe();
     if (!state.user) { await loadProjects(); await loadAllPortfolio(); }

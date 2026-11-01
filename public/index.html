@@ -306,6 +306,9 @@
                             <option value="3D арт">3D арт</option><option value="Другое">Другое</option>
                         </select>
                         <label for="formMessage">Ссылка на референсы</label><textarea id="formMessage" name="reference" placeholder="Стиль, примеры, идеи..." maxlength="5000"></textarea>
+                        <label for="formPromoCode">Промокод партнёра (необязательно)</label>
+                        <input type="text" id="formPromoCode" name="promoCode" maxlength="32" placeholder="Например, FLUFFY10" autocomplete="off" />
+                        <p class="inquiry-field-hint">Скидка будет указана в заявке для подтверждения администрацией.</p>
                         <label for="formContactMethod" class="inquiry-field-label">Способ связи <span class="inquiry-field-required">обязательно</span></label>
                         <p class="inquiry-field-hint">Это тоже список. Выберите, где вам удобнее получить ответ.</p>
                         <select id="formContactMethod" name="contactMethod" class="inquiry-select" required onchange="updateContactDetailField()">
@@ -325,6 +328,10 @@
     </section>
 </main>
 
+<section class="section" id="partnersSection" style="padding-top:35px">
+ <div class="container"><div class="section-head"><span class="section-kicker">COMMUNITY</span><h2>Наши партнёры 🐾</h2><p>Сообщества, с которыми Paw Art Studio развивает творческую фурри-среду.</p></div>
+ <div id="partnersGrid" class="grid grid-3"><div class="admin-empty">Загружаем партнёров…</div></div></div>
+</section>
 <footer>
     <div class="container footer-grid">
         <div class="footer-col">
@@ -590,6 +597,7 @@
             <button class="admin-tab" data-atab="withdrawals" onclick="switchAdminTab('withdrawals')"><i class="fas fa-money-check-alt"></i> Выплаты <span class="admin-badge" id="wdCount">0</span></button>
             <button class="admin-tab" data-atab="requests" onclick="switchAdminTab('requests')"><i class="fas fa-bell"></i> Заявки <span class="admin-badge" id="reqCount">0</span></button>
             <button class="admin-tab" data-atab="users" onclick="switchAdminTab('users')"><i class="fas fa-users"></i> Пользователи</button>
+            <button class="admin-tab" data-atab="partners" onclick="switchAdminTab('partners')"><i class="fas fa-handshake"></i> Партнёры</button>
         </div>
         <div class="admin-panel" id="adminDashboard"><div id="dashboardStats"></div></div>
         <div class="admin-panel hidden" id="adminWithdrawals"><div id="withdrawalsList"></div></div>
@@ -597,6 +605,21 @@
         <div class="admin-panel hidden" id="adminUsers">
             <div class="admin-search"><i class="fas fa-search"></i><input type="text" id="userSearch" placeholder="Поиск..." oninput="renderAdminUsers()" /></div>
             <div id="usersList"></div>
+        </div>
+        <div class="admin-panel hidden" id="adminPartners">
+          <h4>Добавить официального партнёра</h4>
+          <form id="partnerCreateForm" onsubmit="createPartner(event)" style="display:grid;gap:10px;margin:12px 0">
+            <input name="name" required maxlength="100" placeholder="Название Discord-сервера">
+            <input name="referralCode" required minlength="3" maxlength="24" placeholder="Код ссылки, например FLUFFY">
+            <input name="ownerName" placeholder="Владелец / контакт"><input name="contactEmail" type="email" placeholder="Email">
+            <input name="discordUrl" type="url" placeholder="Discord invite URL"><input name="logoUrl" type="url" placeholder="URL логотипа">
+            <input name="discountPercent" type="number" min="0" max="100" value="10" placeholder="Скидка, %">
+            <input name="rewardPercent" type="number" min="0" max="50" step="0.5" value="5" placeholder="Вознаграждение, %">
+            <textarea name="description" rows="2" placeholder="Описание сообщества"></textarea>
+            <button class="btn btn-primary" type="submit">Добавить партнёра</button>
+          </form>
+          <div id="partnersAdminList"></div><h4>Промокоды, конкурсы и реклама</h4><div id="partnerExtras"></div>
+          <h4>Начисления и заявки на выплаты</h4><div id="partnerLedger"></div>
         </div>
     </div>
 </div>
@@ -676,7 +699,7 @@
 </aside>
 
 <script src="/socket.io/socket.io.js"></script>
-<script src="/js/script.js?v=20261031-full-pricing-editor"></script>
+<script src="/js/script.js?v=20261101-partners"></script>
 <script src="/js/paw-upgrade.js?v=20261023-contact-field-fix"></script>
 <script src="/js/service-details.js?v=20261023-service-configurator"></script>
 </body>
