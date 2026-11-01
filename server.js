@@ -498,15 +498,16 @@ function generateReferralCode() {
   return 'PAW' + Math.random().toString(36).slice(2, 8).toUpperCase();
 }
 
-function ensurePartnerLedgerForPaidProject(projectId, now = Date.now()) {
+function ensurePartnerLedgerForCompletedProject(projectId, now = Date.now()) {
   const project = db.prepare("SELECT id,client_id,budget,partner_id,status,payment_status,partner_paid_at,partner_payment_reference FROM projects WHERE id=?").get(projectId);
-  if (!project || project.status !== 'completed' || project.payment_status !== 'paid' || !project.partner_id || Number(project.budget) <= 0) return false;
+  if (!project || project.status !== 'completed' || !project.partner_id || Number(project.budget) <= 0) return false;
   const partner = db.prepare('SELECT id,reward_percent FROM partners WHERE id=?').get(project.partner_id);
   if (!partner || Number(partner.reward_percent) <= 0) return false;
   const reward = Math.floor(Number(project.budget) * Number(partner.reward_percent) / 100);
   if (reward <= 0) return false;
+  const paid=project.payment_status==='paid';
   const result = db.prepare("INSERT OR IGNORE INTO partner_ledger(partner_id,project_id,user_id,order_amount,reward_amount,status,created_at,payment_verified_at,payment_reference) VALUES(?,?,?,?,?,'pending',?,?,?)")
-    .run(partner.id,project.id,project.client_id,project.budget,reward,now,project.partner_paid_at||now,project.partner_payment_reference||'');
+    .run(partner.id,project.id,project.client_id,project.budget,reward,now,paid?(project.partner_paid_at||now):null,paid?(project.partner_payment_reference||''):null);
   return result.changes > 0;
 }
 
@@ -966,7 +967,7 @@ app.post('/api/payments/webhook', async (req, res) => {
         }
         db.prepare("UPDATE projects SET payment_status='paid',partner_paid_at=?,partner_payment_reference=? WHERE id=?").run(now,String(verified.id),projectId);
         db.prepare("UPDATE partner_ledger SET payment_verified_at=?,payment_reference=? WHERE project_id=? AND status IN ('pending','approved')").run(now,String(verified.id),projectId);
-        ensurePartnerLedgerForPaidProject(projectId,now);
+        ensurePartnerLedgerForCompletedProject(projectId,now);
         return 'project';
       }
       db.prepare("UPDATE payments SET status='succeeded' WHERE id=?").run(payment.id);
@@ -1700,7 +1701,7 @@ app.post('/api/projects/:id/status', auth, (req, res) => {
         db.prepare("UPDATE partner_ledger SET status=CASE WHEN status='pending' THEN 'rejected' ELSE 'reversed' END,reviewed_at=?,reviewed_by=? WHERE project_id=? AND status IN ('pending','approved','paid')").run(now,req.user.id,id);
         db.prepare("UPDATE projects SET payment_status=CASE WHEN payment_status='paid' THEN 'refund_required' ELSE payment_status END WHERE id=?").run(id);
       }
-      if(status==='completed')ensurePartnerLedgerForPaidProject(id,now);
+      if(status==='completed')ensurePartnerLedgerForCompletedProject(id,now);
     });
     finish();
     return res.json({ok:true});
@@ -2166,7 +2167,7 @@ app.post('/api/admin/projects/:id/confirm-payment',auth,adminOnly,(req,res)=>{
  db.transaction(()=>{
   db.prepare("UPDATE projects SET partner_paid_at=?,partner_payment_reference=?,payment_status='paid' WHERE id=?").run(now,reference,projectId);
   db.prepare("UPDATE partner_ledger SET payment_verified_at=?,payment_reference=? WHERE project_id=? AND status IN ('pending','approved')").run(now,reference,projectId);
-  ensurePartnerLedgerForPaidProject(projectId,now);
+  ensurePartnerLedgerForCompletedProject(projectId,now);
  })();
  res.json({ok:true,confirmedAt:now});
 });
