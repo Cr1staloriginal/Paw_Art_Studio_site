@@ -2151,11 +2151,11 @@ app.post('/api/admin/partners',auth,adminOnly,(req,res)=>{
 });
 app.patch('/api/admin/partners/:id',auth,adminOnly,(req,res)=>{
  const id=Number(req.params.id),b=req.body||{},p=db.prepare('SELECT * FROM partners WHERE id=?').get(id);if(!p)return res.status(404).json({error:'Партнёр не найден'});
- const status=['active','paused','rejected','pending'].includes(b.status)?b.status:p.status,discount=b.discountPercent===undefined?p.discount_percent:Math.max(0,Math.min(100,Math.round(Number(b.discountPercent)||0))),reward=b.rewardPercent===undefined?p.reward_percent:Math.max(0,Math.min(50,Number(b.rewardPercent)||0));
+ const status=['active','paused','rejected','pending'].includes(b.status)?b.status:p.status,discount=b.discountPercent===undefined?p.discount_percent:Math.max(0,Math.min(100,Math.round(Number(b.discountPercent)||0))),reward=b.rewardPercent===undefined?p.reward_percent:Math.max(0,Math.min(50,Number(b.rewardPercent)||0)),payoutMinimum=b.payoutMinimum===undefined?Number(p.payout_minimum||100):Math.max(100,Math.min(100000000,Math.round(Number(b.payoutMinimum)||100)));
  let linkedUserId=p.partner_user_id||null;
  if(b.accountEmail!==undefined){const email=String(b.accountEmail||'').trim().toLowerCase();if(email){const u=db.prepare('SELECT id,email_verified FROM users WHERE email=?').get(email);if(!u||u.email_verified!==1)return res.status(400).json({error:'Аккаунт не найден или email не подтверждён'});linkedUserId=u.id;}else linkedUserId=null;}
  if(linkedUserId&&db.prepare('SELECT id FROM partners WHERE partner_user_id=? AND id<>?').get(linkedUserId,id))return res.status(409).json({error:'Этот аккаунт уже привязан к другому партнёру'});
- db.prepare('UPDATE partners SET status=?,discount_percent=?,reward_percent=?,partner_user_id=?,updated_at=? WHERE id=?').run(status,discount,reward,linkedUserId,Date.now(),id);res.json({ok:true});
+ db.prepare('UPDATE partners SET status=?,discount_percent=?,reward_percent=?,partner_user_id=?,payout_minimum=?,updated_at=? WHERE id=?').run(status,discount,reward,linkedUserId,payoutMinimum,Date.now(),id);res.json({ok:true});
 });
 app.post('/api/admin/partners/:id/promos',auth,adminOnly,(req,res)=>{
  const id=Number(req.params.id),p=db.prepare('SELECT * FROM partners WHERE id=?').get(id),b=req.body||{};if(!p)return res.status(404).json({error:'Партнёр не найден'});
@@ -2163,6 +2163,18 @@ app.post('/api/admin/partners/:id/promos',auth,adminOnly,(req,res)=>{
  if(!/^[A-Z0-9_-]{3,32}$/.test(code)||(!discount&&!bonus))return res.status(400).json({error:'Укажите код и скидку или бонус'});
  try{db.prepare('INSERT INTO promocodes(code,bonus,discount,active,created_at,partner_id) VALUES(?,?,?,1,?,?)').run(code,bonus,discount,Date.now(),id);res.status(201).json({ok:true,code});}
  catch(e){if(String(e.message).includes('UNIQUE'))return res.status(409).json({error:'Промокод уже существует'});res.status(500).json({error:'Не удалось создать промокод'});}
+});
+app.patch('/api/admin/partners/:id/promos/:promoId',auth,adminOnly,(req,res)=>{
+ const partnerId=Number(req.params.id),promoId=Number(req.params.promoId),b=req.body||{};
+ const promo=db.prepare('SELECT * FROM promocodes WHERE id=? AND partner_id=?').get(promoId,partnerId);
+ if(!promo)return res.status(404).json({error:'Промокод не найден'});
+ const active=b.active===undefined?Number(promo.active):(b.active===true?1:b.active===false?0:null);
+ const discount=b.discountPercent===undefined?Number(promo.discount):Math.max(0,Math.min(100,Math.round(Number(b.discountPercent)||0)));
+ const maxUses=b.maxUses===undefined?promo.max_uses:(b.maxUses===null||b.maxUses===''?null:Number(b.maxUses));
+ const expiresAt=b.expiresAt===undefined?promo.expires_at:(b.expiresAt===null||b.expiresAt===''?null:Date.parse(String(b.expiresAt)));
+ if(active===null||!Number.isSafeInteger(discount)||maxUses!==null&&(!Number.isSafeInteger(maxUses)||maxUses<Number(promo.uses)||maxUses>1000000)||expiresAt!==null&&!Number.isFinite(expiresAt))return res.status(400).json({error:'Некорректные параметры промокода'});
+ db.prepare('UPDATE promocodes SET active=?,discount=?,max_uses=?,expires_at=? WHERE id=? AND partner_id=?').run(active,discount,maxUses,expiresAt,promoId,partnerId);
+ res.json({ok:true});
 });
 app.post('/api/admin/partners/:id/contests',auth,adminOnly,(req,res)=>{
  const id=Number(req.params.id),b=req.body||{},title=String(b.title||'').trim();if(!db.prepare('SELECT id FROM partners WHERE id=?').get(id))return res.status(404).json({error:'Партнёр не найден'});
