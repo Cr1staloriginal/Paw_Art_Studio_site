@@ -1833,7 +1833,8 @@ function renderPartnerAdmin(){
    (x.status==='approved'?'<button class="admin-act-btn" onclick="partnerPayoutAction('+x.id+',\'paid\')">Отметить выплаченным</button>':'')+'</div>').join('')||'<p>Заявок нет.</p>');
  if(ledger)ledger.innerHTML=(d.ledger||[]).map(x=>'<div class="request-card"><b>'+escapeHtml(x.partner_name)+'</b> · '+formatMoney(x.reward_amount)+' · '+escapeHtml(x.status)+
   '<p>Заказ #'+x.project_id+' · Клиент: '+escapeHtml(x.customer_name||'—')+'</p>'+
-  (x.status==='pending'?'<button class="admin-act-btn" onclick="partnerLedgerAction('+x.id+',\'approve\')">Подтвердить</button>':'')+
+  (x.status==='pending'&&!x.payment_verified_at?'<button class="admin-act-btn" onclick="partnerConfirmPayment('+x.project_id+')">Подтвердить оплату</button>':'')+
+  (x.status==='pending'&&x.payment_verified_at?'<button class="admin-act-btn" onclick="partnerLedgerAction('+x.id+',\'approve\')">Одобрить начисление</button>':'')+
   (x.status==='approved'?'<button class="admin-act-btn" onclick="partnerLedgerAction('+x.id+',\'paid\')">Отметить выплаченным</button>':'')+'</div>').join('')||'<p>Начислений пока нет.</p>';
 }
 async function loadPublicPartners(){
