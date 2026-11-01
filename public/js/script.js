@@ -1495,7 +1495,7 @@ function renderAdminRequests() {
     }).join('');
     const contactHtml = contactRequests.map(r => {
         const dateStr = new Date(Number(r.createdAt) || 0).toLocaleString('ru-RU');
-        const details = [['Проект',r.project],['Услуга',r.service],['Бюджет',r.budget],['Способ связи',r.contactMethod],['Контакт',r.contactDetail],['Референсы',r.reference],['Email аккаунта',r.userEmail]].filter(([,v]) => String(v || '').trim());
+        const details = [['Проект',r.project],['Услуга',r.service],['Бюджет',r.budget],['Способ связи',r.contactMethod],['Контакт',r.contactDetail],['Референсы',r.reference],['Промокод',r.promo_code],['Скидка',r.discount_percent ? (r.discount_percent+'%') : ''],['Email аккаунта',r.userEmail]].filter(([,v]) => String(v || '').trim());
         return `<div class="request-card"><div class="request-head"><div class="admin-user-avatar">✉</div><div class="request-info"><div class="request-name">${escapeHtml(r.name || 'Без имени')}</div><div class="request-role">Заявка с сайта #${Number(r.id)}</div><div class="request-date">${escapeHtml(dateStr)}</div></div></div><div style="display:grid;gap:6px;margin-top:12px">${details.map(([label,value]) => `<div><strong>${escapeHtml(label)}:</strong> ${escapeHtml(value)}</div>`).join('')}</div><div class="request-actions"><button class="admin-act-btn" onclick="openContactRequest(${Number(r.id)})"><i class="fas fa-eye"></i> Подробности</button></div></div>`;
     }).join('');
     list.innerHTML = (roleHtml ? '<h3 style="margin:16px 0 10px">Заявки на роли</h3>' + roleHtml : '') +
@@ -1713,7 +1713,8 @@ async function handleSubmit(e) {
         service: document.getElementById('formService').value,
         reference: document.getElementById('formMessage').value.trim(),
         contactMethod: document.getElementById('formContactMethod').value,
-        contactDetail: document.getElementById('formContactDetail').value.trim()
+        contactDetail: document.getElementById('formContactDetail').value.trim(),
+        promoCode: document.getElementById('formPromoCode')?.value.trim().toUpperCase() || ''
     };
     if (button) { button.disabled = true; button.textContent = 'Отправляем...'; }
     try {

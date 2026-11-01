@@ -306,6 +306,9 @@
                             <option value="3D арт">3D арт</option><option value="Другое">Другое</option>
                         </select>
                         <label for="formMessage">Ссылка на референсы</label><textarea id="formMessage" name="reference" placeholder="Стиль, примеры, идеи..." maxlength="5000"></textarea>
+                        <label for="formPromoCode">Промокод партнёра (необязательно)</label>
+                        <input type="text" id="formPromoCode" name="promoCode" maxlength="32" placeholder="Например, FLUFFY10" autocomplete="off" />
+                        <p class="inquiry-field-hint">Скидка будет указана в заявке для подтверждения администрацией.</p>
                         <label for="formContactMethod" class="inquiry-field-label">Способ связи <span class="inquiry-field-required">обязательно</span></label>
                         <p class="inquiry-field-hint">Это тоже список. Выберите, где вам удобнее получить ответ.</p>
                         <select id="formContactMethod" name="contactMethod" class="inquiry-select" required onchange="updateContactDetailField()">

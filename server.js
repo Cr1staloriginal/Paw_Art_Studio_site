@@ -300,6 +300,9 @@ safeAddColumn('users', 'referral_code', 'TEXT');
 safeAddColumn('users', 'referred_by', 'INTEGER');
 safeAddColumn('users', 'partner_id', 'INTEGER');
 safeAddColumn('promocodes', 'partner_id', 'INTEGER');
+safeAddColumn('requests', 'promo_code', 'TEXT');
+safeAddColumn('requests', 'discount_percent', 'INTEGER NOT NULL DEFAULT 0');
+safeAddColumn('requests', 'partner_id', 'INTEGER');
 db.exec('CREATE INDEX IF NOT EXISTS idx_users_partner_id ON users(partner_id)');
 
 // Portfolio author fields: user_id remains the uploader.
@@ -1098,26 +1101,40 @@ app.post('/api/requests', (req, res) => {
     const v = {
       name: String(b.name || '').trim(), project: String(b.project || '').trim(),
       service: String(b.service || '').trim(), budget: String(b.budget || '').trim(),
-      reference: String(b.reference || '').trim(),
-      contactMethod: String(b.contactMethod || 'Сайт').trim(),
-      contactDetail: String(b.contactDetail || '').trim()
+      reference: String(b.reference || '').trim(), contactMethod: String(b.contactMethod || 'Сайт').trim(),
+      contactDetail: String(b.contactDetail || '').trim(), promoCode: String(b.promoCode || '').trim().toUpperCase()
     };
     if (!v.name || !v.service) return res.status(400).json({ error: 'Укажите имя и услугу' });
-    const limits = { name: 100, project: 200, service: 100, budget: 100, reference: 5000, contactDetail: 300 };
-    for (const [key, max] of Object.entries(limits)) {
-      if (v[key].length > max) return res.status(400).json({ error: 'Поле превышает допустимую длину: ' + key });
-    }
+    const limits = { name: 100, project: 200, service: 100, budget: 100, reference: 5000, contactDetail: 300, promoCode: 32 };
+    for (const [key, max] of Object.entries(limits)) if (v[key].length > max)
+      return res.status(400).json({ error: 'Поле превышает допустимую длину: ' + key });
     if (!['Сайт', 'Discord', 'Telegram', 'VK', 'Телефон', 'Email'].includes(v.contactMethod))
       return res.status(400).json({ error: 'Неизвестный способ связи' });
     if (v.contactMethod !== 'Сайт' && !v.contactDetail)
       return res.status(400).json({ error: 'Укажите контакт для связи' });
     const user = optionalRequestUser(req);
-    const result = db.prepare(`
-      INSERT INTO requests (user_id, name, project, service, budget, reference, contact_method, contact_detail, created_at)
-      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(user ? user.id : null, v.name, v.project || null, v.service, v.budget || null,
-      v.reference || null, v.contactMethod, v.contactDetail || null, Date.now());
-    return res.status(201).json({ ok: true, id: Number(result.lastInsertRowid), message: 'Заявка успешно сохранена' });
+    let promo = null;
+    if (v.promoCode) {
+      if (!user) return res.status(401).json({ error: 'Для применения промокода войдите в аккаунт' });
+      promo = db.prepare('SELECT * FROM promocodes WHERE code=?').get(v.promoCode);
+      if (!promo || !promo.active) return res.status(400).json({ error: 'Промокод не найден или неактивен' });
+      if (promo.expires_at && Date.now() > promo.expires_at) return res.status(400).json({ error: 'Срок действия промокода истёк' });
+      if (promo.max_uses && promo.uses >= promo.max_uses) return res.status(400).json({ error: 'Лимит использований промокода исчерпан' });
+      if (db.prepare('SELECT id FROM promo_redemptions WHERE promo_id=? AND user_id=?').get(promo.id,user.id))
+        return res.status(400).json({ error: 'Вы уже использовали этот промокод' });
+      if (!promo.discount) return res.status(400).json({ error: 'Этот промокод не даёт скидку на заявку' });
+    }
+    const now=Date.now();
+    const createRequest=db.transaction(()=>{
+      if(promo){
+        db.prepare('INSERT INTO promo_redemptions(promo_id,user_id,created_at) VALUES(?,?,?)').run(promo.id,user.id,now);
+        db.prepare('UPDATE promocodes SET uses=uses+1 WHERE id=?').run(promo.id);
+      }
+      return db.prepare('INSERT INTO requests(user_id,name,project,service,budget,reference,contact_method,contact_detail,promo_code,discount_percent,partner_id,created_at) VALUES(?,?,?,?,?,?,?,?,?,?,?,?)')
+        .run(user?user.id:null,v.name,v.project||null,v.service,v.budget||null,v.reference||null,v.contactMethod,v.contactDetail||null,promo?promo.code:null,promo?promo.discount:0,promo?promo.partner_id:null,now);
+    });
+    const result=createRequest();
+    return res.status(201).json({ ok:true,id:Number(result.lastInsertRowid),discountPercent:promo?promo.discount:0,message:promo?'Заявка отправлена с промокодом '+promo.code+' (скидка '+promo.discount+'%)':'Заявка успешно сохранена' });
   } catch (err) {
     console.error('[requests] Ошибка сохранения:', err);
     return res.status(500).json({ error: 'Не удалось сохранить заявку' });
