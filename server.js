@@ -312,6 +312,7 @@ safeAddColumn('partner_ledger', 'payment_reference', 'TEXT');
 safeAddColumn('partner_ledger', 'paid_amount', 'INTEGER NOT NULL DEFAULT 0');
 safeAddColumn('partners', 'partner_user_id', 'INTEGER');
 safeAddColumn('partners', 'payout_minimum', 'INTEGER NOT NULL DEFAULT 100');
+db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_partners_user_id ON partners(partner_user_id) WHERE partner_user_id IS NOT NULL');
 const PARTNER_ATTRIBUTION_DAYS = Math.max(1, Math.min(365, Number(process.env.PARTNER_ATTRIBUTION_DAYS) || 30));
 safeAddColumn('requests', 'promo_code', 'TEXT');
 safeAddColumn('requests', 'discount_percent', 'INTEGER NOT NULL DEFAULT 0');
