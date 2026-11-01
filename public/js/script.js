@@ -188,7 +188,8 @@ async function handleRegister(e) {
     const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
     try {
         const ref = getRefFromUrl() || localStorage.getItem('paw_ref');
-        const data = await api('/api/auth/register', { method: 'POST', body: { name, email, password, ref } });
+        const partnerToken = localStorage.getItem('paw_partner_token') || null;
+        const data = await api('/api/auth/register', { method: 'POST', body: { name, email, password, ref, partnerToken } });
         state.pendingEmail = data.email;
 
         // Показать панель верификации, скрыть остальные
@@ -269,7 +270,7 @@ async function resendCode() {
 
 function getRefFromUrl() {
  const value=new URLSearchParams(location.search).get('ref');
- if(value){localStorage.setItem('paw_ref',value.trim().toUpperCase());localStorage.setItem('paw_ref_at',String(Date.now()));return value.trim().toUpperCase();}
+ if(value){localStorage.setItem('paw_ref',value.trim().toUpperCase());localStorage.setItem('paw_ref_at',String(Date.now()));localStorage.removeItem('paw_partner_token');return value.trim().toUpperCase();}
  const saved=localStorage.getItem('paw_ref'),savedAt=Number(localStorage.getItem('paw_ref_at')||0);
  if(saved&&savedAt&&Date.now()-savedAt<30*24*60*60*1000)return saved;
  localStorage.removeItem('paw_ref');localStorage.removeItem('paw_ref_at');return null;
@@ -1798,6 +1799,7 @@ async function partnerAd(id){
  const title=prompt('Название рекламного размещения:');if(!title)return;const targetUrl=prompt('HTTPS-ссылка:');if(!targetUrl)return;
  try{await api('/api/admin/partners/'+id+'/ads',{method:'POST',body:{title:title,targetUrl:targetUrl}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}
 }
+async function partnerConfirmPayment(projectId){const reference=prompt('Укажите подтверждение оплаты (номер перевода/платежа):');if(!reference)return;try{await api('/api/admin/projects/'+projectId+'/confirm-payment',{method:'POST',body:{reference}});await loadPartnerAdmin();showToast('Оплата заказа подтверждена');}catch(e){showToast('❌ '+e.message,'error');}}
 async function partnerLedgerAction(id,action){try{await api('/api/admin/partner-ledger/'+id+'/'+action,{method:'POST',body:{}});await loadPartnerAdmin();}catch(e){showToast('❌ '+e.message,'error');}}
 async function partnerPayoutCreate(id){
  const amountRub=Number(prompt('Сумма подтверждённого вознаграждения к выплате, ₽:','')||0);if(!amountRub)return;
@@ -1847,7 +1849,9 @@ async function init() {
     // Реферальный трекинг
     const ref = getRefFromUrl();
     if (ref) {
-        fetch('/api/referrals/click/' + encodeURIComponent(ref)).catch(() => {});
+        fetch('/api/referrals/click/' + encodeURIComponent(ref)).then(r => r.ok ? r.json() : null)
+          .then(data => { if (data?.partnerToken) localStorage.setItem('paw_partner_token', data.partnerToken); })
+          .catch(() => {});
         localStorage.setItem('paw_ref', ref);
     }
     await loadPublicPartners();
