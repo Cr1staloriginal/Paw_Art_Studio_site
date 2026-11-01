@@ -1871,6 +1871,21 @@ async function init() {
     await loadPublicPartners();
     await loadAndApplyContent();
     await fetchMe();
+    const paymentParams=new URLSearchParams(location.search);
+    if(paymentParams.get('projectPayment')==='success'){
+        const paidProjectId=Number(paymentParams.get('projectId'));
+        if(Number.isSafeInteger(paidProjectId)&&paidProjectId>0&&state.user){
+            try{
+                const result=await api('/api/projects/'+paidProjectId);
+                if(result.project?.payment_status==='paid')showToast('Оплата заказа подтверждена ЮKassa');
+                else showToast('ЮKassa вернула вас на сайт. Подтверждение платежа ещё обрабатывается.');
+                if(result.project)renderProjectDetail(normalizeProject(result.project));
+            }catch(e){showToast('Не удалось проверить статус оплаты: '+e.message,'error');}
+        }else showToast('Возврат из ЮKassa выполнен. Войдите в аккаунт, чтобы проверить заказ.');
+        paymentParams.delete('projectPayment');paymentParams.delete('projectId');
+        const suffix=paymentParams.toString();
+        history.replaceState({},'',location.pathname+(suffix?'?'+suffix:'')+location.hash);
+    }
     if (!state.user) { await loadProjects(); await loadAllPortfolio(); }
     setTimeout(onScroll, 200);
     console.log('🐾 Paw Art Studio v3.8 (hybrid) ready');
