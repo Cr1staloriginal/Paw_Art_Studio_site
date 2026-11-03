@@ -313,6 +313,9 @@ safeAddColumn('projects', 'base_budget', 'INTEGER NOT NULL DEFAULT 0');
 safeAddColumn('projects', 'discount_percent', 'INTEGER NOT NULL DEFAULT 0');
 safeAddColumn('projects', 'promo_code', 'TEXT');
 safeAddColumn('projects', 'partner_id', 'INTEGER');
+safeAddColumn('projects', 'contact_method', "TEXT NOT NULL DEFAULT 'Сайт'");
+safeAddColumn('projects', 'contact_detail', 'TEXT');
+safeAddColumn('chats', 'project_id', 'INTEGER');
 safeAddColumn('projects', 'payment_status', "TEXT NOT NULL DEFAULT 'unpaid'");
 safeAddColumn('partner_ledger', 'payment_verified_at', 'INTEGER');
 safeAddColumn('partner_ledger', 'payment_reference', 'TEXT');
@@ -1622,6 +1625,11 @@ app.get('/api/projects', auth, (req, res) => {
 
 app.post('/api/projects', auth, (req, res) => {
   const b=req.body||{},title=String(b.title||'').trim(),description=String(b.description||'').trim(),category=String(b.category||'').trim();
+  const contactMethod=String(b.contactMethod||'Сайт').trim();
+  const contactDetail=String(b.contactDetail||'').trim();
+  if(!['Сайт','Discord','Telegram','VK','Телефон','Email'].includes(contactMethod))return res.status(400).json({error:'Некорректный способ связи'});
+  if(contactDetail.length>300)return res.status(400).json({error:'Контакт слишком длинный'});
+  if(contactMethod!=='Сайт'&&!contactDetail)return res.status(400).json({error:'Укажите контакт для выбранного способа связи'});
   if(!title||!description||!category)return res.status(400).json({error:'Заполните поля'});
   if(title.length>120||description.length>2000||category.length>80)return res.status(400).json({error:'Превышена допустимая длина полей'});
   const rawBudget=Number(b.budget||0),baseBudget=Math.round(rawBudget*100);
@@ -1647,8 +1655,8 @@ app.post('/api/projects', auth, (req, res) => {
         if(!used.changes)throw new Error('Лимит использований промокода исчерпан или срок его действия закончился');
         db.prepare('INSERT INTO promo_redemptions(promo_id,user_id,created_at) VALUES(?,?,?)').run(promo.id,req.user.id,now);
       }
-      const info=db.prepare(`INSERT INTO projects(title,description,category,budget,status,client_id,created_at,updated_at,base_budget,discount_percent,promo_code,partner_id)
-        VALUES(?,?,?,?,'open',?,?,?,?,?,?,?)`).run(title,description,category,finalBudget,req.user.id,now,now,baseBudget,discount,promo?promo.code:null,partnerId);
+      const info=db.prepare(`INSERT INTO projects(title,description,category,budget,status,client_id,created_at,updated_at,base_budget,discount_percent,promo_code,partner_id,contact_method,contact_detail)
+        VALUES(?,?,?,?,'open',?,?,?,?,?,?,?,?,?)`).run(title,description,category,finalBudget,req.user.id,now,now,baseBudget,discount,promo?promo.code:null,partnerId,contactMethod,contactDetail||null);
       return Number(info.lastInsertRowid);
     });
     const id=create(),project=db.prepare('SELECT * FROM projects WHERE id=?').get(id);
@@ -1986,6 +1994,16 @@ app.get('/api/portfolio', (req, res) => {
 
 
 /* Chat API endpoints used by the messenger UI. */
+function getAllowedProjectChat(chatId) {
+  return db.prepare(`SELECT c.id,c.user_a,c.user_b,c.project_id,p.client_id,p.executor_id,p.contact_method,p.status
+    FROM chats c JOIN projects p ON p.id=c.project_id WHERE c.id=?`).get(chatId);
+}
+function canUseProjectChat(chat, userId) {
+  if (!chat || chat.contact_method !== 'Сайт' || !chat.executor_id || chat.status === 'cancelled') return false;
+  const uid=Number(userId);
+  return (uid===Number(chat.client_id) && [Number(chat.user_a),Number(chat.user_b)].includes(uid)) ||
+    (uid===Number(chat.executor_id) && [Number(chat.user_a),Number(chat.user_b)].includes(uid));
+}
 app.get('/api/chats', auth, (req, res) => {
   try {
     const uid = Number(req.user.id);
@@ -2000,9 +2018,12 @@ app.get('/api/chats', auth, (req, res) => {
       FROM chats c
       JOIN users a ON a.id = c.user_a
       JOIN users b ON b.id = c.user_b
-      WHERE c.user_a = ? OR c.user_b = ?
+      JOIN projects p ON p.id = c.project_id AND p.contact_method = 'Сайт' AND p.executor_id IS NOT NULL AND p.status <> 'cancelled'
+      WHERE (c.user_a = ? OR c.user_b = ?)
+        AND ((? = p.client_id AND ? = c.user_a OR ? = p.client_id AND ? = c.user_b)
+          OR (? = p.executor_id AND ? = c.user_a OR ? = p.executor_id AND ? = c.user_b))
       ORDER BY COALESCE(last_created, c.created_at) DESC
-    `).all(uid, uid, uid, uid, uid, uid);
+    `).all(uid, uid, uid, uid, uid, uid, uid, uid, uid, uid, uid, uid);
     return res.json({ chats: rows.map(r => ({
       id: Number(r.id),
       peer: { id: Number(r.peer_id), name: r.peer_name || 'Пользователь', avatar: r.peer_avatar || null },
@@ -2018,23 +2039,35 @@ app.get('/api/chats', auth, (req, res) => {
 app.post('/api/chats', auth, (req, res) => {
   const uid = Number(req.user.id);
   const peerId = Number(req.body?.peerId);
+  const projectId = Number(req.body?.projectId);
   if (!Number.isSafeInteger(peerId) || peerId <= 0 || peerId === uid)
     return res.status(400).json({ error: 'Некорректный собеседник' });
   try {
-    const peer = db.prepare('SELECT id FROM users WHERE id = ?').get(peerId);
-    if (!peer) return res.status(404).json({ error: 'Пользователь не найден' });
     const userA = Math.min(uid, peerId);
     const userB = Math.max(uid, peerId);
-    let chat = db.prepare('SELECT id FROM chats WHERE user_a = ? AND user_b = ?').get(userA, userB);
-    if (!chat) {
-      try {
-        const info = db.prepare('INSERT INTO chats (user_a, user_b, created_at) VALUES (?, ?, ?)').run(userA, userB, Date.now());
-        chat = { id: Number(info.lastInsertRowid) };
-      } catch (err) {
-        // Handle simultaneous attempts to create the same conversation.
-        chat = db.prepare('SELECT id FROM chats WHERE user_a = ? AND user_b = ?').get(userA, userB);
-        if (!chat) throw err;
+    let chat = db.prepare('SELECT id,project_id FROM chats WHERE user_a = ? AND user_b = ?').get(userA, userB);
+    if (req.user.role === 'executor') {
+      if (!Number.isSafeInteger(projectId) || projectId <= 0) return res.status(400).json({ error: 'Выберите заказ для переписки' });
+      const project=db.prepare("SELECT id,client_id,executor_id,contact_method,status FROM projects WHERE id=?").get(projectId);
+      if(!project || Number(project.executor_id)!==uid || Number(project.client_id)!==peerId || project.contact_method!=='Сайт' || project.status==='cancelled')
+        return res.status(403).json({ error: 'Написать можно только заказчику принятого заказа, выбравшему связь через сайт' });
+      if(chat && chat.project_id && Number(chat.project_id)!==projectId) {
+        const linked=getAllowedProjectChat(chat.id);
+        if(!canUseProjectChat(linked,uid)) return res.status(403).json({error:'Нет доступа к этой переписке'});
       }
+      if (!chat) {
+        const info=db.prepare('INSERT INTO chats (user_a,user_b,project_id,created_at) VALUES (?,?,?,?)').run(userA,userB,projectId,Date.now());
+        chat={id:Number(info.lastInsertRowid),project_id:projectId};
+      } else if (!chat.project_id) {
+        db.prepare('UPDATE chats SET project_id=? WHERE id=?').run(projectId,chat.id);
+        chat.project_id=projectId;
+      }
+    } else if (req.user.role === 'client') {
+      if (!chat || !chat.project_id) return res.status(403).json({ error: 'Вы можете отвечать только в чате, который открыл исполнитель по вашему заказу' });
+      const linked=getAllowedProjectChat(chat.id);
+      if(!canUseProjectChat(linked,uid) || Number(linked.executor_id)!==peerId) return res.status(403).json({error:'Нет доступа к этой переписке'});
+    } else {
+      return res.status(403).json({ error: 'Личные переписки доступны только заказчику и назначенному исполнителю' });
     }
     return res.json({ chatId: Number(chat.id) });
   } catch (err) {
@@ -2047,10 +2080,9 @@ app.get('/api/chats/:chatId/messages', auth, (req, res) => {
   const chatId = Number(req.params.chatId);
   if (!Number.isSafeInteger(chatId) || chatId <= 0) return res.status(400).json({ error: 'Некорректный ID чата' });
   try {
-    const chat = db.prepare('SELECT user_a, user_b FROM chats WHERE id = ?').get(chatId);
+    const chat = getAllowedProjectChat(chatId);
     if (!chat) return res.status(404).json({ error: 'Чат не найден' });
-    if (![Number(chat.user_a), Number(chat.user_b)].includes(Number(req.user.id)))
-      return res.status(403).json({ error: 'Нет доступа к этому чату' });
+    if (!canUseProjectChat(chat,req.user.id)) return res.status(403).json({ error: 'Нет доступа к этому чату' });
     db.prepare('UPDATE messages SET read_at = ? WHERE chat_id = ? AND sender_id != ? AND read_at IS NULL')
       .run(Date.now(), chatId, req.user.id);
     const messages = db.prepare(`
@@ -2085,8 +2117,8 @@ io.on('connection', (socket) => {
   socket.on('chat:join', ({ chatId } = {}) => {
     const id = Number(chatId);
     if (!Number.isSafeInteger(id) || id <= 0) return;
-    const chat = db.prepare('SELECT user_a, user_b FROM chats WHERE id = ?').get(id);
-    if (chat && [Number(chat.user_a), Number(chat.user_b)].includes(uid)) socket.join('chat:' + id);
+    const chat = getAllowedProjectChat(id);
+    if (canUseProjectChat(chat,uid)) socket.join('chat:' + id);
   });
   socket.on('chat:leave', ({ chatId } = {}) => {
     const id = Number(chatId);
@@ -2096,8 +2128,8 @@ io.on('connection', (socket) => {
     const id = Number(chatId);
     const cleanText = String(text || '').trim().slice(0, 2000);
     if (!Number.isSafeInteger(id) || id <= 0 || !cleanText) return;
-    const chat = db.prepare('SELECT user_a, user_b FROM chats WHERE id = ?').get(id);
-    if (!chat || ![Number(chat.user_a), Number(chat.user_b)].includes(uid)) {
+    const chat = getAllowedProjectChat(id);
+    if (!canUseProjectChat(chat,uid)) {
       socket.emit('chat:error', { message: 'Нет доступа к этому чату' });
       return;
     }
@@ -2116,8 +2148,8 @@ io.on('connection', (socket) => {
   socket.on('chat:typing', ({ chatId } = {}) => {
     const id = Number(chatId);
     if (!Number.isSafeInteger(id) || id <= 0) return;
-    const chat = db.prepare('SELECT user_a, user_b FROM chats WHERE id = ?').get(id);
-    if (chat && [Number(chat.user_a), Number(chat.user_b)].includes(uid)) socket.to('chat:' + id).emit('chat:typing', { name: socket.data.user.name });
+    const chat = getAllowedProjectChat(id);
+    if (canUseProjectChat(chat,uid)) socket.to('chat:' + id).emit('chat:typing', { name: socket.data.user.name });
   });
 });
 
