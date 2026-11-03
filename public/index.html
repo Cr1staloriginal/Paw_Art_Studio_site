@@ -475,8 +475,8 @@
             <div id="roleRequestBlock">
                 <p class="role-desc">Отправьте заявку — админ рассмотрит.</p>
                 <div class="role-request-actions">
-                    <button class="btn" onclick="requestRole('executor')"><i class="fas fa-paint-brush"></i> Стать исполнителем</button>
-                    <button class="btn btn-outline" onclick="requestRole('manager')"><i class="fas fa-briefcase"></i> Стать менеджером</button>
+                    <button class="btn" id="requestExecutorRoleBtn" onclick="requestRole('executor')"><i class="fas fa-paint-brush"></i> Стать исполнителем</button>
+                    <button class="btn btn-outline" id="requestManagerRoleBtn" onclick="requestRole('manager')"><i class="fas fa-briefcase"></i> Стать менеджером</button>
                 </div>
             </div>
             <div class="role-pending hidden" id="rolePending"><i class="fas fa-hourglass-half"></i><span id="rolePendingText">Заявка на рассмотрении</span></div>
