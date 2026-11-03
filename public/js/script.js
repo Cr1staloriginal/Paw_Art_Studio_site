@@ -187,12 +187,14 @@ async function handleRegister(e) {
     const name = document.getElementById('regName').value.trim();
     const email = document.getElementById('regEmail').value.trim();
     const password = document.getElementById('regPassword').value;
+    const agreementAccepted = document.getElementById('regAgreement')?.checked === true;
+    if (!agreementAccepted) { showToast('❌ Для регистрации необходимо принять Пользовательское соглашение.', 'error'); return; }
     const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
     try {
         const ref = localStorage.getItem('paw_ref') || null;
         await partnerAttributionPromise.catch(() => {});
         const partnerToken = localStorage.getItem('paw_partner_token') || null;
-        const data = await api('/api/auth/register', { method: 'POST', body: { name, email, password, ref, partnerToken } });
+        const data = await api('/api/auth/register', { method: 'POST', body: { name, email, password, ref, partnerToken, agreementAccepted } });
         state.pendingEmail = data.email;
 
         // Показать панель верификации, скрыть остальные

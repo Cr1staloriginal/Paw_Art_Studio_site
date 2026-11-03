@@ -639,3 +639,9 @@ textarea.content-input { min-height: 70px; resize: vertical; }
 .paw-inquiry-bar.is-dismissed{opacity:0;visibility:hidden;pointer-events:none;transform:translate(-50%,14px)}
 @media(max-width:600px){.paw-inquiry-bar{width:calc(100% - 20px);bottom:max(10px,env(safe-area-inset-bottom));gap:10px;padding:12px 38px 12px 13px;border-radius:16px}.paw-inquiry-copy strong{font-size:.86rem}.paw-inquiry-copy span{font-size:.72rem}.paw-inquiry-action{padding:11px 10px;border-radius:10px;font-size:.8rem}.paw-inquiry-action span{display:none}}
 @media(prefers-reduced-motion:reduce){.paw-inquiry-bar,.paw-inquiry-action{transition:none}}
+
+
+/* Mandatory offer acceptance at registration */
+.agreement-consent{display:flex;align-items:flex-start;gap:10px;margin:14px 0 18px;font-size:.88rem;line-height:1.55;color:var(--text-soft,var(--text));cursor:pointer}
+.agreement-consent input{flex:0 0 auto;width:17px;height:17px;margin:3px 0 0;accent-color:var(--accent,#ec4899);cursor:pointer}
+.agreement-consent a{color:var(--accent,#ec4899);text-decoration:underline;text-underline-offset:3px}
