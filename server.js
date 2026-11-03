@@ -2000,9 +2000,10 @@ function getAllowedProjectChat(chatId) {
 }
 function canUseProjectChat(chat, userId) {
   if (!chat || chat.contact_method !== 'Сайт' || !chat.executor_id || chat.status === 'cancelled') return false;
-  const uid=Number(userId);
-  return (uid===Number(chat.client_id) && [Number(chat.user_a),Number(chat.user_b)].includes(uid)) ||
-    (uid===Number(chat.executor_id) && [Number(chat.user_a),Number(chat.user_b)].includes(uid));
+  const pair=[Number(chat.user_a),Number(chat.user_b)].sort((a,b)=>a-b);
+  const expected=[Number(chat.client_id),Number(chat.executor_id)].sort((a,b)=>a-b);
+  return pair[0]===expected[0] && pair[1]===expected[1] &&
+    [Number(chat.client_id),Number(chat.executor_id)].includes(Number(userId));
 }
 app.get('/api/chats', auth, (req, res) => {
   try {
@@ -2020,10 +2021,11 @@ app.get('/api/chats', auth, (req, res) => {
       JOIN users b ON b.id = c.user_b
       JOIN projects p ON p.id = c.project_id AND p.contact_method = 'Сайт' AND p.executor_id IS NOT NULL AND p.status <> 'cancelled'
       WHERE (c.user_a = ? OR c.user_b = ?)
-        AND ((? = p.client_id AND ? = c.user_a OR ? = p.client_id AND ? = c.user_b)
-          OR (? = p.executor_id AND ? = c.user_a OR ? = p.executor_id AND ? = c.user_b))
+        AND ((p.client_id = c.user_a AND p.executor_id = c.user_b)
+          OR (p.client_id = c.user_b AND p.executor_id = c.user_a))
+        AND ? IN (p.client_id, p.executor_id)
       ORDER BY COALESCE(last_created, c.created_at) DESC
-    `).all(uid, uid, uid, uid, uid, uid, uid, uid, uid, uid, uid, uid);
+    `).all(uid, uid, uid, uid, uid, uid, uid);
     return res.json({ chats: rows.map(r => ({
       id: Number(r.id),
       peer: { id: Number(r.peer_id), name: r.peer_name || 'Пользователь', avatar: r.peer_avatar || null },
