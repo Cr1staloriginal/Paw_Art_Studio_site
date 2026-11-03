@@ -2082,7 +2082,9 @@ app.post('/api/chats', auth, (req, res) => {
     } else {
       return res.status(403).json({ error: 'Личные переписки доступны только заказчику и назначенному исполнителю' });
     }
-    return res.json({ chatId: Number(chat.id) });
+    const peer=db.prepare('SELECT id,name,avatar,role FROM users WHERE id=?').get(peerId);
+    if(!peer)return res.status(404).json({error:'Пользователь не найден'});
+    return res.json({ chatId: Number(chat.id), peer: { id:Number(peer.id), name:peer.name||'Пользователь', avatar:peer.avatar||null, role:peer.role } });
   } catch (err) {
     console.error('Ошибка создания чата:', err);
     return res.status(500).json({ error: 'Не удалось открыть чат' });
