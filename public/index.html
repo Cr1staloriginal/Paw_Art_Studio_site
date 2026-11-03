@@ -65,7 +65,7 @@
                     <a onclick="openProfileEditor()"><i class="fas fa-user-edit"></i> Редактировать профиль</a>
                     <a onclick="openMessenger()"><i class="fas fa-comments"></i> Сообщения (панель)</a>
                     <a href="/messenger.html" target="_blank"><i class="fas fa-external-link-alt"></i> Мессенджер (страница)</a>
-                    <a onclick="openMyPortfolio()"><i class="fas fa-images"></i> Моё портфолио</a>
+                    <a onclick="openMyPortfolio()" id="myPortfolioMenuLink" class="hidden"><i class="fas fa-images"></i> Моё портфолио</a>
                     <a onclick="openAdminPanel()" id="adminMenuLink" class="hidden"><i class="fas fa-shield-alt"></i> Админ-панель</a>
                     <a onclick="openContentEditor()" id="contentMenuLink" class="hidden"><i class="fas fa-edit"></i> Редактор сайта 👑</a>
                     <a onclick="logout()"><i class="fas fa-sign-out-alt"></i> Выйти</a>
@@ -446,7 +446,7 @@
         </div>
         <div class="dash-tabs">
             <button class="dash-tab active" data-dtab="wallet" onclick="switchDashTab('wallet')"><i class="fas fa-wallet"></i> Кошелёк</button>
-            <button class="dash-tab" data-dtab="withdrawals" onclick="switchDashTab('withdrawals')"><i class="fas fa-money-check-alt"></i> Выплаты</button>
+            <button class="dash-tab hidden" id="dashWithdrawalsTab" data-dtab="withdrawals" onclick="switchDashTab('withdrawals')"><i class="fas fa-money-check-alt"></i> Выплаты</button>
             <button class="dash-tab" data-dtab="history" onclick="switchDashTab('history')"><i class="fas fa-history"></i> История</button>
             <button class="dash-tab" data-dtab="role" onclick="switchDashTab('role')"><i class="fas fa-user-tag"></i> Роль</button>
         </div>
@@ -456,7 +456,7 @@
                 <div class="balance-value" id="dashBalance">0 ₽</div>
                 <div class="balance-actions">
                     <button class="btn" onclick="openDeposit()"><i class="fas fa-plus"></i> Пополнить</button>
-                    <button type="button" class="btn btn-outline" onclick="openWithdraw()"><i class="fas fa-arrow-up"></i> Вывести</button>
+                    <button type="button" class="btn btn-outline hidden" id="withdrawBtn" onclick="openWithdraw()"><i class="fas fa-arrow-up"></i> Вывести</button>
                 </div>
                 <div class="commission-note"><i class="fas fa-info-circle"></i> Комиссия <strong>0%</strong>. Пополнение через ЮKassa.</div>
             </div>
