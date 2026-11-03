@@ -381,6 +381,7 @@
             <label for="regPassword">Пароль</label>
             <input type="password" id="regPassword" placeholder="Минимум 6 символов" minlength="6" autocomplete="new-password" required />
             <div class="role-info-box"><i class="fas fa-info-circle"></i><span>На указанный email придёт код подтверждения регистрации.</span></div>
+            <label class="agreement-consent" for="regAgreement"><input type="checkbox" id="regAgreement" required /><span>Я ознакомился(-ась) и принимаю <a href="/agreement.html" target="_blank" rel="noopener noreferrer">Пользовательское соглашение (публичную оферту)</a>.</span></label>
             <button type="submit" class="btn">Получить код на email</button>
         </form>
         <form class="auth-form hidden" id="verifyForm" onsubmit="handleVerify(event)">
