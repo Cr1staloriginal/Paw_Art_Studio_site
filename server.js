@@ -301,6 +301,8 @@ function safeAddColumn(table, column, definition) {
 }
 db.exec("CREATE TABLE IF NOT EXISTS password_reset_codes (id INTEGER PRIMARY KEY AUTOINCREMENT, email TEXT NOT NULL COLLATE NOCASE, code_hash TEXT NOT NULL, expires_at INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL)");
 db.exec("CREATE INDEX IF NOT EXISTS idx_password_reset_email ON password_reset_codes(email, created_at DESC)");
+safeAddColumn('users', 'terms_accepted_at', 'INTEGER');
+safeAddColumn('users', 'terms_version', 'TEXT');
 safeAddColumn('users', 'referral_code', 'TEXT');
 safeAddColumn('users', 'referred_by', 'INTEGER');
 safeAddColumn('users', 'partner_id', 'INTEGER');
@@ -537,8 +539,12 @@ app.get('/health', (req, res) =>
 );
 
 /* ==================== AUTH ==================== */
+const TERMS_VERSION = '2026-10-27';
+
 app.post('/api/auth/register', async (req, res) => {
-  const { name, email, password, ref } = req.body || {};
+  const { name, email, password, ref, agreementAccepted } = req.body || {};
+  if (agreementAccepted !== true)
+    return res.status(400).json({ error: 'Для регистрации необходимо принять Пользовательское соглашение' });
   if (!name || !email || !password)
     return res.status(400).json({ error: 'Заполните все поля' });
   if (String(password).length < 6)
@@ -574,16 +580,16 @@ app.post('/api/auth/register', async (req, res) => {
 
     const tx = db.transaction(() => {
       if (existing && existing.email_verified === 0) {
-        db.prepare(`UPDATE users SET name = ?, password = ?, verification_code = ?, verification_expires = ?, partner_id = COALESCE(partner_id, ?)
+        db.prepare(`UPDATE users SET name = ?, password = ?, verification_code = ?, verification_expires = ?, partner_id = COALESCE(partner_id, ?), terms_accepted_at = ?, terms_version = ?
                     WHERE id = ?`)
-          .run(String(name).trim(), hash, code, expires, referredPartner ? referredPartner.id : null, existing.id);
+          .run(String(name).trim(), hash, code, expires, referredPartner ? referredPartner.id : null, now, TERMS_VERSION, existing.id);
         return existing.id;
       }
       const myRefCode = generateReferralCode();
       const info = db.prepare(`INSERT INTO users
-        (name, email, password, role, balance, email_verified, verification_code, verification_expires, referral_code, referred_by, partner_id, created_at)
-        VALUES (?, ?, ?, 'client', 0, 0, ?, ?, ?, ?, ?, ?)`)
-        .run(String(name).trim(), cleanEmail, hash, code, expires, myRefCode, referrer ? referrer.id : null, referredPartner ? referredPartner.id : null, now);
+        (name, email, password, role, balance, email_verified, verification_code, verification_expires, referral_code, referred_by, partner_id, created_at, terms_accepted_at, terms_version)
+        VALUES (?, ?, ?, 'client', 0, 0, ?, ?, ?, ?, ?, ?, ?, ?)`) 
+        .run(String(name).trim(), cleanEmail, hash, code, expires, myRefCode, referrer ? referrer.id : null, referredPartner ? referredPartner.id : null, now, now, TERMS_VERSION);
       return info.lastInsertRowid;
     });
 
