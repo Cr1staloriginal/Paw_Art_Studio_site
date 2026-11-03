@@ -1607,15 +1607,20 @@ app.get('/api/projects', auth, (req, res) => {
                              LEFT JOIN users e ON e.id = p.executor_id
                              ${where}
                              ORDER BY p.created_at DESC LIMIT 100`).all(...params);
-    const projects = rows.map(p => ({
-      ...p,
+    const projects = rows.map(p => {
+      const { contact_detail, ...safeProject } = p;
+      const canSeeContact = Number(p.client_id) === userId || Number(p.executor_id) === userId || role === 'admin' || role === 'manager';
+      return {
+      ...safeProject,
+      contactDetail: canSeeContact ? (contact_detail || '') : null,
+      contactMethod: p.contact_method || 'Сайт',
       clientId: p.client_id ?? null,
       executorId: p.executor_id ?? null,
       client: { id: p.client_id ?? 0, name: p.client_name || 'Пользователь', avatar: p.client_avatar ?? null },
       executor: p.executor_id ? {
         id: p.executor_id, name: p.executor_name || 'Исполнитель', avatar: p.executor_avatar ?? null,
       } : null,
-    }));
+    }; });
     res.json({ projects });
   } catch (err) {
     console.error('❌ Ошибка загрузки заказов:', err);
@@ -1681,8 +1686,10 @@ app.get('/api/projects/:id', auth, (req, res) => {
     const canView = isAdmin || Number(p.client_id) === Number(req.user.id) ||
       (req.user.role === 'executor' && (p.status === 'open' || Number(p.executor_id) === Number(req.user.id)));
     if (!canView) return res.status(403).json({ error: 'Нет доступа к этому заказу' });
+    const { contact_detail, ...safeProject } = p;
+    const canSeeContact = Number(p.client_id) === Number(req.user.id) || Number(p.executor_id) === Number(req.user.id) || isAdmin;
     return res.json({ project: {
-      ...p, clientId: p.client_id, executorId: p.executor_id,
+      ...safeProject, contactDetail: canSeeContact ? (contact_detail || '') : null, contactMethod: p.contact_method || 'Сайт', clientId: p.client_id, executorId: p.executor_id,
       client: { id: p.client_id, name: p.client_name || 'Пользователь', avatar: p.client_avatar || null },
       executor: p.executor_id ? { id: p.executor_id, name: p.executor_name || 'Исполнитель', avatar: p.executor_avatar || null } : null
     }});
@@ -2049,20 +2056,24 @@ app.post('/api/chats', auth, (req, res) => {
     const userB = Math.max(uid, peerId);
     let chat = db.prepare('SELECT id,project_id FROM chats WHERE user_a = ? AND user_b = ?').get(userA, userB);
     if (req.user.role === 'executor') {
-      if (!Number.isSafeInteger(projectId) || projectId <= 0) return res.status(400).json({ error: 'Выберите заказ для переписки' });
-      const project=db.prepare("SELECT id,client_id,executor_id,contact_method,status FROM projects WHERE id=?").get(projectId);
-      if(!project || Number(project.executor_id)!==uid || Number(project.client_id)!==peerId || project.contact_method!=='Сайт' || project.status==='cancelled')
-        return res.status(403).json({ error: 'Написать можно только заказчику принятого заказа, выбравшему связь через сайт' });
-      if(chat && chat.project_id && Number(chat.project_id)!==projectId) {
-        const linked=getAllowedProjectChat(chat.id);
-        if(!canUseProjectChat(linked,uid)) return res.status(403).json({error:'Нет доступа к этой переписке'});
-      }
-      if (!chat) {
-        const info=db.prepare('INSERT INTO chats (user_a,user_b,project_id,created_at) VALUES (?,?,?,?)').run(userA,userB,projectId,Date.now());
-        chat={id:Number(info.lastInsertRowid),project_id:projectId};
-      } else if (!chat.project_id) {
-        db.prepare('UPDATE chats SET project_id=? WHERE id=?').run(projectId,chat.id);
-        chat.project_id=projectId;
+      if (Number.isSafeInteger(projectId) && projectId > 0) {
+        const project=db.prepare("SELECT id,client_id,executor_id,contact_method,status FROM projects WHERE id=?").get(projectId);
+        if(!project || Number(project.executor_id)!==uid || Number(project.client_id)!==peerId || project.contact_method!=='Сайт' || project.status==='cancelled')
+          return res.status(403).json({ error: 'Написать можно только заказчику принятого заказа, выбравшему связь через сайт' });
+        if(chat && chat.project_id && Number(chat.project_id)!==projectId) {
+          const linked=getAllowedProjectChat(chat.id);
+          if(!canUseProjectChat(linked,uid)) return res.status(403).json({error:'Нет доступа к этой переписке'});
+        }
+        if (!chat) {
+          const info=db.prepare('INSERT INTO chats (user_a,user_b,project_id,created_at) VALUES (?,?,?,?)').run(userA,userB,projectId,Date.now());
+          chat={id:Number(info.lastInsertRowid),project_id:projectId};
+        } else if (!chat.project_id) {
+          db.prepare('UPDATE chats SET project_id=? WHERE id=?').run(projectId,chat.id);
+          chat.project_id=projectId;
+        }
+      } else {
+        const linked=chat?.project_id ? getAllowedProjectChat(chat.id) : null;
+        if(!canUseProjectChat(linked,uid) || Number(linked.client_id)!==peerId) return res.status(403).json({error:'Открывать можно только существующий чат по вашему заказу'});
       }
     } else if (req.user.role === 'client') {
       if (!chat || !chat.project_id) return res.status(403).json({ error: 'Вы можете отвечать только в чате, который открыл исполнитель по вашему заказу' });
