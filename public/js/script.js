@@ -1014,29 +1014,29 @@ async function loadProjectDeliveries(projectId) {
         const isExecutor = Number(p.executorId ?? p.executor_id) === Number(state.user?.id);
         const canUpload = isExecutor && ['in_progress','review'].includes(p.status);
         const latest = deliveries[0];
-        const versions = deliveries.length ? deliveries.map(d => \`
+        const versions = deliveries.length ? deliveries.map(d => `
             <section class="pd-delivery-version" style="border:1px solid var(--border);border-radius:12px;padding:12px;margin:10px 0">
-                <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>Версия \${d.version}</strong><small>\${escapeHtml(d.uploaderName)} · \${formatDateTime(d.createdAt)}</small></div>
-                \${d.note ? '<p class="form-hint">' + escapeHtml(d.note) + '</p>' : ''}
-                <div style="display:grid;gap:8px;margin-top:10px">\${d.files.map(f => \`
-                    <button type="button" class="project-act-btn" style="text-align:left" onclick="downloadDeliveryFile(\${projectId},\${f.id},'\${escapeHtml(f.name).replace(/'/g,"&#39;")}')">
-                        <i class="fas fa-download"></i> \${escapeHtml(f.name)} <small>(\${formatDeliverySize(f.size)})</small>
-                    </button>\`).join('')}</div>
-            </section>\`).join('') : '<p class="form-hint">Исполнитель ещё не передавал файлы.</p>';
-        const reviewActions = isClient && p.status === 'review' && latest ? \`
+                <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>Версия ${d.version}</strong><small>${escapeHtml(d.uploaderName)} · ${formatDateTime(d.createdAt)}</small></div>
+                ${d.note ? '<p class="form-hint">' + escapeHtml(d.note) + '</p>' : ''}
+                <div style="display:grid;gap:8px;margin-top:10px">${d.files.map(f => `
+                    <button type="button" class="project-act-btn" style="text-align:left" onclick="downloadDeliveryFile(${projectId},${f.id},'${escapeHtml(f.name).replace(/'/g,"&#39;")}')">
+                        <i class="fas fa-download"></i> ${escapeHtml(f.name)} <small>(${formatDeliverySize(f.size)})</small>
+                    </button>`).join('')}</div>
+            </section>`).join('') : '<p class="form-hint">Исполнитель ещё не передавал файлы.</p>';
+        const reviewActions = isClient && p.status === 'review' && latest ? `
             <div class="pd-actions" style="margin-top:12px;flex-wrap:wrap">
-                <button class="btn" onclick="acceptProjectDelivery(\${projectId})"><i class="fas fa-check"></i> Принять работу</button>
-                <button class="btn btn-outline" onclick="requestProjectRevision(\${projectId})"><i class="fas fa-rotate"></i> Запросить исправления</button>
-            </div>\` : '';
-        const uploadForm = canUpload ? \`
-            <form onsubmit="uploadProjectDelivery(event,\${projectId})" style="margin-top:14px">
+                <button class="btn" onclick="acceptProjectDelivery(${projectId})"><i class="fas fa-check"></i> Принять работу</button>
+                <button class="btn btn-outline" onclick="requestProjectRevision(${projectId})"><i class="fas fa-rotate"></i> Запросить исправления</button>
+            </div>` : '';
+        const uploadForm = canUpload ? `
+            <form onsubmit="uploadProjectDelivery(event,${projectId})" style="margin-top:14px">
                 <label>Файлы готовой работы *</label>
                 <input type="file" name="files" id="deliveryFiles" multiple required accept="image/*,.zip,.7z,.rar,.pdf,.psd,.txt,.clip,.kra,.blend,.mp4,.mov,.webm">
                 <small class="form-hint">До 10 файлов за раз, максимум 50 МБ на файл. Можно отправлять новые версии после исправлений.</small>
                 <label style="display:block;margin-top:10px">Комментарий к сдаче</label>
                 <textarea name="note" id="deliveryNote" maxlength="2000" placeholder="Что готово, какие файлы приложены…" style="min-height:70px"></textarea>
                 <button class="btn" type="submit" style="margin-top:10px"><i class="fas fa-cloud-upload-alt"></i> Передать заказчику</button>
-            </form>\` : '';
+            </form>` : '';
         host.innerHTML = '<div class="section-divider"><span>Передача готовой работы</span></div>' +
             '<p class="form-hint">Файлы доступны только заказчику, назначенному исполнителю и администрации. Предыдущие версии сохраняются.</p>' +
             versions + reviewActions + uploadForm;
