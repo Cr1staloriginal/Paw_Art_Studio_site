@@ -313,7 +313,7 @@ safeAddColumn('projects', 'base_budget', 'INTEGER NOT NULL DEFAULT 0');
 safeAddColumn('projects', 'discount_percent', 'INTEGER NOT NULL DEFAULT 0');
 safeAddColumn('projects', 'promo_code', 'TEXT');
 safeAddColumn('projects', 'partner_id', 'INTEGER');
-safeAddColumn('projects', 'contact_method', "TEXT NOT NULL DEFAULT 'Сайт'");
+safeAddColumn('projects', 'contact_method', "TEXT NOT NULL DEFAULT 'Не указан'");
 safeAddColumn('projects', 'contact_detail', 'TEXT');
 safeAddColumn('chats', 'project_id', 'INTEGER');
 safeAddColumn('projects', 'payment_status', "TEXT NOT NULL DEFAULT 'unpaid'");
@@ -1613,7 +1613,7 @@ app.get('/api/projects', auth, (req, res) => {
       return {
       ...safeProject,
       contactDetail: canSeeContact ? (contact_detail || '') : null,
-      contactMethod: p.contact_method || 'Сайт',
+      contactMethod: p.contact_method || 'Не указан',
       clientId: p.client_id ?? null,
       executorId: p.executor_id ?? null,
       client: { id: p.client_id ?? 0, name: p.client_name || 'Пользователь', avatar: p.client_avatar ?? null },
@@ -1630,7 +1630,7 @@ app.get('/api/projects', auth, (req, res) => {
 
 app.post('/api/projects', auth, (req, res) => {
   const b=req.body||{},title=String(b.title||'').trim(),description=String(b.description||'').trim(),category=String(b.category||'').trim();
-  const contactMethod=String(b.contactMethod||'Сайт').trim();
+  const contactMethod=String(b.contactMethod||'').trim();
   const contactDetail=String(b.contactDetail||'').trim();
   if(!['Сайт','Discord','Telegram','VK','Телефон','Email'].includes(contactMethod))return res.status(400).json({error:'Некорректный способ связи'});
   if(contactDetail.length>300)return res.status(400).json({error:'Контакт слишком длинный'});
@@ -1689,7 +1689,7 @@ app.get('/api/projects/:id', auth, (req, res) => {
     const { contact_detail, ...safeProject } = p;
     const canSeeContact = Number(p.client_id) === Number(req.user.id) || Number(p.executor_id) === Number(req.user.id) || isAdmin;
     return res.json({ project: {
-      ...safeProject, contactDetail: canSeeContact ? (contact_detail || '') : null, contactMethod: p.contact_method || 'Сайт', clientId: p.client_id, executorId: p.executor_id,
+      ...safeProject, contactDetail: canSeeContact ? (contact_detail || '') : null, contactMethod: p.contact_method || 'Не указан', clientId: p.client_id, executorId: p.executor_id,
       client: { id: p.client_id, name: p.client_name || 'Пользователь', avatar: p.client_avatar || null },
       executor: p.executor_id ? { id: p.executor_id, name: p.executor_name || 'Исполнитель', avatar: p.executor_avatar || null } : null
     }});
