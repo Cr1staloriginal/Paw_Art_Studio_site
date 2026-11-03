@@ -984,7 +984,7 @@ async function handleProjectCreate(e) {
     const contactMethod = document.getElementById('projContactMethod')?.value || 'Сайт';
     const contactDetail = document.getElementById('projContactDetail')?.value.trim() || '';
     const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
-    try { const result = await api('/api/projects', { method: 'POST', body: { title, description, category, budget, promoCode, contactMethod, contactDetail } }); closeProjectCreator(); e.target.reset(); await loadProjects(); showToast('✅ Заказ создан'); }
+    try { const result = await api('/api/projects', { method: 'POST', body: { title, description, category, budget, promoCode, contactMethod, contactDetail } }); closeProjectCreator(); e.target.reset(); updateProjectContactDetail(); await loadProjects(); showToast('✅ Заказ создан'); }
     catch (err) { showToast('❌ ' + err.message, 'error'); }
     finally { btn.disabled = false; }
 }
@@ -1022,8 +1022,8 @@ function renderProjectDetail(p) {
         ${p.executor ? `<div class="pd-row"><span class="pd-label">Исполнитель</span><span class="pd-value">${escapeHtml(p.executor.name)}</span></div>` : ''}
         ${p.contactMethod && p.contactMethod !== 'Сайт' ? `<div class="pd-row"><span class="pd-label">Способ связи</span><span class="pd-value">${escapeHtml(p.contactMethod)}${p.contactDetail ? ': ' + escapeHtml(p.contactDetail) : ''}</span></div>` : `<div class="pd-row"><span class="pd-label">Связь</span><span class="pd-value">Через мессенджер сайта</span></div>`}
         <div class="pd-desc">${escapeHtml(p.description)}</div>
-        <div class="pd-actions">${isExecutor && Number(p.executor?.id ?? p.executor_id) === Number(state.user?.id) && (p.contactMethod || 'Сайт') === 'Сайт' ? `<button class="btn btn-outline" onclick="openChatWith(${p.clientId ?? p.client_id}, ${p.id})"><i class="fas fa-comments"></i> Написать заказчику</button>` : ''}
-        ${isClient && p.executor && (p.contactMethod || 'Сайт') === 'Сайт' ? `<span class="pd-contact-note">Исполнитель сможет написать вам здесь. Ответить можно в мессенджере сайта.</span>` : ''}${isClient&&Number(p.budget)>0&&p.payment_status!=='paid'&&p.payment_status!=='pending'&&p.payment_status!=='refund_required'&&p.payment_status!=='refunded'?`<button class="btn" onclick="payProject(${p.id})"><i class="fas fa-credit-card"></i> Оплатить заказ</button>`:''}${isAdmin&&p.payment_status==='refund_required'?`<button class="btn btn-outline" onclick="adminRefundProject(${p.id})">Зафиксировать возврат</button>`:''}</div>
+        <div class="pd-actions">${isExecutor && Number(p.executor?.id ?? p.executor_id) === Number(state.user?.id) && (p.contactMethod || 'Сайт') === 'Сайт' && p.status !== 'cancelled' ? `<button class="btn btn-outline" onclick="openChatWith(${p.clientId ?? p.client_id}, ${p.id})"><i class="fas fa-comments"></i> Написать заказчику</button>` : ''}
+        ${isClient && p.executor && p.status !== 'cancelled' && (p.contactMethod || 'Сайт') === 'Сайт' ? `<span class="pd-contact-note">Исполнитель сможет написать вам здесь. Ответить можно в мессенджере сайта.</span>` : ''}${isClient&&Number(p.budget)>0&&p.payment_status!=='paid'&&p.payment_status!=='pending'&&p.payment_status!=='refund_required'&&p.payment_status!=='refunded'?`<button class="btn" onclick="payProject(${p.id})"><i class="fas fa-credit-card"></i> Оплатить заказ</button>`:''}${isAdmin&&p.payment_status==='refund_required'?`<button class="btn btn-outline" onclick="adminRefundProject(${p.id})">Зафиксировать возврат</button>`:''}</div>
         ${canChangeStatus ? `<div class="section-divider"><span>Изменить статус</span></div><div class="pd-actions" style="flex-wrap:wrap">${statuses.filter(s => s !== p.status).map(s => `<button class="project-act-btn" onclick="changeStatus(${p.id}, '${s}')">${STATUS_LABELS[s]}</button>`).join('')}</div>` : ''}
     `;
 }
