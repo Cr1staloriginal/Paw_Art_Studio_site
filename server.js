@@ -1758,11 +1758,11 @@ app.get('/api/projects/:id/deliveries',auth,(req,res)=>{
   const id=Number(req.params.id),p=db.prepare('SELECT * FROM projects WHERE id=?').get(id);
   if(!p)return res.status(404).json({error:'Заказ не найден'});
   if(!deliveryAccess(p,req.user))return res.status(403).json({error:'Нет доступа'});
-  const rows=db.prepare(\`SELECT d.id,d.version,d.note,d.created_at AS createdAt,d.uploaded_by AS uploadedBy,u.name AS uploaderName,
+  const rows=db.prepare(`SELECT d.id,d.version,d.note,d.created_at AS createdAt,d.uploaded_by AS uploadedBy,u.name AS uploaderName,
     f.id AS fileId,f.original_name AS originalName,f.mime_type AS mimeType,f.size
     FROM project_deliveries d JOIN users u ON u.id=d.uploaded_by
     LEFT JOIN project_delivery_files f ON f.delivery_id=d.id
-    WHERE d.project_id=? ORDER BY d.version DESC,f.id ASC\`).all(id);
+    WHERE d.project_id=? ORDER BY d.version DESC,f.id ASC`).all(id);
   const map=new Map();
   for(const r of rows){if(!map.has(r.id))map.set(r.id,{id:r.id,version:r.version,note:r.note,createdAt:r.createdAt,uploadedBy:r.uploadedBy,uploaderName:r.uploaderName,files:[]});
     if(r.fileId)map.get(r.id).files.push({id:r.fileId,name:r.originalName,mimeType:r.mimeType,size:r.size});}
