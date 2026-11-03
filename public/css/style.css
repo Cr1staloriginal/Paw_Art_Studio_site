@@ -647,3 +647,29 @@ textarea.content-input { min-height: 70px; resize: vertical; }
 .agreement-consent{display:flex;align-items:flex-start;gap:10px;margin:14px 0 18px;font-size:.88rem;line-height:1.55;color:var(--text-soft,var(--text));cursor:pointer}
 .agreement-consent input{flex:0 0 auto;width:17px;height:17px;margin:3px 0 0;accent-color:var(--accent,#ec4899);cursor:pointer}
 .agreement-consent a{color:var(--accent,#ec4899);text-decoration:underline;text-underline-offset:3px}
+
+/* Enforce the circular site identity image in every browser. */
+header .nav a.logo > img.logo-avatar {
+    display: block !important;
+    width: 42px !important;
+    height: 42px !important;
+    min-width: 42px;
+    min-height: 42px;
+    max-width: 42px !important;
+    max-height: 42px !important;
+    aspect-ratio: 1 / 1;
+    object-fit: cover;
+    border-radius: 50% !important;
+    clip-path: circle(50% at 50% 50%);
+    overflow: hidden;
+}
+@media (max-width: 360px) {
+    header .nav a.logo > img.logo-avatar {
+        width: 36px !important;
+        height: 36px !important;
+        min-width: 36px;
+        min-height: 36px;
+        max-width: 36px !important;
+        max-height: 36px !important;
+    }
+}
