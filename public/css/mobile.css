@@ -245,3 +245,75 @@ pre, code { overflow-wrap: anywhere; }
     gap: 9px;
   }
 }
+
+
+/* Mobile performance and layout refinement (2026-11-04). */
+@media (max-width: 768px) {
+  /* Large blurred animated orbs are costly to repaint while scrolling on phones. */
+  .hero-bg .orb {
+    filter: none !important;
+    animation: none !important;
+    opacity: .16;
+    transform: none !important;
+  }
+  header {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+    background: rgba(13, 8, 16, .97);
+  }
+  .modal, .lightbox {
+    -webkit-backdrop-filter: none;
+    backdrop-filter: none;
+  }
+  .service-card, .pricing-card {
+    transition: border-color .2s ease, opacity .25s ease;
+    transform: none;
+  }
+  .service-card:hover, .pricing-card:hover,
+  .project-card:hover, .portfolio-item:hover {
+    transform: none;
+    box-shadow: none;
+  }
+  .hero-gallery, .paw-mascot-card {
+    contain: layout paint;
+  }
+  .paw-mascot-image {
+    height: auto;
+    max-height: 360px;
+    object-fit: contain;
+  }
+}
+@media (min-width: 390px) and (max-width: 768px) {
+  .services-grid, .paw-services-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 12px;
+  }
+  .service-card, .paw-service-card {
+    padding: 16px 13px;
+  }
+  .service-card h3, .paw-service-card h3 { font-size: 1rem; }
+  .service-card p, .paw-service-card p { font-size: .84rem; line-height: 1.5; }
+  .service-card .price, .paw-service-card .price { font-size: .9rem; }
+  .package-offers-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px; }
+}
+@media (max-width: 389px) {
+  .services-grid, .paw-services-grid, .package-offers-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .hero-actions { flex-direction: column; align-items: stretch; }
+  .hero-actions .btn { width: 100%; }
+  .projects-filters, .port-filters {
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    overscroll-behavior-x: contain;
+    padding: 2px 0 8px;
+    scrollbar-width: none;
+  }
+  .projects-filters::-webkit-scrollbar, .port-filters::-webkit-scrollbar { display: none; }
+  .projects-filters > *, .port-filters > * { flex: 0 0 auto; }
+  .dash-tabs { position: sticky; top: 0; z-index: 2; background: var(--bg-card); }
+  .paw-inquiry-bar { box-shadow: 0 8px 28px rgba(0,0,0,.28); }
+}
