@@ -295,11 +295,11 @@ function updateUI() {
     const u = state.user;
     const loginBtn = document.getElementById('loginBtn'), userBox = document.getElementById('userBox');
     const adminBtn = document.getElementById('adminBtn'), adminMenuLink = document.getElementById('adminMenuLink');
-    const msgrFab = document.getElementById('msgrFab'), createProjectBtn = document.getElementById('createProjectBtn');
+    const createProjectBtn = document.getElementById('createProjectBtn');
     const contentLink = document.getElementById('contentMenuLink');
 
     if (u) {
-        loginBtn.classList.add('hidden'); userBox.classList.remove('hidden'); msgrFab.classList.remove('hidden');
+        loginBtn.classList.add('hidden'); userBox.classList.remove('hidden');
         document.getElementById('userName').textContent = u.name;
         document.getElementById('userRole').textContent = ROLE_LABELS[u.role] || u.role;
         document.getElementById('balanceChip').textContent = formatMoney(u.balance);
@@ -357,7 +357,7 @@ function updateUI() {
         }
     } else {
         loginBtn.classList.remove('hidden'); userBox.classList.add('hidden');
-        adminBtn.classList.add('hidden'); adminMenuLink.classList.add('hidden'); msgrFab.classList.add('hidden');
+        adminBtn.classList.add('hidden'); adminMenuLink.classList.add('hidden');
         if (contentLink) contentLink.classList.add('hidden');
         const editorAdminButton = document.getElementById('contentEditorAdminButton');
         if (editorAdminButton) editorAdminButton.classList.add('hidden');
@@ -966,6 +966,14 @@ function renderProjects() {
 function filterProjects(status) { state.projectFilter = status; document.querySelectorAll('#projectFilters .filter').forEach(b => b.classList.toggle('active', b.dataset.status === status)); renderProjects(); }
 function openProjectCreator() { if (!state.user) return openAuth(); if (state.user.role === 'executor') return showToast('⚠️ Исполнители не создают заказы', 'error'); document.getElementById('projectModal').classList.add('open'); document.body.style.overflow = 'hidden'; }
 function closeProjectCreator() { document.getElementById('projectModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
+function updateProjectContactDetail() {
+    const method = document.getElementById('projContactMethod')?.value || 'Сайт';
+    const wrap = document.getElementById('projContactDetailWrap');
+    const input = document.getElementById('projContactDetail');
+    const needsExternalContact = method !== 'Сайт';
+    wrap?.classList.toggle('hidden', !needsExternalContact);
+    if (input) { input.required = needsExternalContact; if (!needsExternalContact) input.value = ''; }
+}
 async function handleProjectCreate(e) {
     e.preventDefault();
     const title = document.getElementById('projTitle').value.trim();
@@ -973,8 +981,10 @@ async function handleProjectCreate(e) {
     const category = document.getElementById('projCategory').value;
     const budget = Number(document.getElementById('projBudget')?.value || 0);
     const promoCode = document.getElementById('projPromoCode')?.value.trim().toUpperCase() || '';
+    const contactMethod = document.getElementById('projContactMethod')?.value || 'Сайт';
+    const contactDetail = document.getElementById('projContactDetail')?.value.trim() || '';
     const btn = e.target.querySelector('button[type="submit"]'); btn.disabled = true;
-    try { const result = await api('/api/projects', { method: 'POST', body: { title, description, category, budget, promoCode } }); closeProjectCreator(); e.target.reset(); await loadProjects(); showToast('✅ Заказ создан'); }
+    try { const result = await api('/api/projects', { method: 'POST', body: { title, description, category, budget, promoCode, contactMethod, contactDetail } }); closeProjectCreator(); e.target.reset(); await loadProjects(); showToast('✅ Заказ создан'); }
     catch (err) { showToast('❌ ' + err.message, 'error'); }
     finally { btn.disabled = false; }
 }
@@ -1010,8 +1020,10 @@ function renderProjectDetail(p) {
         ${Number(p.discount_percent)>0?`<div class="pd-row"><span class="pd-label">Промокод</span><span class="pd-value">${escapeHtml(p.promo_code)} · скидка ${Number(p.discount_percent)}%</span></div><div class="pd-row"><span class="pd-label">До скидки</span><span class="pd-value">${formatMoney(p.base_budget||p.budget)}</span></div>`:''}
         ${p.payment_status==='paid'?'<div class="pd-row"><span class="pd-label">Оплата</span><span class="pd-value">Оплачен</span></div>':p.payment_status==='refund_required'?'<div class="pd-row"><span class="pd-label">Оплата</span><span class="pd-value">Требуется возврат</span></div>':p.payment_status==='pending'?'<div class="pd-row"><span class="pd-label">Оплата</span><span class="pd-value">Ожидает подтверждения ЮKassa</span></div>':''}
         ${p.executor ? `<div class="pd-row"><span class="pd-label">Исполнитель</span><span class="pd-value">${escapeHtml(p.executor.name)}</span></div>` : ''}
+        ${p.contactMethod && p.contactMethod !== 'Сайт' ? `<div class="pd-row"><span class="pd-label">Способ связи</span><span class="pd-value">${escapeHtml(p.contactMethod)}${p.contactDetail ? ': ' + escapeHtml(p.contactDetail) : ''}</span></div>` : `<div class="pd-row"><span class="pd-label">Связь</span><span class="pd-value">Через мессенджер сайта</span></div>`}
         <div class="pd-desc">${escapeHtml(p.description)}</div>
-        <div class="pd-actions">${p.executor ? `<button class="btn btn-outline" onclick="openChatWith(${p.executor.id})"><i class="fas fa-comments"></i> Написать</button>` : ''}${isClient&&Number(p.budget)>0&&p.payment_status!=='paid'&&p.payment_status!=='pending'&&p.payment_status!=='refund_required'&&p.payment_status!=='refunded'?`<button class="btn" onclick="payProject(${p.id})"><i class="fas fa-credit-card"></i> Оплатить заказ</button>`:''}${isAdmin&&p.payment_status==='refund_required'?`<button class="btn btn-outline" onclick="adminRefundProject(${p.id})">Зафиксировать возврат</button>`:''}</div>
+        <div class="pd-actions">${isExecutor && Number(p.executor?.id ?? p.executor_id) === Number(state.user?.id) && (p.contactMethod || 'Сайт') === 'Сайт' ? `<button class="btn btn-outline" onclick="openChatWith(${p.clientId ?? p.client_id}, ${p.id})"><i class="fas fa-comments"></i> Написать заказчику</button>` : ''}
+        ${isClient && p.executor && (p.contactMethod || 'Сайт') === 'Сайт' ? `<span class="pd-contact-note">Исполнитель сможет написать вам здесь. Ответить можно в мессенджере сайта.</span>` : ''}${isClient&&Number(p.budget)>0&&p.payment_status!=='paid'&&p.payment_status!=='pending'&&p.payment_status!=='refund_required'&&p.payment_status!=='refunded'?`<button class="btn" onclick="payProject(${p.id})"><i class="fas fa-credit-card"></i> Оплатить заказ</button>`:''}${isAdmin&&p.payment_status==='refund_required'?`<button class="btn btn-outline" onclick="adminRefundProject(${p.id})">Зафиксировать возврат</button>`:''}</div>
         ${canChangeStatus ? `<div class="section-divider"><span>Изменить статус</span></div><div class="pd-actions" style="flex-wrap:wrap">${statuses.filter(s => s !== p.status).map(s => `<button class="project-act-btn" onclick="changeStatus(${p.id}, '${s}')">${STATUS_LABELS[s]}</button>`).join('')}</div>` : ''}
     `;
 }
@@ -1327,22 +1339,24 @@ function connectSocket() {
     state.socket.on('presence', ({ userId, online }) => { if (online) state.onlineUsers.add(userId); else state.onlineUsers.delete(userId); renderChatList(); });
     state.socket.on('chat:typing', ({ name }) => { const el = document.getElementById('chatHeadRole'); if (el) { const orig = el.dataset.orig || el.textContent; el.dataset.orig = orig; el.textContent = `${name} печатает...`; clearTimeout(el._t); el._t = setTimeout(() => { el.textContent = orig; }, 2000); } });
 }
-function incrementUnreadBadge() { const b1 = document.getElementById('chatBadge'), b2 = document.getElementById('msgrBadge'); const cur = parseInt(b1.textContent || '0', 10) || 0; const next = cur + 1; [b1, b2].forEach(b => { if (b) { b.textContent = next; b.classList.remove('hidden'); } }); }
+function incrementUnreadBadge() { const badge = document.getElementById('chatBadge'); if (!badge) return; const cur = parseInt(badge.textContent || '0', 10) || 0; badge.textContent = cur + 1; badge.classList.remove('hidden'); }
 
 /* MESSENGER */
 function openMessenger() { if (!state.user) return openAuth(); document.getElementById('messenger').classList.add('open'); document.body.style.overflow = 'hidden'; document.getElementById('userMenu').classList.add('hidden'); loadChats(); closeChat(); }
 function closeMessenger() { document.getElementById('messenger').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; if (state.currentChatId) state.socket?.emit('chat:leave', { chatId: state.currentChatId }); closeChat(); }
 async function loadChats() { if (!state.user) return; try { const { chats } = await api('/api/chats'); state.chats = chats; renderChatList(); updateTotalUnread(); } catch {} }
-function updateTotalUnread() { const total = state.chats.reduce((s, c) => s + c.unread, 0); const b1 = document.getElementById('chatBadge'), b2 = document.getElementById('msgrBadge'); if (total > 0) [b1, b2].forEach(b => { if (b) { b.textContent = total > 99 ? '99+' : total; b.classList.remove('hidden'); } }); else [b1, b2].forEach(b => { if (b) b.classList.add('hidden'); }); }
+function updateTotalUnread() { const total = state.chats.reduce((s, c) => s + c.unread, 0); const badge = document.getElementById('chatBadge'); if (!badge) return; if (total > 0) { badge.textContent = total > 99 ? '99+' : total; badge.classList.remove('hidden'); } else badge.classList.add('hidden'); }
 function renderChatList() {
     const list = document.getElementById('chatList'); if (!list) return;
     if (!state.chats.length) { list.innerHTML = `<div class="empty-state small"><i class="fas fa-comments"></i><p>Нет чатов</p></div>`; return; }
     list.innerHTML = state.chats.map(c => { const peer = c.peer; const preview = c.lastMessage?.text || 'Нет сообщений'; const time = c.lastMessage ? formatTime(c.lastMessage.createdAt) : ''; const unread = c.unread > 0 ? `<span class="chat-unread">${c.unread}</span>` : ''; const online = state.onlineUsers.has(peer.id) ? `<span class="chat-online"></span>` : ''; return `<div class="chat-row" onclick="openChatWith(${peer.id})"><div class="chat-avatar">${userAvatarHtml(peer)}${online}</div><div class="chat-info"><div class="chat-name">${escapeHtml(peer.name)}</div><div class="chat-preview">${escapeHtml(preview)}</div></div><div class="chat-meta"><div class="chat-time">${time}</div>${unread}</div></div>`; }).join('');
 }
-async function openChatWith(peerId) {
+async function openChatWith(peerId, projectId = null) {
     if (!state.user) return openAuth();
     try {
-        const { chatId } = await api('/api/chats', { method: 'POST', body: { peerId } });
+        const chatBody = { peerId };
+        if (projectId) chatBody.projectId = projectId;
+        const { chatId } = await api('/api/chats', { method: 'POST', body: chatBody });
         state.currentChatId = chatId;
         const chat = state.chats.find(c => c.id === chatId);
         if (chat) state.chatPeer = chat.peer;
