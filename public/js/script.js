@@ -1348,7 +1348,7 @@ async function loadChats() { if (!state.user) return; try { const { chats } = aw
 function updateTotalUnread() { const total = state.chats.reduce((s, c) => s + c.unread, 0); const badge = document.getElementById('chatBadge'); if (!badge) return; if (total > 0) { badge.textContent = total > 99 ? '99+' : total; badge.classList.remove('hidden'); } else badge.classList.add('hidden'); }
 function renderChatList() {
     const list = document.getElementById('chatList'); if (!list) return;
-    if (!state.chats.length) { list.innerHTML = `<div class="empty-state small"><i class="fas fa-comments"></i><p>Нет чатов</p></div>`; return; }
+    if (!state.chats.length) { const emptyText = state.user?.role === 'client' ? 'Здесь появится переписка, когда исполнитель напишет вам по заказу.' : 'Здесь появятся чаты по вашим заказам.'; list.innerHTML = `<div class="empty-state small"><i class="fas fa-comments"></i><p>${emptyText}</p></div>`; return; }
     list.innerHTML = state.chats.map(c => { const peer = c.peer; const preview = c.lastMessage?.text || 'Нет сообщений'; const time = c.lastMessage ? formatTime(c.lastMessage.createdAt) : ''; const unread = c.unread > 0 ? `<span class="chat-unread">${c.unread}</span>` : ''; const online = state.onlineUsers.has(peer.id) ? `<span class="chat-online"></span>` : ''; return `<div class="chat-row" onclick="openChatWith(${peer.id})"><div class="chat-avatar">${userAvatarHtml(peer)}${online}</div><div class="chat-info"><div class="chat-name">${escapeHtml(peer.name)}</div><div class="chat-preview">${escapeHtml(preview)}</div></div><div class="chat-meta"><div class="chat-time">${time}</div>${unread}</div></div>`; }).join('');
 }
 async function openChatWith(peerId, projectId = null) {
