@@ -192,3 +192,56 @@ pre, code { overflow-wrap: anywhere; }
   html { scroll-behavior: auto; }
   *, *::before, *::after { scroll-behavior: auto !important; }
 }
+
+/* Registration agreement: keep the consent row inside the mobile auth dialog. */
+.auth-form,
+.auth-form .agreement-consent {
+  box-sizing: border-box;
+  width: 100%;
+  max-width: 100%;
+  min-width: 0;
+}
+.auth-form .agreement-consent {
+  display: flex;
+  flex-direction: row;
+  align-items: flex-start;
+  gap: 10px;
+  white-space: normal;
+  overflow-wrap: anywhere;
+}
+.auth-form .agreement-consent > input[type="checkbox"] {
+  appearance: auto;
+  -webkit-appearance: checkbox;
+  display: block;
+  flex: 0 0 18px;
+  width: 18px !important;
+  min-width: 18px;
+  max-width: 18px;
+  height: 18px;
+  min-height: 18px;
+  margin: 3px 0 0;
+  padding: 0 !important;
+  border: initial;
+  border-radius: 3px;
+  box-shadow: none;
+}
+.auth-form .agreement-consent > span {
+  display: block;
+  flex: 1 1 0%;
+  min-width: 0;
+  max-width: 100%;
+  overflow-wrap: anywhere;
+  word-break: normal;
+  line-height: 1.55;
+}
+.auth-form .agreement-consent a {
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+@media (max-width: 600px) {
+  .modal-box .auth-form .agreement-consent {
+    margin: 12px 0 16px;
+    font-size: .82rem;
+    gap: 9px;
+  }
+}
