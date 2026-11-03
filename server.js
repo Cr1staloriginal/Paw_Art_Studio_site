@@ -2060,9 +2060,10 @@ app.post('/api/chats', auth, (req, res) => {
         const project=db.prepare("SELECT id,client_id,executor_id,contact_method,status FROM projects WHERE id=?").get(projectId);
         if(!project || Number(project.executor_id)!==uid || Number(project.client_id)!==peerId || project.contact_method!=='Сайт' || project.status==='cancelled')
           return res.status(403).json({ error: 'Написать можно только заказчику принятого заказа, выбравшему связь через сайт' });
-        if(chat && chat.project_id && Number(chat.project_id)!==projectId) {
-          const linked=getAllowedProjectChat(chat.id);
-          if(!canUseProjectChat(linked,uid)) return res.status(403).json({error:'Нет доступа к этой переписке'});
+        if(chat && Number(chat.project_id)!==projectId) {
+          // One conversation per customer/executor pair; relink it to their current eligible order.
+          db.prepare('UPDATE chats SET project_id=? WHERE id=?').run(projectId,chat.id);
+          chat.project_id=projectId;
         }
         if (!chat) {
           const info=db.prepare('INSERT INTO chats (user_a,user_b,project_id,created_at) VALUES (?,?,?,?)').run(userA,userB,projectId,Date.now());
