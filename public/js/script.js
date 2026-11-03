@@ -1356,11 +1356,10 @@ async function openChatWith(peerId, projectId = null) {
     try {
         const chatBody = { peerId };
         if (projectId) chatBody.projectId = projectId;
-        const { chatId } = await api('/api/chats', { method: 'POST', body: chatBody });
+        const { chatId, peer } = await api('/api/chats', { method: 'POST', body: chatBody });
         state.currentChatId = chatId;
         const chat = state.chats.find(c => c.id === chatId);
-        if (chat) state.chatPeer = chat.peer;
-        else { const usersRes = await api('/api/users/list'); state.chatPeer = usersRes.users.find(u => u.id === peerId); }
+        state.chatPeer = chat?.peer || peer || null;
         const { messages } = await api(`/api/chats/${chatId}/messages`);
         state.chatMessages[chatId] = messages;
         document.getElementById('chatList').classList.add('hidden');
