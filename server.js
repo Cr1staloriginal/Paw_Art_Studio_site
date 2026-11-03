@@ -26,13 +26,14 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
 const AVATAR_DIR = path.join(UPLOAD_DIR, 'avatars');
 const PORTFOLIO_DIR = path.join(UPLOAD_DIR, 'portfolio');
 const CONTENT_DIR = path.join(UPLOAD_DIR, 'content');
+const DELIVERY_DIR = path.join(UPLOAD_DIR, 'deliveries');
 const SITE_URL = process.env.SITE_URL || 'https://pawartstudio.store';
 
 [DATABASE_PATH].forEach(p => {
   const dir = path.dirname(p);
   if (!fs.existsSync(dir)) fs.mkdirSync(dir, { recursive: true });
 });
-[UPLOAD_DIR, AVATAR_DIR, PORTFOLIO_DIR, CONTENT_DIR].forEach(d => {
+[UPLOAD_DIR, AVATAR_DIR, PORTFOLIO_DIR, CONTENT_DIR, DELIVERY_DIR].forEach(d => {
   if (!fs.existsSync(d)) fs.mkdirSync(d, { recursive: true });
 });
 
@@ -88,6 +89,22 @@ const contentUpload = multer({
   limits: { fileSize: 5 * 1024 * 1024 },
   fileFilter: (req, file, cb) => cb(null, /^image\/(png|jpe?g|gif|webp)$/i.test(file.mimetype)),
 });
+
+const deliveryStorage = multer.diskStorage({
+  destination: (req, file, cb) => cb(null, DELIVERY_DIR),
+  filename: (req, file, cb) => cb(null, 'delivery_' + Date.now() + '_' + crypto.randomBytes(8).toString('hex') + path.extname(file.originalname).toLowerCase().slice(0,12)),
+});
+const deliveryUpload = multer({
+  storage: deliveryStorage, limits: { fileSize: 50 * 1024 * 1024, files: 10 },
+  fileFilter: (req, file, cb) => {
+    const ext = path.extname(file.originalname).toLowerCase();
+    const exts = new Set(['.png','.jpg','.jpeg','.gif','.webp','.avif','.zip','.7z','.rar','.pdf','.psd','.txt','.clip','.kra','.blend','.mp4','.mov','.webm']);
+    const types = new Set(['image/png','image/jpeg','image/gif','image/webp','image/avif','application/zip','application/x-zip-compressed','application/x-7z-compressed','application/x-rar-compressed','application/vnd.rar','application/pdf','application/octet-stream','text/plain','application/vnd.adobe.photoshop','application/x-photoshop','video/mp4','video/quicktime','video/webm']);
+    if (exts.has(ext) || types.has(file.mimetype)) return cb(null,true);
+    cb(new Error('Этот тип файла не поддерживается'));
+  }
+});
+
 
 // --- БД ---
 const db = new Database(DATABASE_PATH);
@@ -317,6 +334,21 @@ safeAddColumn('projects', 'contact_method', "TEXT NOT NULL DEFAULT 'Не ука�
 safeAddColumn('projects', 'contact_detail', 'TEXT');
 safeAddColumn('chats', 'project_id', 'INTEGER');
 safeAddColumn('projects', 'payment_status', "TEXT NOT NULL DEFAULT 'unpaid'");
+db.exec(`
+  CREATE TABLE IF NOT EXISTS project_deliveries (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, project_id INTEGER NOT NULL, version INTEGER NOT NULL,
+    uploaded_by INTEGER NOT NULL, note TEXT NOT NULL DEFAULT '', created_at INTEGER NOT NULL,
+    FOREIGN KEY(project_id) REFERENCES projects(id) ON DELETE CASCADE,
+    FOREIGN KEY(uploaded_by) REFERENCES users(id) ON DELETE CASCADE
+  );
+  CREATE TABLE IF NOT EXISTS project_delivery_files (
+    id INTEGER PRIMARY KEY AUTOINCREMENT, delivery_id INTEGER NOT NULL, stored_name TEXT NOT NULL UNIQUE,
+    original_name TEXT NOT NULL, mime_type TEXT NOT NULL, size INTEGER NOT NULL,
+    FOREIGN KEY(delivery_id) REFERENCES project_deliveries(id) ON DELETE CASCADE
+  );
+  CREATE INDEX IF NOT EXISTS idx_project_deliveries_project ON project_deliveries(project_id,version DESC);
+  CREATE INDEX IF NOT EXISTS idx_project_delivery_files_delivery ON project_delivery_files(delivery_id);
+`);
 safeAddColumn('partner_ledger', 'payment_verified_at', 'INTEGER');
 safeAddColumn('partner_ledger', 'payment_reference', 'TEXT');
 safeAddColumn('partner_ledger', 'paid_amount', 'INTEGER NOT NULL DEFAULT 0');
@@ -1715,6 +1747,79 @@ app.post('/api/projects/:id/accept', auth, (req, res) => {
     console.error('Ошибка принятия заказа:', err);
     return res.status(500).json({ error: 'Не удалось взять заказ' });
   }
+});
+
+
+function deliveryAccess(project,user) {
+  return ['admin','manager'].includes(user.role)||Number(user.is_root)===1||
+    Number(project.client_id)===Number(user.id)||Number(project.executor_id)===Number(user.id);
+}
+app.get('/api/projects/:id/deliveries',auth,(req,res)=>{
+  const id=Number(req.params.id),p=db.prepare('SELECT * FROM projects WHERE id=?').get(id);
+  if(!p)return res.status(404).json({error:'Заказ не найден'});
+  if(!deliveryAccess(p,req.user))return res.status(403).json({error:'Нет доступа'});
+  const rows=db.prepare(\`SELECT d.id,d.version,d.note,d.created_at AS createdAt,d.uploaded_by AS uploadedBy,u.name AS uploaderName,
+    f.id AS fileId,f.original_name AS originalName,f.mime_type AS mimeType,f.size
+    FROM project_deliveries d JOIN users u ON u.id=d.uploaded_by
+    LEFT JOIN project_delivery_files f ON f.delivery_id=d.id
+    WHERE d.project_id=? ORDER BY d.version DESC,f.id ASC\`).all(id);
+  const map=new Map();
+  for(const r of rows){if(!map.has(r.id))map.set(r.id,{id:r.id,version:r.version,note:r.note,createdAt:r.createdAt,uploadedBy:r.uploadedBy,uploaderName:r.uploaderName,files:[]});
+    if(r.fileId)map.get(r.id).files.push({id:r.fileId,name:r.originalName,mimeType:r.mimeType,size:r.size});}
+  res.json({deliveries:[...map.values()]});
+});
+app.post('/api/projects/:id/deliveries',auth,(req,res)=>{
+  const id=Number(req.params.id),p=db.prepare('SELECT * FROM projects WHERE id=?').get(id);
+  if(!p)return res.status(404).json({error:'Заказ не найден'});
+  const privileged=['admin','manager'].includes(req.user.role)||Number(req.user.is_root)===1;
+  if(!privileged&&(req.user.role!=='executor'||Number(p.executor_id)!==Number(req.user.id)))return res.status(403).json({error:'Только назначенный исполнитель может сдать работу'});
+  if(!['in_progress','review'].includes(p.status))return res.status(409).json({error:'Заказ не находится в работе'});
+  deliveryUpload.array('files',10)(req,res,err=>{
+    if(err){for(const f of req.files||[])if(f.path)fs.unlink(f.path,()=>{});return res.status(err.code==='LIMIT_FILE_SIZE'?413:400).json({error:err.code==='LIMIT_FILE_SIZE'?'Максимальный размер файла — 50 МБ':err.message||'Ошибка загрузки'});}
+    if(!req.files?.length)return res.status(400).json({error:'Прикрепите файлы результата'});
+    try{
+      const now=Date.now(),note=String(req.body?.note||'').trim().slice(0,2000);
+      const version=db.transaction(()=>{
+        const v=Number(db.prepare('SELECT COALESCE(MAX(version),0)+1 n FROM project_deliveries WHERE project_id=?').get(id).n);
+        const d=db.prepare('INSERT INTO project_deliveries(project_id,version,uploaded_by,note,created_at) VALUES(?,?,?,?,?)').run(id,v,req.user.id,note,now);
+        const add=db.prepare('INSERT INTO project_delivery_files(delivery_id,stored_name,original_name,mime_type,size) VALUES(?,?,?,?,?)');
+        for(const f of req.files)add.run(Number(d.lastInsertRowid),path.basename(f.filename),String(f.originalname).slice(0,255),f.mimetype||'application/octet-stream',f.size);
+        db.prepare("UPDATE projects SET status='review',updated_at=? WHERE id=?").run(now,id);return v;
+      })();
+      io.emit('project:delivery',{projectId:id,version});res.status(201).json({ok:true,version});
+    }catch(e){for(const f of req.files)if(f.path)fs.unlink(f.path,()=>{});console.error('[delivery]',e);res.status(500).json({error:'Не удалось сохранить результат'});}
+  });
+});
+app.get('/api/projects/:id/deliveries/files/:fileId',auth,(req,res)=>{
+  const id=Number(req.params.id),fid=Number(req.params.fileId),p=db.prepare('SELECT * FROM projects WHERE id=?').get(id);
+  if(!p)return res.status(404).json({error:'Заказ не найден'});
+  if(!deliveryAccess(p,req.user))return res.status(403).json({error:'Нет доступа'});
+  const f=db.prepare('SELECT f.* FROM project_delivery_files f JOIN project_deliveries d ON d.id=f.delivery_id WHERE f.id=? AND d.project_id=?').get(fid,id);
+  if(!f)return res.status(404).json({error:'Файл не найден'});
+  const full=path.join(DELIVERY_DIR,path.basename(f.stored_name));if(!fs.existsSync(full))return res.status(410).json({error:'Файл недоступен'});
+  const name=String(f.original_name).replace(/[\r\n"]/g,'_');
+  res.setHeader('Content-Type',f.mime_type||'application/octet-stream');
+  res.setHeader('Content-Disposition',"attachment; filename*=UTF-8''"+encodeURIComponent(name));
+  res.setHeader('Content-Length',f.size);fs.createReadStream(full).pipe(res);
+});
+app.post('/api/projects/:id/deliveries/accept',auth,(req,res)=>{
+  const id=Number(req.params.id),p=db.prepare('SELECT * FROM projects WHERE id=?').get(id);
+  if(!p)return res.status(404).json({error:'Заказ не найден'});
+  if(Number(p.client_id)!==Number(req.user.id))return res.status(403).json({error:'Только заказчик может принять работу'});
+  if(p.status!=='review'||!db.prepare('SELECT id FROM project_deliveries WHERE project_id=?').get(id))return res.status(409).json({error:'Нет результата на проверке'});
+  const now=Date.now();db.transaction(()=>{db.prepare("UPDATE projects SET status='completed',updated_at=? WHERE id=?").run(now,id);ensurePartnerLedgerForCompletedProject(id,now);})();
+  io.emit('project:delivery-accepted',{projectId:id});res.json({ok:true,status:'completed'});
+});
+app.post('/api/projects/:id/deliveries/revision',auth,(req,res)=>{
+  const id=Number(req.params.id),p=db.prepare('SELECT * FROM projects WHERE id=?').get(id);
+  if(!p)return res.status(404).json({error:'Заказ не найден'});
+  if(Number(p.client_id)!==Number(req.user.id))return res.status(403).json({error:'Только заказчик может запросить исправления'});
+  if(p.status!=='review')return res.status(409).json({error:'Заказ не ожидает проверки'});
+  const note=String(req.body?.note||'').trim().slice(0,2000);if(!note)return res.status(400).json({error:'Опишите необходимые исправления'});
+  db.prepare("UPDATE projects SET status='in_progress',updated_at=? WHERE id=?").run(Date.now(),id);
+  const chat=db.prepare('SELECT id FROM chats WHERE project_id=?').get(id);
+  if(chat){const now=Date.now(),message='Запрошены исправления: '+note,info=db.prepare('INSERT INTO messages(chat_id,sender_id,text,created_at) VALUES(?,?,?,?)').run(chat.id,req.user.id,message,now);io.to('chat:'+chat.id).emit('chat:new',{id:Number(info.lastInsertRowid),chatId:chat.id,senderId:req.user.id,text:message,createdAt:now,readAt:null});}
+  io.emit('project:revision-requested',{projectId:id});res.json({ok:true,status:'in_progress'});
 });
 
 app.post('/api/projects/:id/status', auth, (req, res) => {
