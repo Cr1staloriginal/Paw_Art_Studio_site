@@ -317,3 +317,178 @@ pre, code { overflow-wrap: anywhere; }
   .dash-tabs { position: sticky; top: 0; z-index: 2; background: var(--bg-card); }
   .paw-inquiry-bar { box-shadow: 0 8px 28px rgba(0,0,0,.28); }
 }
+
+/* Compact mobile layouts: prevent action controls from escaping cards/modals. */
+@media (max-width: 768px) {
+  .request-actions,
+  .admin-user-actions,
+  .project-actions,
+  .pd-actions,
+  .balance-actions,
+  .content-editor-actions {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: stretch;
+    min-width: 0;
+    gap: 8px;
+  }
+
+  .request-actions > *,
+  .admin-user-actions > *,
+  .project-actions > *,
+  .pd-actions > *,
+  .balance-actions > *,
+  .content-editor-actions > * {
+    flex: 1 1 145px;
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .admin-act-btn,
+  .project-act-btn {
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+    overflow-wrap: anywhere;
+    line-height: 1.3;
+    text-align: center;
+  }
+
+  .request-card,
+  .withdrawal-card,
+  .project-card,
+  .portfolio-box,
+  .admin-panel {
+    min-width: 0;
+    max-width: 100%;
+  }
+
+  .request-head,
+  .withdrawal-head,
+  .project-head {
+    min-width: 0;
+    flex-wrap: wrap;
+  }
+
+  .request-info,
+  .project-title,
+  .project-client {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+
+  .port-filters,
+  .projects-filters {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 7px;
+    min-width: 0;
+  }
+
+  .port-filters .filter,
+  .projects-filters .filter {
+    flex: 1 1 auto;
+    min-width: 0;
+    max-width: 100%;
+    white-space: normal;
+  }
+
+  .my-portfolio-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+    gap: 8px;
+  }
+
+  .my-portfolio-item {
+    min-width: 0;
+  }
+
+  .my-portfolio-delete {
+    width: 34px;
+    height: 34px;
+    top: 5px;
+    right: 5px;
+  }
+}
+
+@media (max-width: 600px) {
+  /* Keep portfolio dense on phones instead of forcing a single tall column. */
+  .portfolio-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 9px;
+  }
+
+  .portfolio-info {
+    padding: 10px;
+  }
+
+  .portfolio-title {
+    font-size: .84rem;
+    line-height: 1.25;
+    overflow-wrap: anywhere;
+  }
+
+  .portfolio-author {
+    font-size: .7rem;
+    flex-wrap: wrap;
+    overflow-wrap: anywhere;
+  }
+
+  .request-actions > *,
+  .admin-user-actions > *,
+  .project-actions > *,
+  .pd-actions > *,
+  .balance-actions > * {
+    flex: 1 1 100%;
+    width: 100%;
+  }
+
+  .admin-tabs {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 6px;
+  }
+
+  .admin-tab {
+    min-width: 0;
+    width: 100%;
+    white-space: normal;
+    line-height: 1.25;
+    justify-content: center;
+  }
+
+  .dash-head,
+  .user-modal-head {
+    gap: 10px;
+    flex-wrap: wrap;
+  }
+
+  .dash-head > :last-child {
+    min-width: 0;
+  }
+
+  .upload-zone {
+    padding: 20px 14px;
+  }
+}
+
+@media (max-width: 380px) {
+  .portfolio-gallery {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+
+  .my-portfolio-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+
+  .admin-act-btn,
+  .project-act-btn {
+    padding: 8px 9px;
+    font-size: .72rem;
+  }
+
+  .request-card,
+  .withdrawal-card {
+    padding: 12px;
+  }
+}
+
