@@ -322,6 +322,10 @@ function updateUI() {
         else if (u.role === 'admin') { pendingBlock.classList.add('hidden'); requestBlock.classList.add('hidden'); }
         else { pendingBlock.classList.add('hidden'); requestBlock.classList.remove('hidden'); }
 
+        // Не предлагаем пользователю повторно запрашивать уже назначенную ему роль.
+        document.getElementById('requestExecutorRoleBtn')?.classList.toggle('hidden', u.role === 'executor' || u.role === 'admin');
+        document.getElementById('requestManagerRoleBtn')?.classList.toggle('hidden', u.role === 'manager' || u.role === 'admin');
+
         const canEditSite = u.role === 'admin' || u.role === 'manager';
         if (u.role === 'admin') {
             adminBtn.classList.remove('hidden'); adminMenuLink.classList.remove('hidden');
@@ -360,6 +364,8 @@ function updateUI() {
         document.getElementById('dashWithdrawalsTab')?.classList.add('hidden');
         document.getElementById('withdrawBtn')?.classList.add('hidden');
         document.getElementById('myPortfolioMenuLink')?.classList.add('hidden');
+        document.getElementById('requestExecutorRoleBtn')?.classList.add('hidden');
+        document.getElementById('requestManagerRoleBtn')?.classList.add('hidden');
     }
 }
 function toggleUserMenu() { document.getElementById('userMenu').classList.toggle('hidden'); }
