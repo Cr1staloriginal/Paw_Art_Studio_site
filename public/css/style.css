@@ -51,9 +51,10 @@ a { color: var(--accent-light); text-decoration: none; cursor: pointer; }
 header { padding: 14px 0; border-bottom: 1px solid transparent; position: sticky; top: 0; background: rgba(13, 8, 16, 0.78); backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px); z-index: 100; transition: border-color 0.3s, background 0.3s, box-shadow 0.3s; }
 header.scrolled { border-bottom-color: #1f1224; background: rgba(13, 8, 16, 0.95); box-shadow: 0 10px 30px rgba(0, 0, 0, 0.5); }
 .nav { display: flex; justify-content: space-between; align-items: center; gap: 16px; position: relative; }
-.logo { font-size: clamp(1.3rem, 2.5vw, 1.6rem); font-weight: 800; letter-spacing: -0.03em; color: #fff; cursor: pointer; user-select: none; line-height: 1; flex-shrink: 0; display: flex; align-items: center; gap: 6px; }
-.logo span { color: var(--accent); }
-.logo-paw { font-size: 1.2em; }
+.logo { font-size: clamp(1.15rem, 2.2vw, 1.45rem); font-weight: 800; letter-spacing: -0.035em; color: #fff; cursor: pointer; user-select: none; line-height: 1; flex-shrink: 0; display: flex; align-items: center; gap: 10px; text-decoration: none; }
+.logo-avatar { display: block; width: 42px; height: 42px; flex: 0 0 42px; object-fit: cover; border-radius: 50%; border: 1px solid rgba(255,255,255,.16); box-shadow: 0 3px 14px rgba(0,0,0,.28); }
+.logo-name { color: #fff; white-space: nowrap; }
+.logo .logo-accent { color: var(--accent); }
 .nav-links { display: flex; align-items: center; gap: clamp(14px, 1.8vw, 24px); font-weight: 600; }
 .nav-links a { color: var(--text-soft); transition: color 0.2s; font-size: 0.93rem; white-space: nowrap; }
 .nav-links a:hover { color: var(--accent-light); }
@@ -539,7 +540,8 @@ footer { border-top: 1px solid #1f1224; padding-top: clamp(36px, 5vw, 50px); bac
 }
 @media (max-width: 360px) {
     :root { --pad: 14px; }
-    .logo { font-size: 1.15rem; }
+    .logo { font-size: 1.08rem; gap: 8px; }
+    .logo-avatar { width: 36px; height: 36px; flex-basis: 36px; }
     .hero-eyebrow { font-size: 0.7rem; padding: 5px 12px; }
     .hero-badges span { font-size: 0.68rem; padding: 5px 10px; }
     .pricing-card .price-tag { font-size: 1.3rem; }
