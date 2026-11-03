@@ -1749,22 +1749,72 @@ document.querySelectorAll('#projectFilters .filter').forEach(btn => { btn.addEve
 document.querySelectorAll('.port-filters .filter').forEach(btn => { btn.addEventListener('click', () => { state.portfolioFilter = btn.dataset.filter; document.querySelectorAll('.port-filters .filter').forEach(b => b.classList.toggle('active', b === btn)); renderAllPortfolio(); }); });
 document.querySelectorAll('.service-card').forEach(card => { card.addEventListener('click', () => selectService(card.dataset.service, card.dataset.price)); });
 
-/* SCROLL */
-function animateOnScroll() { const els = document.querySelectorAll('.service-card, .pricing-card'); const trigger = window.innerHeight - 100; els.forEach((el, i) => { if (el.classList.contains('visible')) return; if (el.getBoundingClientRect().top < trigger) setTimeout(() => el.classList.add('visible'), i * 60); }); }
-function animateCounter(el, target, suffix = '', duration = 1500) { const st = performance.now(); function u(now) { const p = Math.min((now - st) / duration, 1); const e = 1 - Math.pow(1 - p, 3); el.textContent = Math.floor(target * e); if (p < 1) requestAnimationFrame(u); else el.textContent = target + suffix; } requestAnimationFrame(u); }
+/* SCROLL — observer-based reveal avoids scanning every card on every scroll frame. */
+function animateCounter(el, target, suffix = '', duration = 1500) {
+    if (window.matchMedia('(prefers-reduced-motion: reduce)').matches) {
+        el.textContent = target + suffix;
+        return;
+    }
+    const st = performance.now();
+    function u(now) {
+        const p = Math.min((now - st) / duration, 1);
+        const e = 1 - Math.pow(1 - p, 3);
+        el.textContent = Math.floor(target * e);
+        if (p < 1) requestAnimationFrame(u);
+        else el.textContent = target + suffix;
+    }
+    requestAnimationFrame(u);
+}
 let statsAnimated = false;
 function checkStats() {
     if (statsAnimated) return;
-    const stats = document.querySelector('.about-grid'); if (!stats) return;
-    if (stats.getBoundingClientRect().top < window.innerHeight - 50) {
-        statsAnimated = true;
-        const s1 = document.querySelector('[data-content="about_stat_1"]'), s2 = document.querySelector('[data-content="about_stat_2"]'), s3 = document.querySelector('[data-content="about_stat_3"]');
-        if (s1) animateCounter(s1, parseInt(s1.textContent) || 50);
-        if (s2) animateCounter(s2, parseInt(s2.textContent) || 30);
-        if (s3) animateCounter(s3, parseInt(s3.textContent) || 5, ' дн.');
+    const stats = document.querySelector('.about-grid');
+    if (!stats || stats.getBoundingClientRect().top >= window.innerHeight - 50) return;
+    statsAnimated = true;
+    const s1 = document.querySelector('[data-content="about_stat_1"]');
+    const s2 = document.querySelector('[data-content="about_stat_2"]');
+    const s3 = document.querySelector('[data-content="about_stat_3"]');
+    if (s1) animateCounter(s1, parseInt(s1.textContent, 10) || 50);
+    if (s2) animateCounter(s2, parseInt(s2.textContent, 10) || 30);
+    if (s3) animateCounter(s3, parseInt(s3.textContent, 10) || 5, ' дн.');
+}
+function setupScrollObservers() {
+    const cards = document.querySelectorAll('.service-card:not(.visible), .pricing-card:not(.visible)');
+    if ('IntersectionObserver' in window) {
+        const revealObserver = new IntersectionObserver((entries, observer) => {
+            entries.forEach(entry => {
+                if (!entry.isIntersecting) return;
+                entry.target.classList.add('visible');
+                observer.unobserve(entry.target);
+            });
+        }, { rootMargin: '0px 0px 80px 0px', threshold: 0.01 });
+        cards.forEach(card => revealObserver.observe(card));
+        const stats = document.querySelector('.about-grid');
+        if (stats) {
+            const statsObserver = new IntersectionObserver((entries, observer) => {
+                if (!entries.some(entry => entry.isIntersecting)) return;
+                checkStats();
+                observer.disconnect();
+            }, { rootMargin: '0px 0px 50px 0px' });
+            statsObserver.observe(stats);
+        }
+    } else {
+        cards.forEach(card => card.classList.add('visible'));
     }
 }
-function onScroll() { const y = window.scrollY; const header = document.getElementById('header'), scrollTop = document.getElementById('scrollTop'); if (header) header.classList.toggle('scrolled', y > 20); if (scrollTop) scrollTop.classList.toggle('show', y > 500); animateOnScroll(); checkStats(); }
+let scrollFramePending = false;
+function onScroll() {
+    if (scrollFramePending) return;
+    scrollFramePending = true;
+    requestAnimationFrame(() => {
+        const y = window.scrollY;
+        const header = document.getElementById('header');
+        const scrollTop = document.getElementById('scrollTop');
+        if (header) header.classList.toggle('scrolled', y > 20);
+        if (scrollTop) scrollTop.classList.toggle('show', y > 500);
+        scrollFramePending = false;
+    });
+}
 window.addEventListener('scroll', onScroll, { passive: true });
 
 /* Формат номера карты */
@@ -1899,6 +1949,7 @@ async function init() {
         history.replaceState({},'',location.pathname+(suffix?'?'+suffix:'')+location.hash);
     }
     if (!state.user) { await loadProjects(); await loadAllPortfolio(); }
+    setupScrollObservers();
     setTimeout(onScroll, 200);
     console.log('🐾 Paw Art Studio v3.8 (hybrid) ready');
 }
