@@ -337,13 +337,29 @@ function updateUI() {
             const editorAdminButton = document.getElementById('contentEditorAdminButton');
             if (editorAdminButton) editorAdminButton.classList.toggle('hidden', !canEditSite);
         }
-        if (u.role === 'executor') createProjectBtn.classList.add('hidden'); else createProjectBtn.classList.remove('hidden');
+        const isExecutor = u.role === 'executor';
+        if (isExecutor) createProjectBtn.classList.add('hidden'); else createProjectBtn.classList.remove('hidden');
+
+        // Показываем инструменты только тем ролям, которым они действительно доступны.
+        document.getElementById('dashWithdrawalsTab')?.classList.toggle('hidden', !isExecutor);
+        document.getElementById('withdrawBtn')?.classList.toggle('hidden', !isExecutor);
+        const portfolioLink = document.getElementById('myPortfolioMenuLink');
+        const canManagePortfolio = ['executor', 'manager', 'admin'].includes(u.role);
+        if (portfolioLink) portfolioLink.classList.toggle('hidden', !canManagePortfolio);
+
+        // Если роль изменилась во время открытого кабинета, не оставляем недоступную вкладку активной.
+        if (!isExecutor && document.querySelector('.dash-tab.active')?.dataset.dtab === 'withdrawals') {
+            switchDashTab('wallet');
+        }
     } else {
         loginBtn.classList.remove('hidden'); userBox.classList.add('hidden');
         adminBtn.classList.add('hidden'); adminMenuLink.classList.add('hidden'); msgrFab.classList.add('hidden');
         if (contentLink) contentLink.classList.add('hidden');
         const editorAdminButton = document.getElementById('contentEditorAdminButton');
         if (editorAdminButton) editorAdminButton.classList.add('hidden');
+        document.getElementById('dashWithdrawalsTab')?.classList.add('hidden');
+        document.getElementById('withdrawBtn')?.classList.add('hidden');
+        document.getElementById('myPortfolioMenuLink')?.classList.add('hidden');
     }
 }
 function toggleUserMenu() { document.getElementById('userMenu').classList.toggle('hidden'); }
@@ -748,7 +764,7 @@ function orderCustomPackage() {
 }
 
 /* DASHBOARD */
-function openDashboard() { if (!state.user) return openAuth(); document.getElementById('dashboardModal').classList.add('open'); document.body.style.overflow = 'hidden'; document.getElementById('userMenu').classList.add('hidden'); loadDashboardData(); }
+function openDashboard() { if (!state.user) return openAuth(); document.getElementById('dashboardModal').classList.add('open'); document.body.style.overflow = 'hidden'; document.getElementById('userMenu').classList.add('hidden'); switchDashTab('wallet'); loadDashboardData(); }
 function closeDashboard() { document.getElementById('dashboardModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
 function switchDashTab(tab) {
     document.querySelectorAll('.dash-tab').forEach(t => {
@@ -773,7 +789,18 @@ function switchDashTab(tab) {
 }
 async function loadDashboardData() {
     updateUI();
-    try { const [txRes, wdRes] = await Promise.all([api('/api/wallet/transactions'), api('/api/wallet/withdrawals')]); state.transactions = txRes.transactions; state.userWithdrawals = wdRes.withdrawals; renderTransactions(); renderWalletStats(); renderUserWithdrawals(); }
+    try {
+        const isExecutor = state.user?.role === 'executor';
+        const [txRes, wdRes] = await Promise.all([
+            api('/api/wallet/transactions'),
+            isExecutor ? api('/api/wallet/withdrawals') : Promise.resolve({ withdrawals: [] })
+        ]);
+        state.transactions = txRes.transactions;
+        state.userWithdrawals = Array.isArray(wdRes.withdrawals) ? wdRes.withdrawals : [];
+        renderTransactions();
+        renderWalletStats();
+        if (isExecutor) renderUserWithdrawals();
+    }
     catch (err) { showToast('❌ ' + err.message, 'error'); }
 }
 function renderWalletStats() { const totalIn = state.transactions.filter(t => t.type === 'in').reduce((s, t) => s + t.amount, 0); const totalOut = state.transactions.filter(t => t.type === 'out').reduce((s, t) => s + t.amount, 0); const userId = Number(state.user?.id); const userProjects = userId ? state.projects.filter(p => Number(p.client_id ?? p.clientId ?? p.client?.id) === userId || Number(p.executor_id ?? p.executorId ?? p.executor?.id) === userId) : []; document.getElementById('wsIn').textContent = formatMoney(totalIn); document.getElementById('wsOut').textContent = formatMoney(totalOut); document.getElementById('wsProjects').textContent = userProjects.length; }
