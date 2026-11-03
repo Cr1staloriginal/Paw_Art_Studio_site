@@ -160,6 +160,8 @@ header.scrolled { border-bottom-color: #1f1224; background: rgba(13, 8, 16, 0.95
 .pd-desc { margin: 16px 0; color: var(--text-soft); line-height: 1.6; white-space: pre-wrap; word-wrap: break-word; }
 .pd-actions { display: flex; gap: 10px; margin-top: 20px; flex-wrap: wrap; }
 .pd-actions .btn { flex: 1; min-width: 140px; }
+.pd-contact-note { flex: 1 1 100%; color: var(--text-soft); font-size: .86rem; line-height: 1.5; padding: 10px 12px; border: 1px solid var(--border); border-radius: 10px; background: var(--bg-2); }
+.form-hint { display: block; margin-top: 6px; color: var(--text-mute); font-size: .8rem; line-height: 1.45; }
 .portfolio-gallery { display: grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap: 16px; }
 .portfolio-item { position: relative; border-radius: var(--radius); overflow: hidden; aspect-ratio: 1 / 1; background: var(--bg-card); border: 1px solid var(--border-2); cursor: pointer; transition: border-color 0.3s, transform 0.3s, box-shadow 0.3s; }
 .portfolio-item:hover { border-color: var(--accent); transform: translateY(-4px); box-shadow: 0 16px 36px rgba(236, 72, 153, 0.25); }
