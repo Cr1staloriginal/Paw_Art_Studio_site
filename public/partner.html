@@ -8,6 +8,20 @@
 *{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at top,#22203b 0,#0d1019 55%);color:var(--text);font:15px/1.55 Inter,system-ui,sans-serif}
 main{width:min(1100px,calc(100% - 32px));margin:38px auto 70px}.top{display:flex;justify-content:space-between;align-items:center;gap:16px;margin-bottom:26px}.brand{font-weight:800;font-size:20px}.brand span{color:var(--accent)}a{color:#c4b5fd}.muted{color:var(--muted)}.panel,.stat{background:var(--panel);border:1px solid var(--line);border-radius:16px;padding:20px}.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:12px;margin:18px 0}.stat b{display:block;font-size:25px;margin-top:6px}.grid{display:grid;grid-template-columns:1.2fr .8fr;gap:16px}.panel h2{margin:0 0 14px;font-size:18px}input,textarea,button{font:inherit}input,textarea{width:100%;background:#0e1320;color:var(--text);border:1px solid var(--line);border-radius:10px;padding:12px;margin:7px 0 14px}button{border:0;border-radius:10px;padding:11px 16px;background:var(--accent);color:#171326;font-weight:700;cursor:pointer}.secondary{background:#293149;color:var(--text)}table{width:100%;border-collapse:collapse;font-size:14px}td,th{text-align:left;padding:10px;border-bottom:1px solid var(--line)}.scroll{overflow:auto}.status{color:var(--good)}#notice{padding:12px;border-radius:10px;background:#20283a;margin:14px 0}.hidden{display:none}@media(max-width:720px){.grid{grid-template-columns:1fr}.top{align-items:flex-start;flex-direction:column}}
 </style>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="/css/brand-pages.css?v=20261104-brand">
+<style>
+:root{--bg:#0d0810;--panel:#1a1019;--line:#2d1d35;--text:#fdf2f8;--muted:#b9a9c4;--accent:#ec4899;--good:#6ee7b7;--warn:#fbbf24}
+body{background:radial-gradient(ellipse at top,rgba(168,85,247,.16),transparent 42%),var(--bg)}
+.panel,.stat{background:var(--panel);border-color:var(--line);border-radius:18px}
+button{background:linear-gradient(135deg,var(--accent),#a855f7);color:#fff;border-radius:12px;min-height:44px}
+button.secondary{background:#2b1d32;color:var(--text);border:1px solid var(--line)}
+input,textarea{background:#211723;border-color:var(--line);border-radius:12px;color:var(--text)}
+#notice{background:rgba(236,72,153,.10);border:1px solid rgba(236,72,153,.22)}
+@media(max-width:720px){main{width:min(100% - 24px,1100px);margin:20px auto 40px}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.panel{padding:16px}.scroll{max-width:100%}table{min-width:620px}}
+</style>
 </head>
 <body><main>
 <header class="top"><div><div class="brand">🐾 Paw Art <span>Studio</span></div><div class="muted">Партнёрский кабинет</div></div><a href="/">На главную</a></header>
