@@ -26,7 +26,7 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
 const AVATAR_DIR = path.join(UPLOAD_DIR, 'avatars');
 const PORTFOLIO_DIR = path.join(UPLOAD_DIR, 'portfolio');
 const CONTENT_DIR = path.join(UPLOAD_DIR, 'content');
-const DELIVERY_DIR = path.join(UPLOAD_DIR, 'deliveries');
+const DELIVERY_DIR = path.join(__dirname, 'private_uploads', 'deliveries');
 const SITE_URL = process.env.SITE_URL || 'https://pawartstudio.store';
 
 [DATABASE_PATH].forEach(p => {
@@ -1828,6 +1828,7 @@ app.post('/api/projects/:id/status', auth, (req, res) => {
   const allowed = ['open', 'in_progress', 'review', 'completed', 'cancelled'];
   if (!Number.isSafeInteger(id) || id <= 0) return res.status(400).json({ error: 'Некорректный ID заказа' });
   if (!allowed.includes(status)) return res.status(400).json({ error: 'Некорректный статус заказа' });
+  if (status === 'review' || status === 'completed') return res.status(409).json({ error: 'Передача на проверку и завершение заказа выполняются только через систему сдачи работы' });
   try {
     const p = db.prepare('SELECT id, client_id, executor_id,status FROM projects WHERE id = ?').get(id);
     if (!p) return res.status(404).json({ error: 'Заказ не найден' });
