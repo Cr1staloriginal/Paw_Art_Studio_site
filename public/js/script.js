@@ -997,9 +997,88 @@ async function openProjectDetail(id) {
         renderProjectDetail(normalized);
         document.getElementById('projectDetailModal').classList.add('open');
         document.body.style.overflow = 'hidden';
+        loadProjectDeliveries(normalized.id);
     } catch (err) { showToast('❌ ' + err.message, 'error'); }
 }
 function closeProjectDetail() { document.getElementById('projectDetailModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
+
+async function loadProjectDeliveries(projectId) {
+    const host = document.getElementById('projectDeliveries');
+    if (!host) return;
+    host.innerHTML = '<div class="empty-state small">Загрузка файлов…</div>';
+    try {
+        const data = await api('/api/projects/' + projectId + '/deliveries');
+        const deliveries = Array.isArray(data.deliveries) ? data.deliveries : [];
+        const p = state.currentProject || {};
+        const isClient = Number(p.clientId ?? p.client_id) === Number(state.user?.id);
+        const isExecutor = Number(p.executorId ?? p.executor_id) === Number(state.user?.id);
+        const canUpload = isExecutor && ['in_progress','review'].includes(p.status);
+        const latest = deliveries[0];
+        const versions = deliveries.length ? deliveries.map(d => `
+            <section class="pd-delivery-version" style="border:1px solid var(--border);border-radius:12px;padding:12px;margin:10px 0">
+                <div style="display:flex;justify-content:space-between;gap:8px;flex-wrap:wrap"><strong>Версия ${d.version}</strong><small>${escapeHtml(d.uploaderName)} · ${formatDateTime(d.createdAt)}</small></div>
+                ${d.note ? '<p class="form-hint">' + escapeHtml(d.note) + '</p>' : ''}
+                <div style="display:grid;gap:8px;margin-top:10px">${d.files.map(f => `
+                    <button type="button" class="project-act-btn" style="text-align:left" onclick="downloadDeliveryFile(${projectId},${f.id},'${escapeHtml(f.name).replace(/'/g,"&#39;")}')">
+                        <i class="fas fa-download"></i> ${escapeHtml(f.name)} <small>(${formatDeliverySize(f.size)})</small>
+                    </button>`).join('')}</div>
+            </section>`).join('') : '<p class="form-hint">Исполнитель ещё не передавал файлы.</p>';
+        const reviewActions = isClient && p.status === 'review' && latest ? `
+            <div class="pd-actions" style="margin-top:12px;flex-wrap:wrap">
+                <button class="btn" onclick="acceptProjectDelivery(${projectId})"><i class="fas fa-check"></i> Принять работу</button>
+                <button class="btn btn-outline" onclick="requestProjectRevision(${projectId})"><i class="fas fa-rotate"></i> Запросить исправления</button>
+            </div>` : '';
+        const uploadForm = canUpload ? `
+            <form onsubmit="uploadProjectDelivery(event,${projectId})" style="margin-top:14px">
+                <label>Файлы готовой работы *</label>
+                <input type="file" name="files" id="deliveryFiles" multiple required accept="image/*,.zip,.7z,.rar,.pdf,.psd,.txt,.clip,.kra,.blend,.mp4,.mov,.webm">
+                <small class="form-hint">До 10 файлов за раз, максимум 50 МБ на файл. Можно отправлять новые версии после исправлений.</small>
+                <label style="display:block;margin-top:10px">Комментарий к сдаче</label>
+                <textarea name="note" id="deliveryNote" maxlength="2000" placeholder="Что готово, какие файлы приложены…" style="min-height:70px"></textarea>
+                <button class="btn" type="submit" style="margin-top:10px"><i class="fas fa-cloud-upload-alt"></i> Передать заказчику</button>
+            </form>` : '';
+        host.innerHTML = '<div class="section-divider"><span>Передача готовой работы</span></div>' +
+            '<p class="form-hint">Файлы доступны только заказчику, назначенному исполнителю и администрации. Предыдущие версии сохраняются.</p>' +
+            versions + reviewActions + uploadForm;
+    } catch (e) {
+        host.innerHTML = '<p class="form-hint">Не удалось загрузить материалы: ' + escapeHtml(e.message) + '</p>';
+    }
+}
+function formatDeliverySize(bytes) {
+    const n = Number(bytes)||0;
+    return n >= 1048576 ? (n/1048576).toFixed(1)+' МБ' : Math.max(1,Math.round(n/1024))+' КБ';
+}
+async function downloadDeliveryFile(projectId,fileId,name) {
+    try {
+        const token=getToken();
+        const response=await fetch(API+'/api/projects/'+projectId+'/deliveries/files/'+fileId,{headers:token?{Authorization:'Bearer '+token}:{}});
+        if(!response.ok){let data={};try{data=await response.json();}catch{}throw new Error(data.error||'Не удалось скачать файл');}
+        const blob=await response.blob(),url=URL.createObjectURL(blob),a=document.createElement('a');
+        a.href=url;a.download=name||'delivery-file';document.body.appendChild(a);a.click();a.remove();URL.revokeObjectURL(url);
+    } catch(e){showToast('❌ '+e.message,'error');}
+}
+async function uploadProjectDelivery(event,id) {
+    event.preventDefault();
+    const form=event.currentTarget,files=form.querySelector('input[type=file]')?.files;
+    if(!files?.length)return showToast('Выберите файлы','error');
+    if(files.length>10)return showToast('Можно загрузить не больше 10 файлов за раз','error');
+    for(const f of files)if(f.size>50*1024*1024)return showToast('Файл '+f.name+' превышает 50 МБ','error');
+    const data=new FormData();for(const f of files)data.append('files',f);data.append('note',form.querySelector('textarea')?.value||'');
+    const btn=form.querySelector('button[type=submit]');btn.disabled=true;
+    try{await api('/api/projects/'+id+'/deliveries',{method:'POST',body:data});await openProjectDetail(id);showToast('Работа передана заказчику');}
+    catch(e){showToast('❌ '+e.message,'error');}finally{btn.disabled=false;}
+}
+async function acceptProjectDelivery(id) {
+    if(!confirm('Подтвердить, что работа получена и вас устраивает?'))return;
+    try{await api('/api/projects/'+id+'/deliveries/accept',{method:'POST',body:{}});await openProjectDetail(id);await loadProjects();showToast('Работа принята, заказ завершён');}
+    catch(e){showToast('❌ '+e.message,'error');}
+}
+async function requestProjectRevision(id) {
+    const note=prompt('Опишите, какие исправления необходимо внести:');if(!note||!note.trim())return;
+    try{await api('/api/projects/'+id+'/deliveries/revision',{method:'POST',body:{note:note.trim()}});await openProjectDetail(id);await loadProjects();showToast('Запрос на исправления отправлен исполнителю');}
+    catch(e){showToast('❌ '+e.message,'error');}
+}
+
 function renderProjectDetail(p) {
     const wrap = document.getElementById('projectDetailContent');
     if (!p || typeof p !== 'object' || !wrap) return;
@@ -1022,9 +1101,10 @@ function renderProjectDetail(p) {
         ${p.executor ? `<div class="pd-row"><span class="pd-label">Исполнитель</span><span class="pd-value">${escapeHtml(p.executor.name)}</span></div>` : ''}
         ${p.contactMethod && p.contactMethod !== 'Сайт' ? `<div class="pd-row"><span class="pd-label">Способ связи</span><span class="pd-value">${escapeHtml(p.contactMethod)}${p.contactDetail ? ': ' + escapeHtml(p.contactDetail) : ''}</span></div>` : `<div class="pd-row"><span class="pd-label">Связь</span><span class="pd-value">Через мессенджер сайта</span></div>`}
         <div class="pd-desc">${escapeHtml(p.description)}</div>
+        <div id="projectDeliveries"></div>
         <div class="pd-actions">${isExecutor && Number(p.executor?.id ?? p.executor_id) === Number(state.user?.id) && (p.contactMethod || 'Сайт') === 'Сайт' && p.status !== 'cancelled' ? `<button class="btn btn-outline" onclick="openChatWith(${p.clientId ?? p.client_id}, ${p.id})"><i class="fas fa-comments"></i> Написать заказчику</button>` : ''}
         ${isClient && p.executor && p.status !== 'cancelled' && (p.contactMethod || 'Сайт') === 'Сайт' ? `<span class="pd-contact-note">Исполнитель сможет написать вам здесь. Ответить можно в мессенджере сайта.</span>` : ''}${isClient&&Number(p.budget)>0&&p.payment_status!=='paid'&&p.payment_status!=='pending'&&p.payment_status!=='refund_required'&&p.payment_status!=='refunded'?`<button class="btn" onclick="payProject(${p.id})"><i class="fas fa-credit-card"></i> Оплатить заказ</button>`:''}${isAdmin&&p.payment_status==='refund_required'?`<button class="btn btn-outline" onclick="adminRefundProject(${p.id})">Зафиксировать возврат</button>`:''}</div>
-        ${canChangeStatus ? `<div class="section-divider"><span>Изменить статус</span></div><div class="pd-actions" style="flex-wrap:wrap">${statuses.filter(s => s !== p.status).map(s => `<button class="project-act-btn" onclick="changeStatus(${p.id}, '${s}')">${STATUS_LABELS[s]}</button>`).join('')}</div>` : ''}
+
     `;
 }
 async function adminRefundProject(id){const reference=prompt('Подтверждение фактического возврата клиенту (номер операции):');if(!reference)return;const comment=prompt('Комментарий:','')||'';try{await api('/api/admin/projects/'+id+'/refund',{method:'POST',body:{reference,comment}});await openProjectDetail(id);showToast('Возврат зафиксирован');}catch(e){showToast('❌ '+e.message,'error');}}
