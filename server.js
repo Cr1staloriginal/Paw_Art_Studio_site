@@ -1929,17 +1929,21 @@ app.post('/api/portfolio', auth, portfolioUploadAccess, portfolioUploadMiddlewar
         }
 
         authorUserId = author.id;
-        authorName = author.name;
+        // Keep the display name chosen by the administrator/editor.
+        // The linked account is used for the profile/avatar, not as an override
+        // for the portfolio's explicitly saved artist nickname.
+        authorName = String(req.body.authorName || '').trim() || author.name;
       } else {
         authorName = String(req.body.authorName || '').trim();
-        if (!authorName) {
-          removeUploadedFile();
-          return res.status(400).json({ error: 'Укажите имя автора' });
-        }
-        if (authorName.length > 100) {
-          removeUploadedFile();
-          return res.status(400).json({ error: 'Имя автора слишком длинное' });
-        }
+      }
+
+      if (!authorName) {
+        removeUploadedFile();
+        return res.status(400).json({ error: 'Укажите имя автора' });
+      }
+      if (authorName.length > 100) {
+        removeUploadedFile();
+        return res.status(400).json({ error: 'Имя автора слишком длинное' });
       }
     }
 
@@ -1974,8 +1978,8 @@ app.get('/api/portfolio/all', (req, res) => {
         p.id, p.filename, p.title, p.description, p.category,
         p.created_at AS createdAt, p.author_user_id AS authorUserId,
         COALESCE(
-          NULLIF(TRIM(u.name), ''),
           NULLIF(TRIM(p.author_name), ''),
+          NULLIF(TRIM(u.name), ''),
           NULLIF(TRIM(uploader.name), ''),
           'Аноним'
         ) AS authorName,
