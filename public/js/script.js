@@ -1313,11 +1313,17 @@ function syncPortfolioAuthor() {
 
     const selected = select.options[select.selectedIndex];
     if (select.value) {
-        input.value = selected?.textContent || '';
-        input.readOnly = true;
+        // A profile link supplies avatar/profile navigation, while the visible
+        // portfolio nickname remains editable and is saved independently.
+        if (!input.value.trim() || input.dataset.linkedUserId !== select.value) {
+            input.value = selected?.textContent || '';
+        }
+        input.readOnly = false;
+        input.dataset.linkedUserId = select.value;
     } else {
         input.readOnly = false;
         input.value = '';
+        input.dataset.linkedUserId = '';
     }
 }
 function closeMyPortfolio() { document.getElementById('myPortfolioModal').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; }
