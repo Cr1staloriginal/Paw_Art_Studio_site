@@ -1088,8 +1088,15 @@ function renderProjectDetail(p) {
     const isClient = Number(p.clientId ?? p.client_id) === Number(state.user?.id);
     const isExecutor = Number(p.executor?.id ?? p.executor_id) === Number(state.user?.id);
     const isAdmin = state.user?.role === 'admin' || state.user?.role === 'manager';
-    const canChangeStatus = isClient || isExecutor || isAdmin;
-    const statuses = ['open', 'in_progress', 'review', 'completed', 'cancelled'];
+    // Администратор управляет рабочими статусами из карточки.
+    // Проверка прав и допустимых переходов дополнительно выполняется сервером.
+    const adminStatusActions = isAdmin && p.status !== 'cancelled'
+        ? [
+            p.status !== 'open' ? `<button class="btn btn-outline" onclick="changeStatus(${p.id}, 'open')">Вернуть в открытые</button>` : '',
+            p.status !== 'in_progress' ? `<button class="btn btn-outline" onclick="changeStatus(${p.id}, 'in_progress')">Перевести в работу</button>` : '',
+            `<button class="btn btn-outline" onclick="changeStatus(${p.id}, 'cancelled')">Отменить заказ</button>`
+          ].filter(Boolean).join('')
+        : '';
     wrap.innerHTML = `
         <div class="pd-title">${escapeHtml(p.title)}</div>
         <div style="margin-bottom:12px"><span class="project-status status-${p.status}">${STATUS_LABELS[p.status]}</span></div>
@@ -1102,6 +1109,7 @@ function renderProjectDetail(p) {
         ${p.contactMethod && p.contactMethod !== 'Сайт' ? `<div class="pd-row"><span class="pd-label">Способ связи</span><span class="pd-value">${escapeHtml(p.contactMethod)}${p.contactDetail ? ': ' + escapeHtml(p.contactDetail) : ''}</span></div>` : `<div class="pd-row"><span class="pd-label">Связь</span><span class="pd-value">Через мессенджер сайта</span></div>`}
         <div class="pd-desc">${escapeHtml(p.description)}</div>
         <div id="projectDeliveries"></div>
+        ${adminStatusActions ? `<div class="pd-status-controls"><div class="pd-status-controls-title">Управление статусом</div>${adminStatusActions}<p class="form-hint">Передача на проверку и завершение доступны через систему передачи готовой работы. Отменённый заказ нельзя открыть повторно.</p></div>` : ''}
         <div class="pd-actions">${isExecutor && Number(p.executor?.id ?? p.executor_id) === Number(state.user?.id) && (p.contactMethod || 'Сайт') === 'Сайт' && p.status !== 'cancelled' ? `<button class="btn btn-outline" onclick="openChatWith(${p.clientId ?? p.client_id}, ${p.id})"><i class="fas fa-comments"></i> Написать заказчику</button>` : ''}
         ${isClient && p.executor && p.status !== 'cancelled' && (p.contactMethod || 'Сайт') === 'Сайт' ? `<span class="pd-contact-note">Исполнитель сможет написать вам здесь. Ответить можно в мессенджере сайта.</span>` : ''}${isClient&&Number(p.budget)>0&&p.payment_status!=='paid'&&p.payment_status!=='pending'&&p.payment_status!=='refund_required'&&p.payment_status!=='refunded'?`<button class="btn" onclick="payProject(${p.id})"><i class="fas fa-credit-card"></i> Оплатить заказ</button>`:''}${isAdmin&&p.payment_status==='refund_required'?`<button class="btn btn-outline" onclick="adminRefundProject(${p.id})">Зафиксировать возврат</button>`:''}</div>
 
@@ -1109,7 +1117,17 @@ function renderProjectDetail(p) {
 }
 async function adminRefundProject(id){const reference=prompt('Подтверждение фактического возврата клиенту (номер операции):');if(!reference)return;const comment=prompt('Комментарий:','')||'';try{await api('/api/admin/projects/'+id+'/refund',{method:'POST',body:{reference,comment}});await openProjectDetail(id);showToast('Возврат зафиксирован');}catch(e){showToast('❌ '+e.message,'error');}}
 async function payProject(id){try{const result=await api('/api/projects/'+id+'/pay',{method:'POST',body:{}});if(result.confirmationUrl)location.href=result.confirmationUrl;else showToast('Не удалось получить ссылку на оплату','error');}catch(e){showToast('❌ '+e.message,'error');}}
-async function changeStatus(id, status) { try { await api(`/api/projects/${id}/status`, { method: 'POST', body: { status } }); closeProjectDetail(); await loadProjects(); showToast('✅ Статус обновлён'); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
+async function changeStatus(id, status) {
+    if (status === 'cancelled' && !confirm('Отменить заказ? Это действие нельзя отменить через карточку заказа.')) return;
+    try {
+        await api(`/api/projects/${id}/status`, { method: 'POST', body: { status } });
+        await loadProjects();
+        await openProjectDetail(id);
+        showToast('✅ Статус заказа обновлён');
+    } catch (err) {
+        showToast('❌ ' + err.message, 'error');
+    }
+}
 
 /* PORTFOLIO */
 async function loadAllPortfolio() {
