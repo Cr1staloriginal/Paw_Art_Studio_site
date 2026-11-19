@@ -2151,8 +2151,8 @@ app.get('/api/portfolio', (req, res) => {
 
 /* Chat API endpoints used by the messenger UI. */
 function getAllowedProjectChat(chatId) {
-  return db.prepare(\`SELECT c.id,c.user_a,c.user_b,c.project_id,p.client_id,p.executor_id,p.contact_method,p.status
-    FROM chats c LEFT JOIN projects p ON p.id=c.project_id WHERE c.id=?\`).get(chatId);
+  return db.prepare(`SELECT c.id,c.user_a,c.user_b,c.project_id,p.client_id,p.executor_id,p.contact_method,p.status
+    FROM chats c LEFT JOIN projects p ON p.id=c.project_id WHERE c.id=?`).get(chatId);
 }
 function canUseProjectChat(chat, userId) {
   if (!chat) return false;
@@ -2171,10 +2171,10 @@ app.get('/api/users/search', auth, (req,res) => {
   const q=String(req.query.q||'').trim().replace(/\s+/g,' ').slice(0,60);
   if(q.length<2) return res.json({users:[]});
   try {
-    const users=db.prepare(\`SELECT id,name,avatar,role FROM users
+    const users=db.prepare(`SELECT id,name,avatar,role FROM users
       WHERE id<>? AND name LIKE ? COLLATE NOCASE
       ORDER BY CASE WHEN name LIKE ? COLLATE NOCASE THEN 0 ELSE 1 END,name COLLATE NOCASE
-      LIMIT 20\`).all(Number(req.user.id),'%'+q+'%',q+'%');
+      LIMIT 20`).all(Number(req.user.id),'%'+q+'%',q+'%');
     return res.json({users:users.map(u=>({id:Number(u.id),name:u.name||'Пользователь',avatar:u.avatar||null,role:u.role||'client'}))});
   } catch(err) {
     console.error('Ошибка поиска пользователей:',err);
@@ -2185,7 +2185,7 @@ app.get('/api/users/search', auth, (req,res) => {
 app.get('/api/chats', auth, (req, res) => {
   try {
     const uid = Number(req.user.id);
-    const rows = db.prepare(\`
+    const rows = db.prepare(`
       SELECT c.id,c.user_a,c.user_b,c.project_id,
         p.title AS project_title,p.status AS project_status,
         CASE WHEN c.user_a=? THEN b.id ELSE a.id END AS peer_id,
@@ -2207,7 +2207,7 @@ app.get('/api/chats', auth, (req, res) => {
           AND ? IN (p.client_id,p.executor_id)
         ))
       ORDER BY COALESCE(last_created,c.created_at) DESC
-    \`).all(uid,uid,uid,uid,uid,uid,uid,uid);
+    `).all(uid,uid,uid,uid,uid,uid,uid,uid);
     return res.json({chats:rows.map(r=>({
       id:Number(r.id),projectId:r.project_id==null?null:Number(r.project_id),
       projectTitle:r.project_id==null?null:(r.project_title||('Заказ #'+r.project_id)),
@@ -2268,8 +2268,8 @@ app.get('/api/chats/:chatId/messages', auth, (req,res) => {
     if(!chat) return res.status(404).json({error:'Чат не найден'});
     if(!canUseProjectChat(chat,req.user.id)) return res.status(403).json({error:'Нет доступа к этому чату'});
     db.prepare('UPDATE messages SET read_at=? WHERE chat_id=? AND sender_id<>? AND read_at IS NULL').run(Date.now(),chatId,req.user.id);
-    const messages=db.prepare(\`SELECT m.id,m.chat_id AS chatId,m.sender_id AS senderId,m.text,m.created_at AS createdAt,m.read_at AS readAt
-      FROM messages m WHERE m.chat_id=? ORDER BY m.created_at ASC,m.id ASC LIMIT 500\`).all(chatId)
+    const messages=db.prepare(`SELECT m.id,m.chat_id AS chatId,m.sender_id AS senderId,m.text,m.created_at AS createdAt,m.read_at AS readAt
+      FROM messages m WHERE m.chat_id=? ORDER BY m.created_at ASC,m.id ASC LIMIT 500`).all(chatId)
       .map(m=>({...m,id:Number(m.id),chatId:Number(m.chatId),senderId:Number(m.senderId),createdAt:Number(m.createdAt),readAt:m.readAt==null?null:Number(m.readAt)}));
     return res.json({messages});
   } catch(err) {
