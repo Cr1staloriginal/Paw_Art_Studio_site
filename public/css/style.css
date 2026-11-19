@@ -697,3 +697,5 @@ header .nav a.logo > img.logo-avatar {
 .chat-search-user>i{color:var(--accent)}
 .chat-search-hint{padding:14px;text-align:center}
 .chat-project{color:var(--text-mute);font-size:.76rem;margin:1px 0 3px}
+
+.chat-list{height:calc(100% - 94px)}
