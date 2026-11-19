@@ -1446,79 +1446,144 @@ function connectSocket() {
 function incrementUnreadBadge() { const badge = document.getElementById('chatBadge'); if (!badge) return; const cur = parseInt(badge.textContent || '0', 10) || 0; badge.textContent = cur + 1; badge.classList.remove('hidden'); }
 
 /* MESSENGER */
-function openMessenger() { if (!state.user) return openAuth(); document.getElementById('messenger').classList.add('open'); document.body.style.overflow = 'hidden'; document.getElementById('userMenu').classList.add('hidden'); loadChats(); closeChat(); }
-function closeMessenger() { document.getElementById('messenger').classList.remove('open'); if (!isAnyModalOpen()) document.body.style.overflow = ''; if (state.currentChatId) state.socket?.emit('chat:leave', { chatId: state.currentChatId }); closeChat(); }
-async function loadChats() { if (!state.user) return; try { const { chats } = await api('/api/chats'); state.chats = chats; renderChatList(); updateTotalUnread(); } catch {} }
-function updateTotalUnread() { const total = state.chats.reduce((s, c) => s + c.unread, 0); const badge = document.getElementById('chatBadge'); if (!badge) return; if (total > 0) { badge.textContent = total > 99 ? '99+' : total; badge.classList.remove('hidden'); } else badge.classList.add('hidden'); }
-function renderChatList() {
-    const list = document.getElementById('chatList'); if (!list) return;
-    if (!state.chats.length) { const emptyText = state.user?.role === 'client' ? 'Здесь появится переписка, когда исполнитель напишет вам по заказу.' : 'Здесь появятся чаты по вашим заказам.'; list.innerHTML = `<div class="empty-state small"><i class="fas fa-comments"></i><p>${emptyText}</p></div>`; return; }
-    list.innerHTML = state.chats.map(c => { const peer = c.peer; const preview = c.lastMessage?.text || 'Нет сообщений'; const time = c.lastMessage ? formatTime(c.lastMessage.createdAt) : ''; const unread = c.unread > 0 ? `<span class="chat-unread">${c.unread}</span>` : ''; const online = state.onlineUsers.has(peer.id) ? `<span class="chat-online"></span>` : ''; const order = c.projectTitle || ('Заказ #' + c.projectId); return `<div class="chat-row" onclick="openChatWith(${peer.id}, ${c.projectId})"><div class="chat-avatar">${userAvatarHtml(peer)}${online}</div><div class="chat-info"><div class="chat-name">${escapeHtml(peer.name)}</div><div class="chat-project">${escapeHtml(order)}</div><div class="chat-preview">${escapeHtml(preview)}</div></div><div class="chat-meta"><div class="chat-time">${time}</div>${unread}</div></div>`; }).join('');
-}
-async function openChatWith(peerId, projectId = null) {
+let chatSearchTimer=null;
+function openMessenger() {
     if (!state.user) return openAuth();
+    document.getElementById('messenger').classList.add('open');
+    document.body.style.overflow='hidden';
+    document.getElementById('userMenu').classList.add('hidden');
+    closeChat();
+    loadChats();
+    const search=document.getElementById('chatUserSearch');
+    if(search) setTimeout(()=>search.focus(),120);
+}
+function closeMessenger() {
+    document.getElementById('messenger').classList.remove('open');
+    if(!isAnyModalOpen()) document.body.style.overflow='';
+    if(state.currentChatId) state.socket?.emit('chat:leave',{chatId:state.currentChatId});
+    closeChat();
+}
+async function loadChats() {
+    if(!state.user)return;
+    try { const {chats}=await api('/api/chats');state.chats=chats;renderChatList();updateTotalUnread(); }
+    catch(err){console.error('[Messenger] load chats:',err);showToast('Не удалось загрузить переписки: '+err.message,'error');}
+}
+function updateTotalUnread() {
+    const total=state.chats.reduce((sum,c)=>sum+Number(c.unread||0),0),badge=document.getElementById('chatBadge');
+    if(!badge)return;
+    if(total>0){badge.textContent=total>99?'99+':total;badge.classList.remove('hidden');}
+    else badge.classList.add('hidden');
+}
+function renderChatList() {
+    const list=document.getElementById('chatList');if(!list)return;
+    if(!state.chats.length){list.innerHTML='<div class="empty-state small"><i class="fas fa-comments"></i><p>Пока нет переписок. Найдите пользователя выше, чтобы написать первым.</p></div>';return;}
+    list.innerHTML=state.chats.map(c=>{
+        const peer=c.peer,preview=c.lastMessage?.text||'Нет сообщений',time=c.lastMessage?formatTime(c.lastMessage.createdAt):'';
+        const unread=c.unread>0?'<span class="chat-unread">'+c.unread+'</span>':'';
+        const online=state.onlineUsers.has(peer.id)?'<span class="chat-online"></span>':'';
+        const context=c.projectTitle?escapeHtml(c.projectTitle):'Личное сообщение';
+        return '<div class="chat-row" onclick="openChatWith('+peer.id+','+(c.projectId||'null')+')">'+
+          '<div class="chat-avatar">'+userAvatarHtml(peer)+online+'</div><div class="chat-info">'+
+          '<div class="chat-name">'+escapeHtml(peer.name)+'</div><div class="chat-project">'+context+'</div>'+
+          '<div class="chat-preview">'+escapeHtml(preview)+'</div></div><div class="chat-meta">'+
+          '<div class="chat-time">'+time+'</div>'+unread+'</div></div>';
+    }).join('');
+}
+async function searchChatUsers(value) {
+    const q=String(value||'').trim(),results=document.getElementById('chatSearchResults');
+    if(!results)return;
+    if(q.length<2){results.innerHTML='';results.classList.add('hidden');return;}
+    results.classList.remove('hidden');
+    results.innerHTML='<div class="chat-search-hint">Ищем пользователей…</div>';
     try {
-        const chatBody = { peerId };
-        if (projectId) chatBody.projectId = projectId;
-        const { chatId, peer } = await api('/api/chats', { method: 'POST', body: chatBody });
-        state.currentChatId = chatId;
-        const chat = state.chats.find(c => c.id === chatId);
-        state.chatPeer = chat?.peer || peer || null;
-        const { messages } = await api(`/api/chats/${chatId}/messages`);
-        state.chatMessages[chatId] = messages;
+        const data=await api('/api/users/search?q='+encodeURIComponent(q));
+        if(document.getElementById('chatUserSearch')?.value.trim()!==q)return;
+        if(!data.users?.length){results.innerHTML='<div class="chat-search-hint">Пользователи не найдены</div>';return;}
+        results.innerHTML=data.users.map(u=>'<button type="button" class="chat-search-user" onclick="openChatWith('+Number(u.id)+')">'+
+          '<span class="chat-avatar">'+userAvatarHtml(u)+'</span><span class="chat-search-user-info"><strong>'+escapeHtml(u.name)+'</strong>'+
+          '<small>'+escapeHtml(ROLE_LABELS[u.role]||'Пользователь')+'</small></span><i class="fas fa-comment-dots"></i></button>').join('');
+    } catch(err) {
+        results.innerHTML='<div class="chat-search-hint">Ошибка поиска: '+escapeHtml(err.message)+'</div>';
+    }
+}
+function handleChatUserSearch(value) {
+    clearTimeout(chatSearchTimer);
+    chatSearchTimer=setTimeout(()=>searchChatUsers(value),250);
+}
+async function openChatWith(peerId,projectId=null) {
+    if(!state.user)return openAuth();
+    try {
+        if(state.currentChatId)state.socket?.emit('chat:leave',{chatId:state.currentChatId});
+        const body={peerId:Number(peerId)};
+        if(projectId)body.projectId=Number(projectId);
+        const {chatId,peer}=await api('/api/chats',{method:'POST',body});
+        state.currentChatId=Number(chatId);
+        state.chatPeer=peer||state.chats.find(c=>c.id===chatId)?.peer||null;
+        const {messages}=await api('/api/chats/'+chatId+'/messages');
+        state.chatMessages[chatId]=messages;
         document.getElementById('chatList').classList.add('hidden');
+        document.getElementById('chatSearchResults')?.classList.add('hidden');
         document.getElementById('chatWindow').classList.remove('hidden');
         document.getElementById('chatHead').classList.remove('hidden');
         document.getElementById('msgrBack').classList.remove('hidden');
-        document.getElementById('msgrTitle').innerHTML = '<i class="fas fa-comments"></i> Чат';
-        document.getElementById('chatHeadAvatar').innerHTML = userAvatarHtml(state.chatPeer);
-        document.getElementById('chatHeadName').textContent = state.chatPeer?.name || '—';
-        document.getElementById('chatHeadRole').textContent = ROLE_LABELS[state.chatPeer?.role] || '';
+        document.getElementById('msgrTitle').innerHTML='<i class="fas fa-comments"></i> Чат';
+        document.getElementById('chatHeadAvatar').innerHTML=userAvatarHtml(state.chatPeer);
+        document.getElementById('chatHeadName').textContent=state.chatPeer?.name||'—';
+        document.getElementById('chatHeadRole').textContent=ROLE_LABELS[state.chatPeer?.role]||'Пользователь';
         renderChatMessages(messages);
-        state.socket?.emit('chat:join', { chatId });
-        document.getElementById('messenger').classList.add('open'); document.body.style.overflow = 'hidden';
+        state.socket?.emit('chat:join',{chatId:Number(chatId)});
+        document.getElementById('messenger').classList.add('open');
+        document.body.style.overflow='hidden';
         await loadChats();
-        setTimeout(() => document.getElementById('chatInput').focus(), 300);
-    } catch (err) { showToast('❌ ' + err.message, 'error'); }
+        setTimeout(()=>document.getElementById('chatInput')?.focus(),120);
+    } catch(err){showToast('Не удалось открыть чат: '+err.message,'error');}
 }
 function closeChat() {
-    if (state.currentChatId) state.socket?.emit('chat:leave', { chatId: state.currentChatId });
-    state.currentChatId = null; state.chatPeer = null;
-    document.getElementById('chatWindow').classList.add('hidden');
-    document.getElementById('chatList').classList.remove('hidden');
-    document.getElementById('msgrBack').classList.add('hidden');
-    document.getElementById('msgrTitle').innerHTML = '<i class="fas fa-comments"></i> Сообщения';
+    if(state.currentChatId)state.socket?.emit('chat:leave',{chatId:state.currentChatId});
+    state.currentChatId=null;state.chatPeer=null;
+    document.getElementById('chatWindow')?.classList.add('hidden');
+    document.getElementById('chatList')?.classList.remove('hidden');
+    document.getElementById('msgrBack')?.classList.add('hidden');
+    document.getElementById('msgrTitle').innerHTML='<i class="fas fa-comments"></i> Сообщения';
+    document.getElementById('chatSearchResults')?.classList.remove('hidden');
     renderChatList();
 }
-function renderChatMessages(messages) { const wrap = document.getElementById('chatMessages'); if (!wrap) return; if (!messages.length) { wrap.innerHTML = `<div class="empty-state small"><i class="fas fa-comment"></i><p>Начните переписку</p></div>`; return; } wrap.innerHTML = messages.map(m => msgHtml(m)).join(''); wrap.scrollTop = wrap.scrollHeight; }
-function msgHtml(m) { const isOut = m.senderId === state.user.id; return `<div class="msg ${isOut ? 'msg-out' : 'msg-in'}">${escapeHtml(m.text)}<span class="msg-time">${formatTime(m.createdAt)}</span></div>`; }
-function appendMessageToWindow(m) { const wrap = document.getElementById('chatMessages'); if (!wrap) return; const empty = wrap.querySelector('.empty-state'); if (empty) empty.remove(); wrap.insertAdjacentHTML('beforeend', msgHtml(m)); wrap.scrollTop = wrap.scrollHeight; }
+function renderChatMessages(messages) {
+    const wrap=document.getElementById('chatMessages');if(!wrap)return;
+    if(!messages.length){wrap.innerHTML='<div class="empty-state small"><i class="fas fa-comment"></i><p>Начните переписку</p></div>';return;}
+    wrap.innerHTML=messages.map(m=>msgHtml(m)).join('');wrap.scrollTop=wrap.scrollHeight;
+}
+function msgHtml(m) {
+    const isOut=Number(m.senderId)===Number(state.user.id);
+    return '<div class="msg '+(isOut?'msg-out':'msg-in')+'">'+escapeHtml(m.text)+'<span class="msg-time">'+formatTime(m.createdAt)+'</span></div>';
+}
+function appendMessageToWindow(m) {
+    const wrap=document.getElementById('chatMessages');if(!wrap)return;
+    if(wrap.querySelector('.empty-state'))wrap.innerHTML='';
+    if(wrap.querySelector('[data-message-id="'+Number(m.id)+'"]'))return;
+    const node=document.createElement('div');node.innerHTML=msgHtml(m);const item=node.firstElementChild;
+    item.dataset.messageId=String(m.id);wrap.appendChild(item);wrap.scrollTop=wrap.scrollHeight;
+}
 async function sendMessage(e) {
     e.preventDefault();
-    const input = document.getElementById('chatInput');
-    const text = input.value.trim();
-    const chatId = Number(state.currentChatId);
-    if (!text || !chatId) return;
-    const submit = input.form?.querySelector('button[type="submit"]');
-    if (submit) submit.disabled = true;
+    const input=document.getElementById('chatInput'),text=input.value.trim(),chatId=Number(state.currentChatId);
+    if(!text||!chatId)return;
+    const submit=input.form?.querySelector('button[type="submit"]');if(submit)submit.disabled=true;
     try {
-        const result = await api(`/api/chats/${chatId}/messages`, { method: 'POST', body: { text } });
-        const message = result.message;
-        const messages = state.chatMessages[chatId] || (state.chatMessages[chatId] = []);
-        if (!messages.some(item => Number(item.id) === Number(message.id))) {
-            messages.push(message);
-            if (state.currentChatId === chatId) appendMessageToWindow(message);
-        }
-        input.value = '';
-        await loadChats();
-    } catch (err) {
-        showToast('❌ ' + err.message, 'error');
-    } finally {
-        if (submit) submit.disabled = false;
-        input.focus();
-    }
+        const result=await api('/api/chats/'+chatId+'/messages',{method:'POST',body:{text}});
+        const message=result.message,messages=state.chatMessages[chatId]||(state.chatMessages[chatId]=[]);
+        if(!messages.some(item=>Number(item.id)===Number(message.id))){messages.push(message);if(state.currentChatId===chatId)appendMessageToWindow(message);}
+        input.value='';await loadChats();
+    } catch(err){showToast('Не удалось отправить сообщение: '+err.message,'error');}
+    finally{if(submit)submit.disabled=false;input.focus();}
 }
-document.addEventListener('input', (e) => { if (e.target.id === 'chatInput' && state.currentChatId && state.socket) { clearTimeout(window._typingTimer); window._typingTimer = setTimeout(() => { state.socket.emit('chat:typing', { chatId: state.currentChatId }); }, 300); } });
+document.addEventListener('input',e=>{
+    if(e.target.id==='chatUserSearch')handleChatUserSearch(e.target.value);
+    if(e.target.id==='chatInput'&&state.currentChatId&&state.socket){
+        clearTimeout(window._typingTimer);
+        window._typingTimer=setTimeout(()=>state.socket.emit('chat:typing',{chatId:state.currentChatId}),300);
+    }
+});
 
 /* ADMIN */
 async function openAdminPanel() { if (!state.user || state.user.role !== 'admin') return showToast('⛔ Нет доступа', 'error'); document.getElementById('adminModal').classList.add('open'); document.body.style.overflow = 'hidden'; document.getElementById('userMenu').classList.add('hidden'); await loadAdminData(); switchAdminTab('dashboard'); }
