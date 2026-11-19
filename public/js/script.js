@@ -1438,7 +1438,7 @@ function connectSocket() {
     state.socket.on('connect', () => { if (state.currentChatId) state.socket.emit('chat:join', { chatId: state.currentChatId }); });
     state.socket.on('connect_error', (err) => showToast('❌ Чат: ' + (err.message || 'ошибка соединения'), 'error'));
     state.socket.on('chat:error', (data) => showToast('❌ ' + (data?.message || 'Сообщение не отправлено'), 'error'));
-    state.socket.on('chat:new', (msg) => { const arr = state.chatMessages[msg.chatId] || []; if (!arr.find(m => m.id === msg.id)) { arr.push(msg); state.chatMessages[msg.chatId] = arr; } if (state.currentChatId === msg.chatId) appendMessageToWindow(msg); loadChats(); });
+    state.socket.on('chat:new', (msg) => { const arr = state.chatMessages[msg.chatId] || []; const isNew = !arr.some(m => Number(m.id) === Number(msg.id)); if (isNew) { arr.push(msg); state.chatMessages[msg.chatId] = arr; if (state.currentChatId === Number(msg.chatId)) appendMessageToWindow(msg); loadChats(); } });
     state.socket.on('chat:notify', ({ chatId, message }) => { if (state.currentChatId !== chatId) { incrementUnreadBadge(); showToast(`💬 ${message.senderName}: ${message.text.slice(0, 40)}`); } });
     state.socket.on('presence', ({ userId, online }) => { if (online) state.onlineUsers.add(userId); else state.onlineUsers.delete(userId); renderChatList(); });
     state.socket.on('chat:typing', ({ name }) => { const el = document.getElementById('chatHeadRole'); if (el) { const orig = el.dataset.orig || el.textContent; el.dataset.orig = orig; el.textContent = `${name} печатает...`; clearTimeout(el._t); el._t = setTimeout(() => { el.textContent = orig; }, 2000); } });
@@ -1493,14 +1493,30 @@ function closeChat() {
 function renderChatMessages(messages) { const wrap = document.getElementById('chatMessages'); if (!wrap) return; if (!messages.length) { wrap.innerHTML = `<div class="empty-state small"><i class="fas fa-comment"></i><p>Начните переписку</p></div>`; return; } wrap.innerHTML = messages.map(m => msgHtml(m)).join(''); wrap.scrollTop = wrap.scrollHeight; }
 function msgHtml(m) { const isOut = m.senderId === state.user.id; return `<div class="msg ${isOut ? 'msg-out' : 'msg-in'}">${escapeHtml(m.text)}<span class="msg-time">${formatTime(m.createdAt)}</span></div>`; }
 function appendMessageToWindow(m) { const wrap = document.getElementById('chatMessages'); if (!wrap) return; const empty = wrap.querySelector('.empty-state'); if (empty) empty.remove(); wrap.insertAdjacentHTML('beforeend', msgHtml(m)); wrap.scrollTop = wrap.scrollHeight; }
-function sendMessage(e) {
+async function sendMessage(e) {
     e.preventDefault();
     const input = document.getElementById('chatInput');
     const text = input.value.trim();
-    if (!text || !state.currentChatId) return;
-    if (!state.socket || !state.socket.connected) return showToast('⚠️ Нет соединения с чатом. Обновите страницу и войдите снова.', 'error');
-    state.socket.emit('chat:send', { chatId: state.currentChatId, text });
-    input.value = '';
+    const chatId = Number(state.currentChatId);
+    if (!text || !chatId) return;
+    const submit = input.form?.querySelector('button[type="submit"]');
+    if (submit) submit.disabled = true;
+    try {
+        const result = await api(`/api/chats/${chatId}/messages`, { method: 'POST', body: { text } });
+        const message = result.message;
+        const messages = state.chatMessages[chatId] || (state.chatMessages[chatId] = []);
+        if (!messages.some(item => Number(item.id) === Number(message.id))) {
+            messages.push(message);
+            if (state.currentChatId === chatId) appendMessageToWindow(message);
+        }
+        input.value = '';
+        await loadChats();
+    } catch (err) {
+        showToast('❌ ' + err.message, 'error');
+    } finally {
+        if (submit) submit.disabled = false;
+        input.focus();
+    }
 }
 document.addEventListener('input', (e) => { if (e.target.id === 'chatInput' && state.currentChatId && state.socket) { clearTimeout(window._typingTimer); window._typingTimer = setTimeout(() => { state.socket.emit('chat:typing', { chatId: state.currentChatId }); }, 300); } });
 
