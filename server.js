@@ -2187,9 +2187,23 @@ app.post('/api/chats', auth, (req, res) => {
         if(!canUseProjectChat(linked,uid) || Number(linked.client_id)!==peerId) return res.status(403).json({error:'Открывать можно только существующий чат по вашему заказу'});
       }
     } else if (req.user.role === 'client') {
-      if (!chat || !chat.project_id) return res.status(403).json({ error: 'Вы можете отвечать только в чате, который открыл исполнитель по вашему заказу' });
+      // Клиент может начать чат только с исполнителем своего заказа,
+      // если заказ предусматривает связь через внутренний мессенджер.
+      if (!Number.isSafeInteger(projectId) || projectId <= 0)
+        return res.status(400).json({ error: 'Не указан заказ для переписки' });
+      const project=db.prepare("SELECT id,client_id,executor_id,contact_method,status FROM projects WHERE id=?").get(projectId);
+      if (!project || Number(project.client_id)!==uid || Number(project.executor_id)!==peerId || project.contact_method!=='Сайт' || project.status==='cancelled')
+        return res.status(403).json({ error: 'Написать можно только назначенному исполнителю заказа, для которого выбрана связь через сайт' });
+      if (!chat) {
+        const info=db.prepare('INSERT INTO chats (user_a,user_b,project_id,created_at) VALUES (?,?,?,?)').run(userA,userB,projectId,Date.now());
+        chat={id:Number(info.lastInsertRowid),project_id:projectId};
+      } else if (Number(chat.project_id)!==projectId) {
+        db.prepare('UPDATE chats SET project_id=? WHERE id=?').run(projectId,chat.id);
+        chat.project_id=projectId;
+      }
       const linked=getAllowedProjectChat(chat.id);
-      if(!canUseProjectChat(linked,uid) || Number(linked.executor_id)!==peerId) return res.status(403).json({error:'Нет доступа к этой переписке'});
+      if(!canUseProjectChat(linked,uid) || Number(linked.executor_id)!==peerId)
+        return res.status(403).json({error:'Нет доступа к этой переписке'});
     } else {
       return res.status(403).json({ error: 'Личные переписки доступны только заказчику и назначенному исполнителю' });
     }
