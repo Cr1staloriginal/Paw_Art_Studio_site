@@ -2246,8 +2246,8 @@ app.post('/api/chats', auth, (req,res) => {
     } else {
       chat=db.prepare('SELECT id,project_id FROM chats WHERE user_a=? AND user_b=? AND project_id IS NULL').get(userA,userB);
       if(!chat) {
-        const info=db.prepare('INSERT INTO chats(user_a,user_b,project_id,created_at) VALUES(?,?,NULL,?)').run(userA,userB,Date.now());
-        chat={id:Number(info.lastInsertRowid),project_id:null};
+        const info=db.prepare('INSERT OR IGNORE INTO chats(user_a,user_b,project_id,created_at) VALUES(?,?,NULL,?)').run(userA,userB,Date.now());
+        chat=db.prepare('SELECT id,project_id FROM chats WHERE user_a=? AND user_b=? AND project_id IS NULL').get(userA,userB);
       }
     }
     const linked=getAllowedProjectChat(chat.id);
