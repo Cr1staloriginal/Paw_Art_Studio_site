@@ -2268,6 +2268,28 @@ app.get('/api/chats/:chatId/messages', auth, (req, res) => {
   }
 });
 
+app.post('/api/chats/:chatId/messages', auth, (req, res) => {
+  const chatId = Number(req.params.chatId);
+  const cleanText = String(req.body?.text || '').trim().slice(0, 2000);
+  if (!Number.isSafeInteger(chatId) || chatId <= 0) return res.status(400).json({ error: 'Некорректный ID чата' });
+  if (!cleanText) return res.status(400).json({ error: 'Введите сообщение' });
+  try {
+    const chat = getAllowedProjectChat(chatId);
+    if (!chat) return res.status(404).json({ error: 'Чат не найден' });
+    if (!canUseProjectChat(chat, req.user.id)) return res.status(403).json({ error: 'Нет доступа к этому чату' });
+    const now = Date.now();
+    const info = db.prepare('INSERT INTO messages (chat_id, sender_id, text, created_at) VALUES (?, ?, ?, ?)')
+      .run(chatId, Number(req.user.id), cleanText, now);
+    const message = { id: Number(info.lastInsertRowid), chatId, senderId: Number(req.user.id), text: cleanText, createdAt: now, readAt: null };
+    io.to('chat:' + chatId).emit('chat:new', message);
+    io.to('chat:' + chatId).emit('chat:notify', { chatId, message: { senderName: req.user.name || 'Пользователь', text: cleanText } });
+    return res.status(201).json({ message });
+  } catch (err) {
+    console.error('Ошибка отправки сообщения через API:', err);
+    return res.status(500).json({ error: 'Не удалось отправить сообщение' });
+  }
+});
+
 /* ==================== CHATS ==================== */
 // Authenticate sockets with the same JWT used by the REST API.
 io.use((socket, next) => {
