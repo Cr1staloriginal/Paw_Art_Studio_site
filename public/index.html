@@ -600,6 +600,11 @@
         <button class="msgr-close" onclick="closeMessenger()">×</button>
     </div>
     <div class="msgr-body">
+        <div class="chat-search-panel" id="chatSearchPanel">
+            <label for="chatUserSearch"><i class="fas fa-search"></i> Найти пользователя</label>
+            <input type="search" id="chatUserSearch" placeholder="Введите имя пользователя..." autocomplete="off" maxlength="60">
+            <div class="chat-search-results hidden" id="chatSearchResults"></div>
+        </div>
         <div class="chat-list" id="chatList"></div>
         <div class="chat-window hidden" id="chatWindow">
             <div class="chat-head hidden" id="chatHead">
