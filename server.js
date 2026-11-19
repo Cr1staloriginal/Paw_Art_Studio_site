@@ -2243,10 +2243,6 @@ app.post('/api/chats', auth, (req, res) => {
     if (!peer) return res.status(404).json({ error: 'Пользователь не найден' });
     return res.json({ chatId: Number(chat.id), projectId: Number(chat.project_id), peer: { id:Number(peer.id), name:peer.name||'Пользователь', avatar:peer.avatar||null, role:peer.role } });
   } catch (err) {
-    if (String(err?.message || '').includes('UNIQUE constraint failed')) {
-      const existing = db.prepare('SELECT id,project_id FROM chats WHERE user_a=? AND user_b=? AND project_id=?').get(userA,userB,requestedProjectId);
-      if (existing) return res.json({ chatId:Number(existing.id), projectId:Number(existing.project_id) });
-    }
     console.error('Ошибка создания чата:', err);
     return res.status(500).json({ error: 'Не удалось открыть чат' });
   }
