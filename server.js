@@ -333,6 +333,45 @@ safeAddColumn('projects', 'partner_id', 'INTEGER');
 safeAddColumn('projects', 'contact_method', "TEXT NOT NULL DEFAULT 'Не указан'");
 safeAddColumn('projects', 'contact_detail', 'TEXT');
 safeAddColumn('chats', 'project_id', 'INTEGER');
+
+// Allow one persistent conversation per customer/executor pair AND order.
+// Rebuild only the legacy table that had UNIQUE(user_a,user_b); message IDs
+// and chat IDs are preserved, so existing history remains attached.
+{
+  const chatSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='chats'").get()?.sql || '';
+  if (/UNIQUE\\s*\\(\\s*user_a\\s*,\\s*user_b\\s*\\)/i.test(chatSchema)) {
+    db.pragma('foreign_keys = OFF');
+    try {
+      db.exec(`
+        BEGIN IMMEDIATE;
+        CREATE TABLE chats_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          user_a INTEGER NOT NULL,
+          user_b INTEGER NOT NULL,
+          created_at INTEGER NOT NULL,
+          project_id INTEGER,
+          FOREIGN KEY (user_a) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (user_b) REFERENCES users(id) ON DELETE CASCADE,
+          FOREIGN KEY (project_id) REFERENCES projects(id) ON DELETE SET NULL
+        );
+        INSERT INTO chats_new (id,user_a,user_b,created_at,project_id)
+          SELECT id,user_a,user_b,created_at,project_id FROM chats;
+        DROP TABLE chats;
+        ALTER TABLE chats_new RENAME TO chats;
+        CREATE UNIQUE INDEX idx_chats_pair_project ON chats(user_a,user_b,COALESCE(project_id,0));
+        COMMIT;
+      `);
+      console.log('✅ Миграция чатов: включены отдельные диалоги по заказам');
+    } catch (migrationError) {
+      try { db.exec('ROLLBACK'); } catch {}
+      throw migrationError;
+    } finally {
+      db.pragma('foreign_keys = ON');
+    }
+  } else {
+    db.exec('CREATE UNIQUE INDEX IF NOT EXISTS idx_chats_pair_project ON chats(user_a,user_b,COALESCE(project_id,0))');
+  }
+}
 safeAddColumn('projects', 'payment_status', "TEXT NOT NULL DEFAULT 'unpaid'");
 db.exec(`
   CREATE TABLE IF NOT EXISTS project_deliveries (
@@ -2116,7 +2155,7 @@ function getAllowedProjectChat(chatId) {
     FROM chats c JOIN projects p ON p.id=c.project_id WHERE c.id=?`).get(chatId);
 }
 function canUseProjectChat(chat, userId) {
-  if (!chat || chat.contact_method !== 'Сайт' || !chat.executor_id || chat.status === 'cancelled') return false;
+  if (!chat || chat.contact_method !== 'Сайт' || !chat.executor_id) return false;
   const pair=[Number(chat.user_a),Number(chat.user_b)].sort((a,b)=>a-b);
   const expected=[Number(chat.client_id),Number(chat.executor_id)].sort((a,b)=>a-b);
   return pair[0]===expected[0] && pair[1]===expected[1] &&
@@ -2126,7 +2165,8 @@ app.get('/api/chats', auth, (req, res) => {
   try {
     const uid = Number(req.user.id);
     const rows = db.prepare(`
-      SELECT c.id, c.user_a, c.user_b,
+      SELECT c.id, c.user_a, c.user_b, c.project_id,
+        p.title AS project_title, p.status AS project_status,
         CASE WHEN c.user_a = ? THEN b.id ELSE a.id END AS peer_id,
         CASE WHEN c.user_a = ? THEN b.name ELSE a.name END AS peer_name,
         CASE WHEN c.user_a = ? THEN b.avatar ELSE a.avatar END AS peer_avatar,
@@ -2136,7 +2176,7 @@ app.get('/api/chats', auth, (req, res) => {
       FROM chats c
       JOIN users a ON a.id = c.user_a
       JOIN users b ON b.id = c.user_b
-      JOIN projects p ON p.id = c.project_id AND p.contact_method = 'Сайт' AND p.executor_id IS NOT NULL AND p.status <> 'cancelled'
+      JOIN projects p ON p.id = c.project_id AND p.contact_method = 'Сайт' AND p.executor_id IS NOT NULL
       WHERE (c.user_a = ? OR c.user_b = ?)
         AND ((p.client_id = c.user_a AND p.executor_id = c.user_b)
           OR (p.client_id = c.user_b AND p.executor_id = c.user_a))
@@ -2145,6 +2185,9 @@ app.get('/api/chats', auth, (req, res) => {
     `).all(uid, uid, uid, uid, uid, uid, uid);
     return res.json({ chats: rows.map(r => ({
       id: Number(r.id),
+      projectId: Number(r.project_id),
+      projectTitle: r.project_title || ('Заказ #' + r.project_id),
+      projectStatus: r.project_status || '',
       peer: { id: Number(r.peer_id), name: r.peer_name || 'Пользователь', avatar: r.peer_avatar || null },
       lastMessage: r.last_text == null ? null : { text: r.last_text, createdAt: Number(r.last_created || 0) },
       unread: Number(r.unread || 0)
@@ -2158,63 +2201,52 @@ app.get('/api/chats', auth, (req, res) => {
 app.post('/api/chats', auth, (req, res) => {
   const uid = Number(req.user.id);
   const peerId = Number(req.body?.peerId);
-  const projectId = Number(req.body?.projectId);
+  const requestedProjectId = Number(req.body?.projectId);
   if (!Number.isSafeInteger(peerId) || peerId <= 0 || peerId === uid)
     return res.status(400).json({ error: 'Некорректный собеседник' });
   try {
     const userA = Math.min(uid, peerId);
     const userB = Math.max(uid, peerId);
-    let chat = db.prepare('SELECT id,project_id FROM chats WHERE user_a = ? AND user_b = ?').get(userA, userB);
-    if (req.user.role === 'executor') {
-      if (Number.isSafeInteger(projectId) && projectId > 0) {
-        const project=db.prepare("SELECT id,client_id,executor_id,contact_method,status FROM projects WHERE id=?").get(projectId);
-        if(!project || Number(project.executor_id)!==uid || Number(project.client_id)!==peerId || project.contact_method!=='Сайт' || project.status==='cancelled')
-          return res.status(403).json({ error: 'Написать можно только заказчику принятого заказа, выбравшему связь через сайт' });
-        if(chat && Number(chat.project_id)!==projectId) {
-          // One conversation per customer/executor pair; relink it to their current eligible order.
-          db.prepare('UPDATE chats SET project_id=? WHERE id=?').run(projectId,chat.id);
-          chat.project_id=projectId;
-        }
-        if (!chat) {
-          const info=db.prepare('INSERT INTO chats (user_a,user_b,project_id,created_at) VALUES (?,?,?,?)').run(userA,userB,projectId,Date.now());
-          chat={id:Number(info.lastInsertRowid),project_id:projectId};
-        } else if (!chat.project_id) {
-          db.prepare('UPDATE chats SET project_id=? WHERE id=?').run(projectId,chat.id);
-          chat.project_id=projectId;
-        }
-      } else {
-        const linked=chat?.project_id ? getAllowedProjectChat(chat.id) : null;
-        if(!canUseProjectChat(linked,uid) || Number(linked.client_id)!==peerId) return res.status(403).json({error:'Открывать можно только существующий чат по вашему заказу'});
+    let project = null;
+    let chat = null;
+
+    if (Number.isSafeInteger(requestedProjectId) && requestedProjectId > 0) {
+      project = db.prepare("SELECT id,client_id,executor_id,contact_method,status FROM projects WHERE id=?").get(requestedProjectId);
+      if (!project || Number(project.client_id) !== (req.user.role === 'client' ? uid : peerId) ||
+          Number(project.executor_id) !== (req.user.role === 'executor' ? uid : peerId) ||
+          project.contact_method !== 'Сайт' || !project.executor_id) {
+        return res.status(403).json({ error: 'Чат доступен только заказчику и назначенному исполнителю заказа с выбранной связью через сайт' });
       }
-    } else if (req.user.role === 'client') {
-      // Клиент может начать переписку из карточки заказа или вернуться
-      // в уже созданный диалог из общего списка сообщений.
-      if (Number.isSafeInteger(projectId) && projectId > 0) {
-        const project=db.prepare("SELECT id,client_id,executor_id,contact_method,status FROM projects WHERE id=?").get(projectId);
-        if (!project || Number(project.client_id)!==uid || Number(project.executor_id)!==peerId || project.contact_method!=='Сайт' || project.status==='cancelled')
-          return res.status(403).json({ error: 'Написать можно только назначенному исполнителю заказа, для которого выбрана связь через сайт' });
-        if (!chat) {
-          const info=db.prepare('INSERT INTO chats (user_a,user_b,project_id,created_at) VALUES (?,?,?,?)').run(userA,userB,projectId,Date.now());
-          chat={id:Number(info.lastInsertRowid),project_id:projectId};
-        } else if (Number(chat.project_id)!==projectId) {
-          db.prepare('UPDATE chats SET project_id=? WHERE id=?').run(projectId,chat.id);
-          chat.project_id=projectId;
-        }
-      } else if (!chat?.project_id) {
-        return res.status(400).json({ error: 'Не указан заказ для переписки' });
+      chat = db.prepare('SELECT id,project_id FROM chats WHERE user_a=? AND user_b=? AND project_id=?').get(userA,userB,requestedProjectId);
+      if (!chat) {
+        const info = db.prepare('INSERT INTO chats (user_a,user_b,project_id,created_at) VALUES (?,?,?,?)')
+          .run(userA,userB,requestedProjectId,Date.now());
+        chat = { id: Number(info.lastInsertRowid), project_id: requestedProjectId };
       }
-      // При открытии из списка projectId не передаётся: проверяем существующий
-      // чат по его привязке к заказу и не разрешаем произвольные контакты.
-      const linked=getAllowedProjectChat(chat.id);
-      if(!canUseProjectChat(linked,uid) || Number(linked.executor_id)!==peerId)
-        return res.status(403).json({error:'Нет доступа к этой переписке'});
     } else {
-      return res.status(403).json({ error: 'Личные переписки доступны только заказчику и назначенному исполнителю' });
+      // Opening a saved conversation from the messenger list must resolve to
+      // an already-existing order thread; it must never create an unlinked chat.
+      const candidates = db.prepare('SELECT id,project_id FROM chats WHERE user_a=? AND user_b=? AND project_id IS NOT NULL ORDER BY id DESC').all(userA,userB);
+      chat = candidates.find(row => {
+        const linked = getAllowedProjectChat(row.id);
+        return canUseProjectChat(linked,uid) &&
+          Number(linked.client_id) === (req.user.role === 'client' ? uid : peerId) &&
+          Number(linked.executor_id) === (req.user.role === 'executor' ? uid : peerId);
+      }) || null;
+      if (!chat) return res.status(403).json({ error: 'Нет доступа к переписке по этому заказу' });
+      project = db.prepare('SELECT id FROM projects WHERE id=?').get(chat.project_id);
     }
-    const peer=db.prepare('SELECT id,name,avatar,role FROM users WHERE id=?').get(peerId);
-    if(!peer)return res.status(404).json({error:'Пользователь не найден'});
-    return res.json({ chatId: Number(chat.id), peer: { id:Number(peer.id), name:peer.name||'Пользователь', avatar:peer.avatar||null, role:peer.role } });
+
+    const linked = getAllowedProjectChat(chat.id);
+    if (!canUseProjectChat(linked,uid)) return res.status(403).json({ error: 'Нет доступа к этой переписке' });
+    const peer = db.prepare('SELECT id,name,avatar,role FROM users WHERE id=?').get(peerId);
+    if (!peer) return res.status(404).json({ error: 'Пользователь не найден' });
+    return res.json({ chatId: Number(chat.id), projectId: Number(chat.project_id), peer: { id:Number(peer.id), name:peer.name||'Пользователь', avatar:peer.avatar||null, role:peer.role } });
   } catch (err) {
+    if (String(err?.message || '').includes('UNIQUE constraint failed')) {
+      const existing = db.prepare('SELECT id,project_id FROM chats WHERE user_a=? AND user_b=? AND project_id=?').get(userA,userB,requestedProjectId);
+      if (existing) return res.json({ chatId:Number(existing.id), projectId:Number(existing.project_id) });
+    }
     console.error('Ошибка создания чата:', err);
     return res.status(500).json({ error: 'Не удалось открыть чат' });
   }
