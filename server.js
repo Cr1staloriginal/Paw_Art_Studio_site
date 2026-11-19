@@ -2151,142 +2151,150 @@ app.get('/api/portfolio', (req, res) => {
 
 /* Chat API endpoints used by the messenger UI. */
 function getAllowedProjectChat(chatId) {
-  return db.prepare(`SELECT c.id,c.user_a,c.user_b,c.project_id,p.client_id,p.executor_id,p.contact_method,p.status
-    FROM chats c JOIN projects p ON p.id=c.project_id WHERE c.id=?`).get(chatId);
+  return db.prepare(\`SELECT c.id,c.user_a,c.user_b,c.project_id,p.client_id,p.executor_id,p.contact_method,p.status
+    FROM chats c LEFT JOIN projects p ON p.id=c.project_id WHERE c.id=?\`).get(chatId);
 }
 function canUseProjectChat(chat, userId) {
-  if (!chat || chat.contact_method !== 'Сайт' || !chat.executor_id) return false;
+  if (!chat) return false;
+  const uid=Number(userId);
+  if (![Number(chat.user_a),Number(chat.user_b)].includes(uid)) return false;
+  // Direct conversations are available to both participants only.
+  if (chat.project_id == null) return true;
+  if (chat.contact_method !== 'Сайт' || !chat.executor_id) return false;
   const pair=[Number(chat.user_a),Number(chat.user_b)].sort((a,b)=>a-b);
   const expected=[Number(chat.client_id),Number(chat.executor_id)].sort((a,b)=>a-b);
   return pair[0]===expected[0] && pair[1]===expected[1] &&
-    [Number(chat.client_id),Number(chat.executor_id)].includes(Number(userId));
+    [Number(chat.client_id),Number(chat.executor_id)].includes(uid);
 }
+
+app.get('/api/users/search', auth, (req,res) => {
+  const q=String(req.query.q||'').trim().replace(/\s+/g,' ').slice(0,60);
+  if(q.length<2) return res.json({users:[]});
+  try {
+    const users=db.prepare(\`SELECT id,name,avatar,role FROM users
+      WHERE id<>? AND name LIKE ? COLLATE NOCASE
+      ORDER BY CASE WHEN name LIKE ? COLLATE NOCASE THEN 0 ELSE 1 END,name COLLATE NOCASE
+      LIMIT 20\`).all(Number(req.user.id),'%'+q+'%',q+'%');
+    return res.json({users:users.map(u=>({id:Number(u.id),name:u.name||'Пользователь',avatar:u.avatar||null,role:u.role||'client'}))});
+  } catch(err) {
+    console.error('Ошибка поиска пользователей:',err);
+    return res.status(500).json({error:'Не удалось выполнить поиск пользователей'});
+  }
+});
+
 app.get('/api/chats', auth, (req, res) => {
   try {
     const uid = Number(req.user.id);
-    const rows = db.prepare(`
-      SELECT c.id, c.user_a, c.user_b, c.project_id,
-        p.title AS project_title, p.status AS project_status,
-        CASE WHEN c.user_a = ? THEN b.id ELSE a.id END AS peer_id,
-        CASE WHEN c.user_a = ? THEN b.name ELSE a.name END AS peer_name,
-        CASE WHEN c.user_a = ? THEN b.avatar ELSE a.avatar END AS peer_avatar,
-        (SELECT m.text FROM messages m WHERE m.chat_id = c.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_text,
-        (SELECT m.created_at FROM messages m WHERE m.chat_id = c.id ORDER BY m.created_at DESC, m.id DESC LIMIT 1) AS last_created,
-        (SELECT COUNT(*) FROM messages m WHERE m.chat_id = c.id AND m.sender_id != ? AND m.read_at IS NULL) AS unread
+    const rows = db.prepare(\`
+      SELECT c.id,c.user_a,c.user_b,c.project_id,
+        p.title AS project_title,p.status AS project_status,
+        CASE WHEN c.user_a=? THEN b.id ELSE a.id END AS peer_id,
+        CASE WHEN c.user_a=? THEN b.name ELSE a.name END AS peer_name,
+        CASE WHEN c.user_a=? THEN b.avatar ELSE a.avatar END AS peer_avatar,
+        CASE WHEN c.user_a=? THEN b.role ELSE a.role END AS peer_role,
+        (SELECT m.text FROM messages m WHERE m.chat_id=c.id ORDER BY m.created_at DESC,m.id DESC LIMIT 1) AS last_text,
+        (SELECT m.created_at FROM messages m WHERE m.chat_id=c.id ORDER BY m.created_at DESC,m.id DESC LIMIT 1) AS last_created,
+        (SELECT COUNT(*) FROM messages m WHERE m.chat_id=c.id AND m.sender_id<>? AND m.read_at IS NULL) AS unread
       FROM chats c
-      JOIN users a ON a.id = c.user_a
-      JOIN users b ON b.id = c.user_b
-      JOIN projects p ON p.id = c.project_id AND p.contact_method = 'Сайт' AND p.executor_id IS NOT NULL
-      WHERE (c.user_a = ? OR c.user_b = ?)
-        AND ((p.client_id = c.user_a AND p.executor_id = c.user_b)
-          OR (p.client_id = c.user_b AND p.executor_id = c.user_a))
-        AND ? IN (p.client_id, p.executor_id)
-      ORDER BY COALESCE(last_created, c.created_at) DESC
-    `).all(uid, uid, uid, uid, uid, uid, uid);
-    return res.json({ chats: rows.map(r => ({
-      id: Number(r.id),
-      projectId: Number(r.project_id),
-      projectTitle: r.project_title || ('Заказ #' + r.project_id),
-      projectStatus: r.project_status || '',
-      peer: { id: Number(r.peer_id), name: r.peer_name || 'Пользователь', avatar: r.peer_avatar || null },
-      lastMessage: r.last_text == null ? null : { text: r.last_text, createdAt: Number(r.last_created || 0) },
-      unread: Number(r.unread || 0)
-    })) });
-  } catch (err) {
-    console.error('Ошибка загрузки чатов:', err);
-    return res.status(500).json({ error: 'Не удалось загрузить чаты' });
+      JOIN users a ON a.id=c.user_a
+      JOIN users b ON b.id=c.user_b
+      LEFT JOIN projects p ON p.id=c.project_id
+      WHERE (c.user_a=? OR c.user_b=?)
+        AND (c.project_id IS NULL OR (
+          p.contact_method='Сайт' AND p.executor_id IS NOT NULL
+          AND ((p.client_id=c.user_a AND p.executor_id=c.user_b)
+            OR (p.client_id=c.user_b AND p.executor_id=c.user_a))
+          AND ? IN (p.client_id,p.executor_id)
+        ))
+      ORDER BY COALESCE(last_created,c.created_at) DESC
+    \`).all(uid,uid,uid,uid,uid,uid,uid,uid);
+    return res.json({chats:rows.map(r=>({
+      id:Number(r.id),projectId:r.project_id==null?null:Number(r.project_id),
+      projectTitle:r.project_id==null?null:(r.project_title||('Заказ #'+r.project_id)),
+      projectStatus:r.project_status||'',
+      peer:{id:Number(r.peer_id),name:r.peer_name||'Пользователь',avatar:r.peer_avatar||null,role:r.peer_role||'client'},
+      lastMessage:r.last_text==null?null:{text:r.last_text,createdAt:Number(r.last_created||0)},
+      unread:Number(r.unread||0)
+    }))});
+  } catch(err) {
+    console.error('Ошибка загрузки чатов:',err);
+    return res.status(500).json({error:'Не удалось загрузить чаты'});
   }
 });
 
-app.post('/api/chats', auth, (req, res) => {
-  const uid = Number(req.user.id);
-  const peerId = Number(req.body?.peerId);
-  const requestedProjectId = Number(req.body?.projectId);
-  if (!Number.isSafeInteger(peerId) || peerId <= 0 || peerId === uid)
-    return res.status(400).json({ error: 'Некорректный собеседник' });
+app.post('/api/chats', auth, (req,res) => {
+  const uid=Number(req.user.id),peerId=Number(req.body?.peerId);
+  const requestedProjectId=Number(req.body?.projectId);
+  if(!Number.isSafeInteger(peerId)||peerId<=0||peerId===uid)
+    return res.status(400).json({error:'Некорректный собеседник'});
   try {
-    const userA = Math.min(uid, peerId);
-    const userB = Math.max(uid, peerId);
-    let project = null;
-    let chat = null;
-
-    if (Number.isSafeInteger(requestedProjectId) && requestedProjectId > 0) {
-      project = db.prepare("SELECT id,client_id,executor_id,contact_method,status FROM projects WHERE id=?").get(requestedProjectId);
-      if (!project || Number(project.client_id) !== (req.user.role === 'client' ? uid : peerId) ||
-          Number(project.executor_id) !== (req.user.role === 'executor' ? uid : peerId) ||
-          project.contact_method !== 'Сайт' || !project.executor_id) {
-        return res.status(403).json({ error: 'Чат доступен только заказчику и назначенному исполнителю заказа с выбранной связью через сайт' });
-      }
-      chat = db.prepare('SELECT id,project_id FROM chats WHERE user_a=? AND user_b=? AND project_id=?').get(userA,userB,requestedProjectId);
-      if (!chat) {
-        const info = db.prepare('INSERT INTO chats (user_a,user_b,project_id,created_at) VALUES (?,?,?,?)')
-          .run(userA,userB,requestedProjectId,Date.now());
-        chat = { id: Number(info.lastInsertRowid), project_id: requestedProjectId };
+    const peer=db.prepare('SELECT id,name,avatar,role FROM users WHERE id=?').get(peerId);
+    if(!peer) return res.status(404).json({error:'Пользователь не найден'});
+    const userA=Math.min(uid,peerId),userB=Math.max(uid,peerId);
+    let chat=null;
+    if(Number.isSafeInteger(requestedProjectId)&&requestedProjectId>0) {
+      const project=db.prepare('SELECT id,client_id,executor_id,contact_method FROM projects WHERE id=?').get(requestedProjectId);
+      if(!project||Number(project.client_id)!==(req.user.role==='client'?uid:peerId)||
+        Number(project.executor_id)!==(req.user.role==='executor'?uid:peerId)||
+        project.contact_method!=='Сайт'||!project.executor_id)
+        return res.status(403).json({error:'Чат заказа доступен только его заказчику и назначенному исполнителю при связи через сайт'});
+      chat=db.prepare('SELECT id,project_id FROM chats WHERE user_a=? AND user_b=? AND project_id=?').get(userA,userB,requestedProjectId);
+      if(!chat) {
+        const info=db.prepare('INSERT INTO chats(user_a,user_b,project_id,created_at) VALUES(?,?,?,?)').run(userA,userB,requestedProjectId,Date.now());
+        chat={id:Number(info.lastInsertRowid),project_id:requestedProjectId};
       }
     } else {
-      // Opening a saved conversation from the messenger list must resolve to
-      // an already-existing order thread; it must never create an unlinked chat.
-      const candidates = db.prepare('SELECT id,project_id FROM chats WHERE user_a=? AND user_b=? AND project_id IS NOT NULL ORDER BY id DESC').all(userA,userB);
-      chat = candidates.find(row => {
-        const linked = getAllowedProjectChat(row.id);
-        return canUseProjectChat(linked,uid) &&
-          Number(linked.client_id) === (req.user.role === 'client' ? uid : peerId) &&
-          Number(linked.executor_id) === (req.user.role === 'executor' ? uid : peerId);
-      }) || null;
-      if (!chat) return res.status(403).json({ error: 'Нет доступа к переписке по этому заказу' });
-      project = db.prepare('SELECT id FROM projects WHERE id=?').get(chat.project_id);
+      chat=db.prepare('SELECT id,project_id FROM chats WHERE user_a=? AND user_b=? AND project_id IS NULL').get(userA,userB);
+      if(!chat) {
+        const info=db.prepare('INSERT INTO chats(user_a,user_b,project_id,created_at) VALUES(?,?,NULL,?)').run(userA,userB,Date.now());
+        chat={id:Number(info.lastInsertRowid),project_id:null};
+      }
     }
-
-    const linked = getAllowedProjectChat(chat.id);
-    if (!canUseProjectChat(linked,uid)) return res.status(403).json({ error: 'Нет доступа к этой переписке' });
-    const peer = db.prepare('SELECT id,name,avatar,role FROM users WHERE id=?').get(peerId);
-    if (!peer) return res.status(404).json({ error: 'Пользователь не найден' });
-    return res.json({ chatId: Number(chat.id), projectId: Number(chat.project_id), peer: { id:Number(peer.id), name:peer.name||'Пользователь', avatar:peer.avatar||null, role:peer.role } });
-  } catch (err) {
-    console.error('Ошибка создания чата:', err);
-    return res.status(500).json({ error: 'Не удалось открыть чат' });
+    const linked=getAllowedProjectChat(chat.id);
+    if(!canUseProjectChat(linked,uid)) return res.status(403).json({error:'Нет доступа к этой переписке'});
+    return res.json({chatId:Number(chat.id),projectId:chat.project_id==null?null:Number(chat.project_id),
+      peer:{id:Number(peer.id),name:peer.name||'Пользователь',avatar:peer.avatar||null,role:peer.role}});
+  } catch(err) {
+    console.error('Ошибка создания чата:',err);
+    return res.status(500).json({error:'Не удалось открыть чат'});
   }
 });
 
-app.get('/api/chats/:chatId/messages', auth, (req, res) => {
-  const chatId = Number(req.params.chatId);
-  if (!Number.isSafeInteger(chatId) || chatId <= 0) return res.status(400).json({ error: 'Некорректный ID чата' });
+app.get('/api/chats/:chatId/messages', auth, (req,res) => {
+  const chatId=Number(req.params.chatId);
+  if(!Number.isSafeInteger(chatId)||chatId<=0) return res.status(400).json({error:'Некорректный ID чата'});
   try {
-    const chat = getAllowedProjectChat(chatId);
-    if (!chat) return res.status(404).json({ error: 'Чат не найден' });
-    if (!canUseProjectChat(chat,req.user.id)) return res.status(403).json({ error: 'Нет доступа к этому чату' });
-    db.prepare('UPDATE messages SET read_at = ? WHERE chat_id = ? AND sender_id != ? AND read_at IS NULL')
-      .run(Date.now(), chatId, req.user.id);
-    const messages = db.prepare(`
-      SELECT m.id, m.chat_id AS chatId, m.sender_id AS senderId, m.text, m.created_at AS createdAt, m.read_at AS readAt
-      FROM messages m WHERE m.chat_id = ? ORDER BY m.created_at ASC, m.id ASC LIMIT 500
-    `).all(chatId).map(m => ({ ...m, id: Number(m.id), chatId: Number(m.chatId), senderId: Number(m.senderId), createdAt: Number(m.createdAt), readAt: m.readAt == null ? null : Number(m.readAt) }));
-    return res.json({ messages });
-  } catch (err) {
-    console.error('Ошибка загрузки сообщений:', err);
-    return res.status(500).json({ error: 'Не удалось загрузить сообщения' });
+    const chat=getAllowedProjectChat(chatId);
+    if(!chat) return res.status(404).json({error:'Чат не найден'});
+    if(!canUseProjectChat(chat,req.user.id)) return res.status(403).json({error:'Нет доступа к этому чату'});
+    db.prepare('UPDATE messages SET read_at=? WHERE chat_id=? AND sender_id<>? AND read_at IS NULL').run(Date.now(),chatId,req.user.id);
+    const messages=db.prepare(\`SELECT m.id,m.chat_id AS chatId,m.sender_id AS senderId,m.text,m.created_at AS createdAt,m.read_at AS readAt
+      FROM messages m WHERE m.chat_id=? ORDER BY m.created_at ASC,m.id ASC LIMIT 500\`).all(chatId)
+      .map(m=>({...m,id:Number(m.id),chatId:Number(m.chatId),senderId:Number(m.senderId),createdAt:Number(m.createdAt),readAt:m.readAt==null?null:Number(m.readAt)}));
+    return res.json({messages});
+  } catch(err) {
+    console.error('Ошибка загрузки сообщений:',err);
+    return res.status(500).json({error:'Не удалось загрузить сообщения'});
   }
 });
 
-app.post('/api/chats/:chatId/messages', auth, (req, res) => {
-  const chatId = Number(req.params.chatId);
-  const cleanText = String(req.body?.text || '').trim().slice(0, 2000);
-  if (!Number.isSafeInteger(chatId) || chatId <= 0) return res.status(400).json({ error: 'Некорректный ID чата' });
-  if (!cleanText) return res.status(400).json({ error: 'Введите сообщение' });
+app.post('/api/chats/:chatId/messages', auth, (req,res) => {
+  const chatId=Number(req.params.chatId),cleanText=String(req.body?.text||'').trim().slice(0,2000);
+  if(!Number.isSafeInteger(chatId)||chatId<=0) return res.status(400).json({error:'Некорректный ID чата'});
+  if(!cleanText) return res.status(400).json({error:'Введите сообщение'});
   try {
-    const chat = getAllowedProjectChat(chatId);
-    if (!chat) return res.status(404).json({ error: 'Чат не найден' });
-    if (!canUseProjectChat(chat, req.user.id)) return res.status(403).json({ error: 'Нет доступа к этому чату' });
-    const now = Date.now();
-    const info = db.prepare('INSERT INTO messages (chat_id, sender_id, text, created_at) VALUES (?, ?, ?, ?)')
-      .run(chatId, Number(req.user.id), cleanText, now);
-    const message = { id: Number(info.lastInsertRowid), chatId, senderId: Number(req.user.id), text: cleanText, createdAt: now, readAt: null };
-    io.to('chat:' + chatId).emit('chat:new', message);
-    io.to('chat:' + chatId).emit('chat:notify', { chatId, message: { senderName: req.user.name || 'Пользователь', text: cleanText } });
-    return res.status(201).json({ message });
-  } catch (err) {
-    console.error('Ошибка отправки сообщения через API:', err);
-    return res.status(500).json({ error: 'Не удалось отправить сообщение' });
+    const chat=getAllowedProjectChat(chatId);
+    if(!chat) return res.status(404).json({error:'Чат не найден'});
+    if(!canUseProjectChat(chat,req.user.id)) return res.status(403).json({error:'Нет доступа к этому чату'});
+    const now=Date.now();
+    const info=db.prepare('INSERT INTO messages(chat_id,sender_id,text,created_at) VALUES(?,?,?,?)').run(chatId,Number(req.user.id),cleanText,now);
+    const message={id:Number(info.lastInsertRowid),chatId,senderId:Number(req.user.id),text:cleanText,createdAt:now,readAt:null};
+    io.to('chat:'+chatId).emit('chat:new',message);
+    io.to('chat:'+chatId).emit('chat:notify',{chatId,message:{senderName:req.user.name||'Пользователь',text:cleanText}});
+    return res.status(201).json({message});
+  } catch(err) {
+    console.error('Ошибка отправки сообщения через API:',err);
+    return res.status(500).json({error:'Не удалось отправить сообщение'});
   }
 });
 
