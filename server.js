@@ -339,7 +339,7 @@ safeAddColumn('chats', 'project_id', 'INTEGER');
 // and chat IDs are preserved, so existing history remains attached.
 {
   const chatSchema = db.prepare("SELECT sql FROM sqlite_master WHERE type='table' AND name='chats'").get()?.sql || '';
-  if (/UNIQUE\\s*\\(\\s*user_a\\s*,\\s*user_b\\s*\\)/i.test(chatSchema)) {
+  if (/UNIQUE\s*\(\s*user_a\s*,\s*user_b\s*\)/i.test(chatSchema)) {
     db.pragma('foreign_keys = OFF');
     try {
       db.exec(`
