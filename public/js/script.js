@@ -1828,7 +1828,7 @@ function renderAdminUsers() {
             ? `<button class="admin-act-btn" onclick="adminSetRole(${id},'client')">Клиент</button><button class="admin-act-btn" onclick="adminSetRole(${id},'executor')">Исполнитель</button><button class="admin-act-btn" onclick="adminSetRole(${id},'manager')">Менеджер</button>${canSetAdmin ? `<button class="admin-act-btn" onclick="adminSetRole(${id},'admin')">Админ</button>` : ''}`
             : `<span style="color:var(--text-mute);font-size:0.78rem;padding:6px 12px">${isRootUser ? '👑 Главный админ' : '🔒 Недоступно'}</span>`;
         const balanceButton = canAdjustBalance
-            ? `<button class="admin-act-btn" onclick="adminAdjustBalance(${id})"><i class="fas fa-coins"></i> Баланс</button>`
+            ? `<button class="admin-act-btn" onclick="adminAdjustBalance(${id})"><i class="fas fa-coins"></i> Баланс</button><button class="admin-act-btn" onclick="adminZeroBalance(${id})" ${Number(u.balance) > 0 ? '' : 'disabled'}><i class="fas fa-eraser"></i> Обнулить</button>`
             : '';
 
         return `<div class="admin-user-row"><div class="admin-user-avatar" ${isRootUser ? 'style="box-shadow:0 0 0 2px #fbbf24;"' : ''}>${avatar}</div><div class="admin-user-info"><div class="admin-user-name">${escapeHtml(name)}${isRootUser ? ' <span style="color:#fbbf24;font-weight:700">👑</span>' : ''}${isSelf ? ' <span style="color:var(--text-mute);font-weight:500">(вы)</span>' : ''}</div><div class="admin-user-email">${escapeHtml(email)}<br><span style="opacity:.72;font-size:.78rem">Регистрация: ${Number(u.createdAt ?? u.created_at ?? 0) ? new Date(Number(u.createdAt ?? u.created_at ?? 0)).toLocaleString("ru-RU") : "дата неизвестна"} · ID #${id}</span></div></div><span class="admin-user-role role-badge-${escapeHtml(role)}">${escapeHtml(ROLE_LABELS[role] || role)}</span><span class="admin-user-balance">${escapeHtml(formatMoney(Number(u.balance) || 0))}</span><div class="admin-user-actions"><button class="admin-act-btn primary" onclick="openUserFull(${id})"><i class="fas fa-eye"></i> История</button>${roleButtons}${balanceButton}</div></div>`;
@@ -1837,6 +1837,33 @@ function renderAdminUsers() {
 async function approveRequest(userId) { try { await api('/api/admin/approve', { method: 'POST', body: { userId } }); showToast('✅ Одобрено'); await loadAdminData(); await fetchMe(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 async function rejectRequest(userId) { try { await api('/api/admin/reject', { method: 'POST', body: { userId } }); showToast('❌ Отклонено'); await loadAdminData(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
 async function adminSetRole(userId, role) { try { await api('/api/admin/role', { method: 'POST', body: { userId, role } }); showToast(`✅ Роль → ${ROLE_LABELS[role]}`); await loadAdminData(); await fetchMe(); } catch (err) { showToast('❌ ' + err.message, 'error'); } }
+async function adminZeroBalance(userId) {
+    const u = state.adminUsers.find(x => Number(x.id) === Number(userId));
+    if (!u) return showToast('❌ Пользователь не найден', 'error');
+
+    const currentKopecks = Number(u.balance ?? 0);
+    if (!Number.isSafeInteger(currentKopecks) || currentKopecks < 0) {
+        return showToast('❌ Некорректный баланс пользователя', 'error');
+    }
+    if (currentKopecks === 0) {
+        return showToast('ℹ️ Баланс уже равен 0 ₽');
+    }
+
+    const amount = -(currentKopecks / 100);
+    if (!confirm(`Обнулить баланс пользователя «${u.name}»?\\nБудет списано: ${formatMoney(currentKopecks)}\\nПосле операции: 0 ₽`)) return;
+
+    try {
+        await api('/api/admin/balance', {
+            method: 'POST',
+            body: { userId: Number(userId), amount }
+        });
+        showToast('✅ Баланс обнулён');
+        await loadAdminData();
+        await fetchMe();
+    } catch (err) {
+        showToast('❌ ' + err.message, 'error');
+    }
+}
 async function adminAdjustBalance(userId) {
     const u = state.adminUsers.find(x => Number(x.id) === Number(userId));
     if (!u) return showToast('❌ Пользователь не найден', 'error');
