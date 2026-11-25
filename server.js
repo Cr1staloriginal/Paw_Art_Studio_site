@@ -17,7 +17,16 @@ const app = express();
 const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
-const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
+const JWT_SECRET = process.env.JWT_SECRET || (process.env.NODE_ENV === 'production' ? '' : 'local-development-secret-not-for-production');
+if (process.env.NODE_ENV === 'production') {
+  if (JWT_SECRET.length < 32 || /change_me|dev_secret|example/i.test(JWT_SECRET)) {
+    throw new Error('SECURITY: production requires a unique JWT_SECRET of at least 32 characters');
+  }
+  if (!process.env.ADMIN_EMAIL || !process.env.ADMIN_PASSWORD ||
+      /example\.com|change_me|password_here/i.test(process.env.ADMIN_EMAIL + ' ' + process.env.ADMIN_PASSWORD)) {
+    throw new Error('SECURITY: production requires explicit ADMIN_EMAIL and ADMIN_PASSWORD');
+  }
+}
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@example.com').toLowerCase();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'change_me';
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -57,8 +66,18 @@ if (process.env.YOOKASSA_SHOP_ID && process.env.YOOKASSA_SECRET_KEY) {
   console.log('⚠️ ЮKassa не настроена');
 }
 
+const ALLOWED_ORIGINS = new Set([
+  SITE_URL,
+  ...(process.env.CORS_ORIGINS || '').split(',').map(value => value.trim()).filter(Boolean),
+].map(value => {
+  try { return new URL(value).origin; } catch { throw new Error('Invalid CORS origin: ' + value); }
+}));
+const corsOrigin = (origin, callback) => {
+  if (!origin || ALLOWED_ORIGINS.has(origin)) return callback(null, true);
+  return callback(new Error('Origin is not allowed by CORS'));
+};
 const io = new SocketServer(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
+  cors: { origin: corsOrigin, methods: ['GET', 'POST'] },
   transports: ['websocket', 'polling'],
 });
 
@@ -490,10 +509,40 @@ if (contentCount === 0) {
 }
 
 app.set('trust proxy', 1);
-app.use(cors());
+app.disable('x-powered-by');
+app.use((req, res, next) => {
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  res.setHeader('Referrer-Policy', 'strict-origin-when-cross-origin');
+  res.setHeader('X-Frame-Options', 'DENY');
+  res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
+  if (IS_PROD) res.setHeader('Strict-Transport-Security', 'max-age=31536000; includeSubDomains');
+  next();
+});
+app.use(cors({ origin: corsOrigin, methods: ['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'OPTIONS'], allowedHeaders: ['Content-Type', 'Authorization'] }));
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: IS_PROD ? '7d' : 0 }));
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: IS_PROD ? '30d' : 0 }));
+
+// Lightweight per-process rate limiter. For multi-instance deployments use a shared store.
+const rateLimitBuckets = new Map();
+function rateLimit({ windowMs = 15 * 60 * 1000, max = 20 } = {}) {
+  return (req, res, next) => {
+    const key = String(req.ip || req.socket.remoteAddress || 'unknown') + ':' + req.path;
+    const now = Date.now();
+    let bucket = rateLimitBuckets.get(key);
+    if (!bucket || now >= bucket.resetAt) bucket = { count: 0, resetAt: now + windowMs };
+    bucket.count += 1;
+    rateLimitBuckets.set(key, bucket);
+    if (rateLimitBuckets.size > 10000) {
+      for (const [k, v] of rateLimitBuckets) if (now >= v.resetAt) rateLimitBuckets.delete(k);
+    }
+    res.setHeader('RateLimit-Limit', String(max));
+    res.setHeader('RateLimit-Remaining', String(Math.max(0, max - bucket.count)));
+    res.setHeader('RateLimit-Reset', String(Math.ceil(bucket.resetAt / 1000)));
+    if (bucket.count > max) return res.status(429).json({ error: 'Слишком много запросов. Попробуйте позже.' });
+    next();
+  };
+}
 
 // --- Helpers ---
 function auth(req, res, next) {
@@ -615,7 +664,7 @@ app.get('/health', (req, res) =>
 /* ==================== AUTH ==================== */
 const TERMS_VERSION = '2026-10-27';
 
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', rateLimit({ max: 8 }), async (req, res) => {
   const { name, email, password, ref, agreementAccepted } = req.body || {};
   if (agreementAccepted !== true)
     return res.status(400).json({ error: 'Для регистрации необходимо принять Пользовательское соглашение' });
@@ -680,7 +729,7 @@ app.post('/api/auth/register', async (req, res) => {
   }
 });
 
-app.post('/api/auth/verify-email', (req, res) => {
+app.post('/api/auth/verify-email', rateLimit({ max: 10 }), (req, res) => {
   try {
     const { email, code } = req.body || {};
     if (!email || code === undefined || code === null) return res.status(400).json({ error: 'Укажите email и код' });
@@ -715,7 +764,7 @@ app.post('/api/auth/verify-email', (req, res) => {
   }
 });
 
-app.post('/api/auth/resend-code', async (req, res) => {
+app.post('/api/auth/resend-code', rateLimit({ max: 5 }), async (req, res) => {
   const { email } = req.body || {};
   if (!email) return res.status(400).json({ error: 'Укажите email' });
   const cleanEmail = String(email).trim().toLowerCase();
@@ -734,7 +783,7 @@ app.post('/api/auth/resend-code', async (req, res) => {
   res.json({ ok: true, message: 'Код отправлен повторно' });
 });
 
-app.post('/api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', rateLimit({ max: 5 }), async (req, res) => {
   const email = String(req.body?.email || '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Укажите корректный email' });
   const user = db.prepare('SELECT id, email_verified FROM users WHERE email = ?').get(email);
@@ -761,7 +810,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   res.json({ ok: true, message: 'Если аккаунт существует, код отправлен на почту' });
 });
 
-app.post('/api/auth/reset-password', (req, res) => {
+app.post('/api/auth/reset-password', rateLimit({ max: 8 }), (req, res) => {
   const email = String(req.body?.email || '').trim().toLowerCase();
   const code = String(req.body?.code || '').trim();
   const password = String(req.body?.password || '');
@@ -788,7 +837,7 @@ app.post('/api/auth/reset-password', (req, res) => {
   res.json({ ok: true, message: 'Пароль успешно изменён' });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', rateLimit({ max: 10 }), (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Заполните все поля' });
 
@@ -1270,7 +1319,7 @@ function optionalRequestUser(req) {
   } catch { return null; }
 }
 
-app.post('/api/requests', (req, res) => {
+app.post('/api/requests', rateLimit({ windowMs: 60 * 60 * 1000, max: 12 }), (req, res) => {
   try {
     const b = req.body || {};
     const v = {
