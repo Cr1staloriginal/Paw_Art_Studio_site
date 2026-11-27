@@ -13,7 +13,7 @@ test('partner referral, discount, verified reward and payout lifecycle', async t
   const port = 32000 + (process.pid % 10000);
   const env = {
     ...process.env, NODE_ENV: 'test', PORT: String(port), HOST: '127.0.0.1',
-    DATABASE_PATH: dbPath, UPLOAD_DIR: path.join(dir, 'uploads'),
+    DATABASE_PATH: dbPath, UPLOAD_DIR: path.join(dir, 'uploads'), DELIVERY_DIR: path.join(dir, 'deliveries'),
     JWT_SECRET: 'test-secret-partner-suite', ADMIN_EMAIL: 'admin@test.local',
     ADMIN_PASSWORD: 'AdminTest123'
   };
