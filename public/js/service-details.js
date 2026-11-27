@@ -102,7 +102,7 @@
       button.type = 'button';
       button.className = 'paw-service-more';
       button.textContent = tr('Подробнее','Details');
-      button.setAttribute('aria-label', tr('Подробнее об услуге ','More about this service ') + (card.dataset.service || ''));
+      button.setAttribute('aria-label', 'Подробнее');
       content.appendChild(button);
     }
   });
