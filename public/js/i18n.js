@@ -269,7 +269,8 @@
     'Описание сообщества':'Community description',
     'Стоимость обсуждается':'Price to be discussed','Не добавлено':'Not included',
     'Услуга':'Service','Количество:':'Quantity:','Предварительная стоимость:':'Estimated price:',
-    'Закрыть':'Close','Подробнее':'Details','Клиенты':'Clients'
+    'Закрыть':'Close','Подробнее':'Details','Клиенты':'Clients',
+    'Кабинет партнёра — Paw Art Studio':'Partner dashboard — Paw Art Studio'
   };
   const reverse = Object.fromEntries(Object.entries(translations).map(([ru,en]) => [en,ru]));
   let language = localStorage.getItem(STORAGE_KEY) === 'en' ? 'en' : 'ru';
