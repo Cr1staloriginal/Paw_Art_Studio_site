@@ -2,7 +2,7 @@ name: Sync npm lockfile
 
 on:
   push:
-    branches: [main, fix/partner-test-and-multer-security]
+    branches: [main]
     paths:
       - package.json
       - .github/workflows/sync-lockfile.yml
@@ -17,7 +17,7 @@ jobs:
       - name: Checkout repository
         uses: actions/checkout@v4
         with:
-          ref: ${{ github.ref_name }}
+          ref: main
           token: ${{ secrets.GITHUB_TOKEN }}
 
       - name: Set up Node.js
@@ -26,21 +26,18 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Regenerate and audit lockfile
-        run: |
-          npm install --package-lock-only --ignore-scripts
-          npm audit fix --package-lock-only --ignore-scripts
-          npm audit --json > "$RUNNER_TEMP/npm-audit.json" || true
-          node -e "const a=require(process.env.RUNNER_TEMP+'/npm-audit.json');const v=a.metadata?.vulnerabilities||{};console.log('AUDIT SUMMARY '+JSON.stringify(v));for(const [n,x] of Object.entries(a.vulnerabilities||{}))console.log(n+': '+x.severity+'; fix='+JSON.stringify(x.fixAvailable));"
+      - name: Regenerate lockfile from package.json
+        run: npm install --package-lock-only --ignore-scripts
 
       - name: Commit lockfile if changed
         run: |
-          git add package-lock.json
-          if git diff --cached --quiet; then
+          if git diff --quiet -- package-lock.json; then
             echo "package-lock.json is already synchronized"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git commit -m "chore: update dependency lockfile and security fixes"
-          git push origin HEAD:${{ github.ref_name }}
+          git add package-lock.json
+          git commit -m "chore: synchronize npm lockfile"
+          git pull --rebase origin main
+          git push origin HEAD:main
