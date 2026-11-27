@@ -272,6 +272,152 @@
     'Закрыть':'Close','Подробнее':'Details','Клиенты':'Clients',
     'Кабинет партнёра — Paw Art Studio':'Partner dashboard — Paw Art Studio'
   };
+  Object.assign(translations, {
+    'Требуется авторизация':'Authentication required',
+    'Не найден':'Not found','Токен недействителен':'Invalid token','Нужны права админа':'Administrator permissions required',
+    'Доступно редакторам сайта и администраторам':'Available to site editors and administrators',
+    'Только главный админ':'Super administrator only',
+    'Для регистрации необходимо принять Пользовательское соглашение':'You must accept the Terms of Service to register',
+    'Заполните все поля':'Please complete all fields','Пароль минимум 6 символов':'Password must be at least 6 characters',
+    'Некорректный email':'Invalid email address','Email занят':'Email address is already in use',
+    'Внутренняя ошибка сервера. Попробуйте позже.':'Internal server error. Please try again later.',
+    'Укажите email и код':'Enter your email and code','Введите шестизначный код из письма':'Enter the six-digit code from the email',
+    'Email уже подтверждён. Попробуйте войти.':'Email is already verified. Please sign in.',
+    'Код не найден. Запросите новый.':'Code not found. Request a new one.',
+    'Неверный код. Проверьте письмо и попробуйте снова.':'Incorrect code. Check your email and try again.',
+    'Код истёк. Запросите новый.':'Code expired. Request a new one.',
+    'Не удалось загрузить данные пользователя':'Could not load user data',
+    'Код уже использован или истёк. Запросите новый.':'Code has already been used or expired. Request a new one.',
+    'Ошибка сервера при подтверждении email. Попробуйте позже.':'Server error while verifying email. Please try again later.',
+    'Укажите email':'Enter your email','Email уже подтверждён':'Email is already verified',
+    'Укажите корректный email':'Enter a valid email address',
+    'Не удалось отправить письмо. Попробуйте позже или обратитесь в поддержку.':'Could not send the email. Please try again later or contact support.',
+    'Проверьте email, шестизначный код и пароль (минимум 6 символов)':'Check your email, six-digit code and password (at least 6 characters)',
+    'Слишком много попыток. Запросите новый код.':'Too many attempts. Request a new code.',
+    'Неверный код':'Incorrect code','Аккаунт не найден или email не подтверждён':'Account not found or email is not verified',
+    'Неверный email или пароль':'Incorrect email or password','Email не подтверждён. Проверьте почту.':'Email is not verified. Check your inbox.',
+    'Ожидается объект updates':'An updates object is required','Нет полей для сохранения':'There are no fields to save',
+    'Слишком много полей':'Too many fields','Не удалось сохранить контент':'Could not save content',
+    'Файл больше 5 МБ':'File exceeds 5 MB','Допустимы изображения PNG, JPG, WEBP и GIF':'PNG, JPG, WEBP and GIF images are allowed',
+    'Выберите изображение':'Choose an image','Некорректный ID заказа':'Invalid order ID',
+    'ЮKassa не настроена. Оплата заказа пока недоступна.':'YooKassa is not configured. Order payment is currently unavailable.',
+    'Оплатить заказ может только его заказчик':'Only the customer can pay for this order',
+    'Этот заказ нельзя оплатить: он отменён или ожидает возврата':'This order cannot be paid: it is cancelled or awaiting a refund',
+    'Заказ уже оплачен':'Order has already been paid',
+    'У заказа не указана корректная сумма (минимум 1 ₽)':'Order amount is invalid (minimum RUB 1)',
+    'Для этого заказа уже создан платёж. Завершите оплату или дождитесь отмены платежа.':'A payment has already been created for this order. Complete it or wait for it to be cancelled.',
+    'Не удалось создать платёж за заказ через ЮKassa. Попробуйте позже.':'Could not create the order payment through YooKassa. Please try again later.',
+    'ЮKassa не настроена. Обратитесь к админу.':'YooKassa is not configured. Contact an administrator.',
+    'Минимум 1 ₽':'Minimum RUB 1','Введите текущий пароль':'Enter your current password',
+    'Текущий пароль неверен':'Current password is incorrect','Новый пароль минимум 6 символов':'New password must be at least 6 characters',
+    'Нечего обновлять':'There is nothing to update','Файл не загружен':'No file was uploaded',
+    'Прямое пополнение отключено. Используйте защищённую оплату через ЮKassa.':'Direct top-ups are disabled. Use secure YooKassa checkout.',
+    'Вывод средств доступен только исполнителям заказов':'Withdrawals are available only to artists',
+    'Некорректная сумма':'Invalid amount','Укажите корректный номер карты (16–19 цифр)':'Enter a valid card number (16–19 digits)',
+    'Недостаточно средств':'Insufficient funds','Введите промокод':'Enter a promo code',
+    'Промокод не найден':'Promo code not found','Промокод неактивен':'Promo code is inactive',
+    'Промокод истёк':'Promo code has expired','Лимит использований исчерпан':'Usage limit has been reached',
+    'Вы уже использовали этот промокод':'You have already used this promo code',
+    'Не удалось активировать промокод':'Could not redeem the promo code','Нет кода':'No code provided',
+    'Реферал не найден':'Referral not found','Укажите имя и услугу':'Enter your name and select a service',
+    'Неизвестный способ связи':'Unknown contact method','Укажите контакт для связи':'Enter contact details',
+    'Для применения промокода войдите в аккаунт':'Sign in to use a promo code',
+    'Промокод не найден или неактивен':'Promo code not found or inactive',
+    'Промокод партнёра временно недоступен':'Partner promo code is temporarily unavailable',
+    'Срок действия промокода истёк':'Promo code has expired',
+    'Лимит использований промокода исчерпан':'Promo code usage limit has been reached',
+    'Этот промокод не даёт скидку на заявку':'This promo code does not apply a discount to requests',
+    'Не удалось сохранить заявку':'Could not save the request','Некорректный ID заявки':'Invalid request ID',
+    'Заявка не найдена':'Request not found','Не удалось загрузить заявку':'Could not load the request',
+    'Некорректный ID пользователя':'Invalid user ID','Не удалось загрузить историю пользователя':'Could not load user history',
+    'Недостаточно прав':'Insufficient permissions','Не удалось загрузить пользователей':'Could not load users',
+    'Не удалось загрузить статистику':'Could not load statistics','Не удалось загрузить заявки':'Could not load requests',
+    'У пользователя нет ожидающей заявки':'User has no pending request',
+    'Некорректная сумма или ID пользователя':'Invalid amount or user ID',
+    'Сумма превышает допустимый диапазон':'Amount exceeds the permitted range',
+    'Не удалось изменить баланс':'Could not update the balance','Заявка уже обработана':'Request has already been processed',
+    'Некорректная роль':'Invalid role','Админ не меняет роль':'Administrators cannot change their own role',
+    'Эта роль уже ваша':'You already have this role','Нет доступа к заказам':'No access to orders',
+    'Не удалось загрузить заказы':'Could not load orders','Некорректный способ связи':'Invalid contact method',
+    'Контакт слишком длинный':'Contact details are too long',
+    'Укажите контакт для выбранного способа связи':'Enter contact details for the selected method',
+    'Заполните поля':'Please complete the fields','Превышена допустимая длина полей':'One or more fields exceed the maximum length',
+    'Некорректный бюджет':'Invalid budget',
+    'Чтобы применить скидку, укажите бюджет заказа не менее 1 ₽':'To apply a discount, enter an order budget of at least RUB 1',
+    'Этот промокод не даёт скидку на заказ':'This promo code does not apply a discount to orders',
+    'Промокод уже использован':'Promo code has already been used','Не удалось создать заказ':'Could not create the order',
+    'Нет доступа к этому заказу':'No access to this order','Не удалось загрузить заказ':'Could not load the order',
+    'Только исполнитель может взять заказ':'Only an artist can accept an order','Не удалось взять заказ':'Could not accept the order',
+    'Нет доступа':'Access denied','Только назначенный исполнитель может сдать работу':'Only the assigned artist can submit work',
+    'Заказ не находится в работе':'Order is not in progress','Прикрепите файлы результата':'Attach the completed work files',
+    'Не удалось сохранить результат':'Could not save the delivery','Файл не найден':'File not found',
+    'Файл недоступен':'File is unavailable','Только заказчик может принять работу':'Only the customer can accept the delivery',
+    'Нет результата на проверке':'There is no delivery awaiting review',
+    'Только заказчик может запросить исправления':'Only the customer can request revisions',
+    'Заказ не ожидает проверки':'Order is not awaiting review','Опишите необходимые исправления':'Describe the required revisions',
+    'Некорректный статус заказа':'Invalid order status',
+    'Передача на проверку и завершение заказа выполняются только через систему сдачи работы':'Submitting work for review and completing an order must be done through the delivery workflow',
+    'Отменённый заказ нельзя повторно открыть':'A cancelled order cannot be reopened',
+    'Нет доступа к изменению этого заказа':'You do not have permission to change this order',
+    'Не удалось изменить статус заказа':'Could not update the order status',
+    'Нет прав для загрузки работ в портфолио':'You do not have permission to upload portfolio work',
+    'Изображение больше 5 МБ':'Image exceeds 5 MB',
+    'Не удалось принять изображение. Используйте PNG, JPG, WEBP, AVIF или GIF до 5 МБ.':'Image could not be accepted. Use PNG, JPG, WEBP, AVIF or GIF up to 5 MB.',
+    'Выберите изображение PNG, JPG, WEBP, AVIF или GIF до 5 МБ.':'Choose a PNG, JPG, WEBP, AVIF or GIF image up to 5 MB.',
+    'Укажите название работы':'Enter a title for the work','Название не должно превышать 120 символов':'Title must not exceed 120 characters',
+    'Описание не должно превышать 500 символов':'Description must not exceed 500 characters',
+    'Некорректный пользователь':'Invalid user','Выбранный пользователь не найден':'Selected user was not found',
+    'Укажите имя автора':'Enter the artist name','Имя автора слишком длинное':'Artist name is too long',
+    'Не удалось сохранить работу':'Could not save the work','Не удалось загрузить портфолио':'Could not load the portfolio',
+    'Не удалось загрузить ваши работы':'Could not load your work','Не удалось загрузить профиль':'Could not load the profile',
+    'Не удалось загрузить список пользователей':'Could not load the user list',
+    'Некорректный ID работы':'Invalid work ID','Работа не найдена':'Work not found',
+    'Нет прав удалить эту работу':'You do not have permission to delete this work',
+    'Не удалось удалить работу':'Could not delete the work','Не удалось выполнить поиск пользователей':'Could not search users',
+    'Не удалось загрузить чаты':'Could not load chats','Некорректный собеседник':'Invalid conversation participant',
+    'Чат заказа доступен только его заказчику и назначенному исполнителю при связи через сайт':'Order chat is available only to the customer and assigned artist when website contact is selected',
+    'Нет доступа к этой переписке':'No access to this conversation','Не удалось открыть чат':'Could not open the chat',
+    'Некорректный ID чата':'Invalid chat ID','Нет доступа к этому чату':'No access to this chat',
+    'Не удалось загрузить сообщения':'Could not load messages','Введите сообщение':'Enter a message',
+    'Не удалось отправить сообщение':'Could not send the message',
+    'Аккаунт партнёра не найден или email не подтверждён. Попросите партнёра сначала зарегистрироваться.':'Partner account was not found or its email is not verified. Ask the partner to register first.',
+    'Проверьте название и код партнёра (3–24 символа)':'Check the partner name and code (3–24 characters)',
+    'Этот код уже занят личной реферальной системой':'This code is already used by a personal referral system',
+    'Некорректная Discord-ссылка':'Invalid Discord link',
+    'Реферальный код уже занят или аккаунт уже привязан к другому партнёру':'Referral code is already taken or the account is linked to another partner',
+    'Не удалось создать партнёра':'Could not create the partner','Партнёр не найден':'Partner not found',
+    'Этот аккаунт уже привязан к другому партнёру':'This account is already linked to another partner',
+    'Укажите код и скидку или бонус':'Enter a code and a discount or bonus',
+    'Дата окончания должна быть в будущем':'Expiry date must be in the future',
+    'Лимит использований должен быть от 1 до 1 000 000':'Usage limit must be between 1 and 1,000,000',
+    'Промокод уже существует':'Promo code already exists','Не удалось создать промокод':'Could not create promo code',
+    'Некорректные параметры промокода':'Invalid promo code settings','Укажите название конкурса':'Enter a contest title',
+    'Нужны заголовок и HTTPS-ссылка':'A title and HTTPS link are required',
+    'Укажите корректный заказ и подтверждение оплаты':'Enter a valid order and payment confirmation',
+    'Сначала заказ должен получить статус «Завершён»':'The order must be marked as completed first',
+    'Оплата этого заказа уже подтверждена':'Payment for this order has already been confirmed',
+    'Укажите заказ и подтверждение фактического возврата':'Enter the order and confirmation of the completed refund',
+    'Заказ не находится в статусе, требующем возврата':'Order is not in a state that requires a refund',
+    'Не удалось зафиксировать возврат':'Could not record the refund',
+    'Начисление не найдено':'Reward entry not found','Начисление уже обработано':'Reward entry has already been processed',
+    'Нельзя одобрить: заказ не завершён или оплата не подтверждена администратором':'Cannot approve: the order is not complete or payment has not been confirmed by an administrator',
+    'Выплаты проводятся через заявку партнёра, а не напрямую из начисления':'Payouts are requested by the partner, not directly from a reward entry',
+    'К этому аккаунту не привязан активный партнёр. Обратитесь к администратору.':'No active partner is linked to this account. Contact an administrator.',
+    'Активный партнёрский аккаунт не найден':'Active partner account not found',
+    'Укажите корректные платёжные реквизиты':'Enter valid payment details',
+    'Некорректные параметры кампании':'Invalid campaign settings','Кампания не найдена':'Campaign not found',
+    'Активный партнёр не найден':'Active partner not found','Проверьте сумму и реквизиты':'Check the amount and payment details',
+    'Недопустимый статус заявки':'Invalid request status',
+    'Код подтверждения отправлен на email':'Verification code sent by email',
+    'Пароль успешно изменён':'Password changed successfully',
+    'Возврат зафиксирован. Партнёрское начисление сторнировано.':'Refund recorded. The partner reward has been reversed.',
+    'Заявка на выплату отправлена администратору':'Payout request sent to the administrator',
+    'Такой API-маршрут не существует.':'This API route does not exist.'
+  });
+  Object.assign(translations, {
+    'Поле превышает допустимую длину: ':'Field exceeds the maximum length: ',
+    'Сумма должна совпадать с доступным остатком: ':'Amount must match the available balance: '
+  });
   const reverse = Object.fromEntries(Object.entries(translations).map(([ru,en]) => [en,ru]));
   let language = localStorage.getItem(STORAGE_KEY) === 'en' ? 'en' : 'ru';
   const original = new WeakMap();
@@ -282,9 +428,19 @@
     const text = String(value ?? '');
     const trimmed = text.trim();
     if (!trimmed) return text;
-    const translated = language === 'en' ? translations[trimmed] : reverse[trimmed];
-    if (!translated) return text;
-    return text.replace(trimmed, translated);
+    if (language !== 'en') {
+      const restored = reverse[trimmed];
+      return restored ? text.replace(trimmed, restored) : text;
+    }
+    const leading = trimmed.match(/^(❌|⚠️|📧|🎉|👋|📋|⛔)\s*/u);
+    const prefix = leading ? leading[0] : '';
+    const body = leading ? trimmed.slice(prefix.length) : trimmed;
+    if (translations[body]) return text.replace(trimmed, prefix + translations[body]);
+    const match = Object.keys(translations)
+      .filter(key => key.length >= 12 && body.startsWith(key))
+      .sort((a,b) => b.length - a.length)[0];
+    if (!match) return text;
+    return text.replace(trimmed, prefix + translations[match] + body.slice(match.length));
   }
   function processNode(node) {
     if (node.nodeType === Node.TEXT_NODE) {
@@ -292,8 +448,7 @@
       if (!original.has(node) || (rendered.has(node) && current !== rendered.get(node))) original.set(node, current);
       const source = original.get(node);
       const key = source.trim();
-      const translated = language === 'en' ? translations[key] : null;
-      const nextValue = translated ? source.replace(key, translated) : source;
+      const nextValue = language === 'en' ? translateValue(source) : source;
       if (current !== nextValue) node.nodeValue = nextValue;
       rendered.set(node, nextValue);
       return;
