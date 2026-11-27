@@ -34,6 +34,10 @@
       "logo": "https://pawartstudio.store/site_avatar.jpg"
     }
     </script>
+
+<style>
+.pas-language-switch{display:flex;align-items:center;gap:4px;margin:0 12px 0 auto;padding:4px;border:1px solid var(--border,rgba(255,255,255,.15));border-radius:999px;background:var(--card,rgba(255,255,255,.05));flex-shrink:0}.pas-language-option{border:0;background:transparent;color:var(--text-mute,#aaa);font:600 11px Inter,sans-serif;padding:6px 8px;border-radius:999px;cursor:pointer}.pas-language-option.active{background:var(--accent,#8b78ff);color:#fff}@media(max-width:900px){.pas-language-switch{margin:8px 0 8px auto}}
+</style>
 </head>
 <body>
 
@@ -49,6 +53,10 @@
             <a onclick="scrollToSection('faq')">FAQ</a>
             <a onclick="scrollToSection('contact')">Контакты</a>
         </nav>
+                <div class="pas-language-switch" role="group" aria-label="Language">
+            <button type="button" class="pas-language-option" data-lang="ru" aria-pressed="true">RU</button>
+            <button type="button" class="pas-language-option" data-lang="en" aria-pressed="false">EN</button>
+        </div>
         <div class="nav-user">
             <button class="btn-login" id="loginBtn" onclick="openAuth()"><i class="fas fa-user"></i> Войти</button>
             <div class="user-box hidden" id="userBox">
@@ -741,5 +749,6 @@
 <script src="/js/script.js?v=20261119-direct-messenger-v1"></script>
 <script src="/js/paw-upgrade.js?v=20261023-contact-field-fix"></script>
 <script src="/js/service-details.js?v=20261023-service-configurator"></script>
+<script src="/js/i18n.js?v=20261128-ru-en"></script>
 </body>
 </html>
