@@ -29,7 +29,7 @@ const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
 const AVATAR_DIR = path.join(UPLOAD_DIR, 'avatars');
 const PORTFOLIO_DIR = path.join(UPLOAD_DIR, 'portfolio');
 const CONTENT_DIR = path.join(UPLOAD_DIR, 'content');
-const DELIVERY_DIR = path.join(__dirname, 'private_uploads', 'deliveries');
+const DELIVERY_DIR = process.env.DELIVERY_DIR || path.join(__dirname, 'private_uploads', 'deliveries');
 const SITE_URL = process.env.SITE_URL || 'https://pawartstudio.store';
 
 [DATABASE_PATH].forEach(p => {
