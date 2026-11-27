@@ -18,6 +18,9 @@ const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
+if (IS_PROD && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || process.env.JWT_SECRET === 'dev_secret_change_me' || !process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'change_me')) {
+  throw new Error('Production security configuration is incomplete: set a unique JWT_SECRET (32+ chars) and ADMIN_PASSWORD in the environment.');
+}
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@example.com').toLowerCase();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'change_me';
 const IS_PROD = process.env.NODE_ENV === 'production';
@@ -57,8 +60,17 @@ if (process.env.YOOKASSA_SHOP_ID && process.env.YOOKASSA_SECRET_KEY) {
   console.log('⚠️ ЮKassa не настроена');
 }
 
+const allowedOrigins = new Set([
+  SITE_URL.replace(/\/$/, ''),
+  ...(process.env.CORS_ORIGINS || '').split(',').map(value => value.trim().replace(/\/$/, '')).filter(Boolean),
+  ...(!IS_PROD ? ['http://localhost:3000', 'http://127.0.0.1:3000'] : []),
+]);
+function checkOrigin(origin, callback) {
+  if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+  return callback(new Error('Origin is not allowed by CORS'));
+}
 const io = new SocketServer(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
+  cors: { origin: checkOrigin, methods: ['GET', 'POST'], credentials: true },
   transports: ['websocket', 'polling'],
 });
 
@@ -490,7 +502,30 @@ if (contentCount === 0) {
 }
 
 app.set('trust proxy', 1);
-app.use(cors());
+app.use(cors({ origin: checkOrigin, credentials: true }));
+const authRateBuckets = new Map();
+function authRateLimit({ windowMs = 15 * 60 * 1000, max = 8 } = {}) {
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = String(req.ip || req.socket.remoteAddress || 'unknown') + ':' + req.path;
+    let bucket = authRateBuckets.get(key);
+    if (!bucket || now >= bucket.resetAt) {
+      bucket = { count: 0, resetAt: now + windowMs };
+      authRateBuckets.set(key, bucket);
+    }
+    bucket.count += 1;
+    if (authRateBuckets.size > 10000) {
+      for (const [bucketKey, value] of authRateBuckets) if (now >= value.resetAt) authRateBuckets.delete(bucketKey);
+    }
+    res.setHeader('RateLimit-Limit', String(max));
+    res.setHeader('RateLimit-Remaining', String(Math.max(0, max - bucket.count)));
+    if (bucket.count > max) {
+      res.setHeader('Retry-After', String(Math.ceil((bucket.resetAt - now) / 1000)));
+      return res.status(429).json({ error: 'Слишком много попыток. Попробуйте позже.' });
+    }
+    next();
+  };
+}
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: IS_PROD ? '7d' : 0 }));
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: IS_PROD ? '30d' : 0 }));
@@ -615,7 +650,7 @@ app.get('/health', (req, res) =>
 /* ==================== AUTH ==================== */
 const TERMS_VERSION = '2026-10-27';
 
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authRateLimit({ windowMs: 15 * 60 * 1000, max: 5 }), async (req, res) => {
   const { name, email, password, ref, agreementAccepted } = req.body || {};
   if (agreementAccepted !== true)
     return res.status(400).json({ error: 'Для регистрации необходимо принять Пользовательское соглашение' });
@@ -788,7 +823,7 @@ app.post('/api/auth/reset-password', (req, res) => {
   res.json({ ok: true, message: 'Пароль успешно изменён' });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', authRateLimit({ windowMs: 15 * 60 * 1000, max: 8 }), (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Заполните все поля' });
 
