@@ -26,20 +26,21 @@ jobs:
           node-version: 20
           cache: npm
 
-      - name: Regenerate lockfile from package.json
+      - name: Regenerate and audit lockfile
         run: |
           npm install --package-lock-only --ignore-scripts
           npm audit fix --package-lock-only --ignore-scripts
+          npm audit --json > "$RUNNER_TEMP/npm-audit.json" || true
+          node -e "const a=require(process.env.RUNNER_TEMP+'/npm-audit.json');const v=a.metadata?.vulnerabilities||{};console.log('AUDIT SUMMARY '+JSON.stringify(v));for(const [n,x] of Object.entries(a.vulnerabilities||{}))console.log(n+': '+x.severity+'; fix='+JSON.stringify(x.fixAvailable));"
 
       - name: Commit lockfile if changed
         run: |
-          if git diff --quiet -- package-lock.json; then
+          git add package-lock.json
+          if git diff --cached --quiet; then
             echo "package-lock.json is already synchronized"
             exit 0
           fi
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add package-lock.json
-          git commit -m "chore: synchronize npm lockfile"
-          git pull --rebase origin ${{ github.ref_name }}
+          git commit -m "chore: update dependency lockfile and security fixes"
           git push origin HEAD:${{ github.ref_name }}
