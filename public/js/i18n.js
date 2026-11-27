@@ -229,7 +229,29 @@
     'Количество услуги':'Service quantity',' шт.':' pcs',
     'Маскот не будет включён в заявку. Перед заказом его концепцию нужно обсудить лично.':'The mascot will not be added to the request. Its concept must be discussed separately before ordering.',
     'Пример услуги «':'Example service “','Подробнее об услуге ':'More about this service ',
-    'Количество: ':'Quantity: ','Предварительная стоимость:':'Estimated price:'
+    'Количество: ':'Quantity: ','Предварительная стоимость:':'Estimated price:',
+    'Надзаголовок':'Eyebrow text','Заголовок':'Heading','Подзаголовок':'Subheading',
+    'Бейдж 1':'Badge 1','Бейдж 2':'Badge 2','Бейдж 3':'Badge 3',
+    'Фоновое изображение':'Background image','💰 Тарифы':'💰 Pricing tiers',
+    '🛠 Услуги':'🛠 Services','👥 О нас':'👥 About us','📞 Контакты':'📞 Contact',
+    'Текст':'Text','Цитата':'Quote','Цифра 1':'Metric 1','Подпись 1':'Label 1',
+    'Цифра 2':'Metric 2','Подпись 2':'Label 2','Цифра 3':'Metric 3','Подпись 3':'Label 3',
+    'Текст под логотипом':'Text below the logo','⛔ Нет доступа к редактору сайта':'⛔ You do not have access to the site editor',
+    'Максимум должен быть целым числом и не меньше минимума':'The maximum must be a whole number and cannot be less than the minimum',
+    'Проверьте цену и диапазон количества: цена — до 10 000 000 ₽, количество — целые числа, максимум не меньше минимума':'Check the price and quantity range: price up to RUB 10,000,000; quantities must be whole numbers; maximum must not be less than minimum',
+    '⚠️ Проверьте цены и диапазоны количества услуг':'⚠️ Check service prices and quantity ranges',
+    'Взять':'Accept','Обнулить':'Reset balance','Поиск пользователей...':'Search users...',
+    'Чаты не найдены':'No chats found','Выберите чат':'Select a chat','Нет сообщений':'No messages',
+    'Напишите сообщение':'Write a message','Отправить файл':'Send file',
+    'Сайт':'Website','Телефон':'Phone','Discord':'Discord','Telegram':'Telegram',
+    'Клиент отменил заказ':'The client cancelled the order',
+    'Заказ отменён':'Order cancelled','Заказ завершён':'Order completed',
+    'Заявка на роль':'Role request','на рассмотрении':'under review',
+    'Главный админ':'Super admin','Админ':'Admin',
+    'Операции с балансом':'Balance transactions','История операций':'Transaction history',
+    'Выберите сумму':'Choose an amount','Номер карты для вывода':'Card number for withdrawal',
+    'Скопировать email':'Copy email',
+    'Пока нет операций':'No transactions yet','Пока нет заявок на вывод':'No withdrawal requests yet'
   };
   const reverse = Object.fromEntries(Object.entries(translations).map(([ru,en]) => [en,ru]));
   let language = localStorage.getItem(STORAGE_KEY) === 'en' ? 'en' : 'ru';
