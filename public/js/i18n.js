@@ -61,7 +61,8 @@
       const source = original.get(node);
       const key = source.trim();
       const translated = language === 'en' ? translations[key] : null;
-      node.nodeValue = translated ? source.replace(key, translated) : source;
+      const nextValue = translated ? source.replace(key, translated) : source;
+      if (node.nodeValue !== nextValue) node.nodeValue = nextValue;
       return;
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return;
