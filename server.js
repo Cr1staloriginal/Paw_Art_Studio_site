@@ -795,7 +795,7 @@ app.post('/api/auth/resend-code', async (req, res) => {
   res.json({ ok: true, message: 'Код отправлен повторно' });
 });
 
-app.post('/api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', authRateLimit({ windowMs: 15 * 60 * 1000, max: 3 }), async (req, res) => {
   const email = String(req.body?.email || '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Укажите корректный email' });
   const user = db.prepare('SELECT id, email_verified FROM users WHERE email = ?').get(email);
@@ -822,7 +822,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   res.json({ ok: true, message: 'Если аккаунт существует, код отправлен на почту' });
 });
 
-app.post('/api/auth/reset-password', (req, res) => {
+app.post('/api/auth/reset-password', authRateLimit({ windowMs: 15 * 60 * 1000, max: 8 }), (req, res) => {
   const email = String(req.body?.email || '').trim().toLowerCase();
   const code = String(req.body?.code || '').trim();
   const password = String(req.body?.password || '');
