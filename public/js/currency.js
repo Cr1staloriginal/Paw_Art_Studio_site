@@ -1,7 +1,7 @@
 /* Approximate USD display for RUB service prices. This does not change payment currency. */
 (() => {
   'use strict';
-  const selectors = '.services .price, #pawServicePrice, #packageTotalPrice, .package-total-price';
+  const selectors = '.services .price, .package-offer-price, #pawServicePrice, #packageTotalPrice, .package-total-price';
   let rubPerUsd = null;
   let rateDate = null;
 
