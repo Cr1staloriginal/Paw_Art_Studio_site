@@ -13,7 +13,7 @@ test('partner referral, discount, verified reward and payout lifecycle', async t
   const port = 32000 + (process.pid % 10000);
   const env = {
     ...process.env, NODE_ENV: 'test', PORT: String(port), HOST: '127.0.0.1',
-    DATABASE_PATH: dbPath, UPLOAD_DIR: path.join(dir, 'uploads'),
+    DATABASE_PATH: dbPath, UPLOAD_DIR: path.join(dir, 'uploads'), DELIVERY_DIR: path.join(dir, 'deliveries'),
     JWT_SECRET: 'test-secret-partner-suite', ADMIN_EMAIL: 'admin@test.local',
     ADMIN_PASSWORD: 'AdminTest123'
   };
@@ -52,6 +52,8 @@ test('partner referral, discount, verified reward and payout lifecycle', async t
   const partnerId=created.data.partner.id;
   const partnerToken=await login('partner@test.local','PartnerPass123');
   assert.equal((await request('/api/partner/me',{token:partnerToken})).status,200);
+  db.prepare("INSERT INTO users(name,email,password,role,email_verified,created_at) VALUES('Executor','executor@test.local',?,'executor',1,?)").run(bcrypt.hashSync('ExecutorPass123',8),Date.now());
+  const executorToken=await login('executor@test.local','ExecutorPass123');
 
   const click=await request('/api/referrals/click/TESTPAW');
   assert.equal(click.status,200);
@@ -98,7 +100,14 @@ test('partner referral, discount, verified reward and payout lifecycle', async t
   assert.equal(duplicateProject.status,400);
   assert.equal((await request('/api/projects/'+project.data.project.id+'/pay',{method:'POST',token:customerToken,body:{}})).status,503);
   const projectId=project.data.project.id;
-  assert.equal((await request('/api/projects/'+projectId+'/status',{method:'POST',token:customerToken,body:{status:'completed'}})).status,200);
+  assert.equal((await request('/api/projects/'+projectId+'/accept',{method:'POST',token:executorToken,body:{}})).status,200);
+  const deliveryForm=new FormData();
+  deliveryForm.append('files',new Blob(['integration test delivery'],{type:'text/plain'}),'delivery.txt');
+  const deliveryResponse=await fetch(base+'/api/projects/'+projectId+'/deliveries',{method:'POST',headers:{Authorization:'Bearer '+executorToken},body:deliveryForm});
+  const deliveryData=await deliveryResponse.json().catch(()=>({}));
+  assert.equal(deliveryResponse.status,201,JSON.stringify(deliveryData));
+  const deliveryAccepted=await request('/api/projects/'+projectId+'/deliveries/accept',{method:'POST',token:customerToken,body:{}});
+  assert.equal(deliveryAccepted.status,200,JSON.stringify(deliveryAccepted.data));
   let adminData=(await request('/api/admin/partners',{token:adminToken})).data;
   let ledger=adminData.ledger.find(x=>x.project_id===projectId);
   assert.ok(ledger);
