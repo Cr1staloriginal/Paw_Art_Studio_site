@@ -42,11 +42,39 @@
     'Переписка внутри сайта будет доступна, если выбран этот способ связи.':'Website messaging is available when this contact method is selected.',
     'Пользовательское соглашение':'Terms of Service','Телефон':'Phone','Email':'Email',
     'Скоро здесь появятся наши партнёры.':'Our partners will appear here soon.',
-    'Не удалось загрузить партнёров.':'Could not load partners.'
+    'Не удалось загрузить партнёров.':'Could not load partners.',
+    'Восстановление доступа':'Password recovery','Установить новый пароль':'Set a new password',
+    'Если аккаунт существует, код отправлен на почту':'If the account exists, a code has been sent by email',
+    'Активировать промокод':'Redeem promo code','Введи код, чтобы получить доступную скидку или бонус на баланс.':'Enter a code to receive an available discount or balance bonus.',
+    'Активировать':'Redeem','Проверяем код…':'Checking code…','Промокод применён!':'Promo code applied!',
+    'Не удалось применить промокод.':'Could not redeem promo code.','Не удалось подключиться к API.':'Could not connect to the API.',
+    'Приглашай друзей 🐾':'Invite friends 🐾','Поделись персональной ссылкой. Здесь видно количество переходов.':'Share your personal link. The number of visits is shown here.',
+    'Загружаем ссылку…':'Loading link…','Скопировать ссылку':'Copy link','Скопировано ✓':'Copied ✓',
+    'Переходов по ссылке:':'Link visits:','Ссылка появится после входа в аккаунт.':'Your link will appear after you sign in.',
+    'Вывод средств':'Withdraw funds','Оформить вывод':'Request a withdrawal',
+    'Исполнители могут отправить заявку на вывод доступного баланса. Администратор проверит реквизиты и вручную выполнит перевод. До рассмотрения сумма резервируется; при отказе возвращается на баланс.':'Artists can request a withdrawal of their available balance. An administrator will verify the details and make the transfer manually. The amount is reserved while the request is reviewed; rejected requests are refunded to the balance.',
+    'Количество':'Quantity','Подробнее':'Details','Обсудить / оформить заказ':'Discuss / place an order',
+    'Закрыть окно':'Close window','Стоимость обсуждается':'Price to be discussed','Не добавлено':'Not included',
+    'Цена указана ориентировочно. До начала работы согласуем задачу, сроки и итоговую стоимость.':'The price is indicative. We will agree on the task, timeline and final price before work begins.',
+    'Это предварительный расчёт по выбранному количеству. Окончательную стоимость подтвердим до начала работы.':'This is an estimate based on the selected quantity. The final price will be confirmed before work begins.',
+    'Промокод скопирован:':'Promo code copied:','Не удалось скопировать промокод.':'Could not copy promo code.',
+    'Партнёрская ссылка скопирована.':'Partner link copied.','Не удалось скопировать ссылку. Скопируйте её вручную.':'Could not copy the link. Please copy it manually.',
+    'Официальный партнёр Paw Art Studio':'Official Paw Art Studio partner',
+    'Скидка по промокодам:':'Promo code discount:','Вознаграждение:':'Reward:','Минимальная выплата:':'Minimum payout:',
+    'На рассмотрении':'Under review','Одобрено':'Approved','Выплачено':'Paid','Отклонено':'Rejected','Сторнировано':'Reversed',
+    'Активных промокодов пока нет.':'No active promo codes yet.','Пока нет заявок.':'No requests yet.','Нет начислений.':'No credits yet.',
+    'Сначала войдите в аккаунт на главной странице, затем откройте кабинет партнёра.':'First sign in on the home page, then open the partner dashboard.',
+    'Ошибка запроса':'Request error','Заявка отправлена.':'Request submitted.',
+    'Скрыть плашку':'Hide banner','Быстрый переход к услугам':'Quick link to services',
+    'Открыт':'Open','В работе':'In progress','На проверке':'In review','Завершён':'Completed','Отменён':'Cancelled',
+    'сейчас':'now','мин':'min','шт.':'pcs'
   };
   const reverse = Object.fromEntries(Object.entries(translations).map(([ru,en]) => [en,ru]));
   let language = localStorage.getItem(STORAGE_KEY) === 'en' ? 'en' : 'ru';
   const original = new WeakMap();
+  const rendered = new WeakMap();
+  const originalAttributes = new WeakMap();
+  const renderedAttributes = new WeakMap();
   function translateValue(value) {
     const text = String(value ?? '');
     const trimmed = text.trim();
@@ -57,21 +85,28 @@
   }
   function processNode(node) {
     if (node.nodeType === Node.TEXT_NODE) {
-      if (!original.has(node)) original.set(node, node.nodeValue);
+      const current = node.nodeValue;
+      if (!original.has(node) || (rendered.has(node) && current !== rendered.get(node))) original.set(node, current);
       const source = original.get(node);
       const key = source.trim();
       const translated = language === 'en' ? translations[key] : null;
       const nextValue = translated ? source.replace(key, translated) : source;
-      if (node.nodeValue !== nextValue) node.nodeValue = nextValue;
+      if (current !== nextValue) node.nodeValue = nextValue;
+      rendered.set(node, nextValue);
       return;
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return;
     for (const attr of ['placeholder','title','aria-label','alt']) {
       if (!node.hasAttribute(attr)) continue;
-      const keyAttr = 'data-pas-original-' + attr;
-      if (!node.hasAttribute(keyAttr)) node.setAttribute(keyAttr, node.getAttribute(attr));
-      const source = node.getAttribute(keyAttr);
-      node.setAttribute(attr, translateValue(source));
+      let originals = originalAttributes.get(node);
+      let outputs = renderedAttributes.get(node);
+      if (!originals) { originals = {}; originalAttributes.set(node, originals); }
+      if (!outputs) { outputs = {}; renderedAttributes.set(node, outputs); }
+      const current = node.getAttribute(attr);
+      if (originals[attr] === undefined || (outputs[attr] !== undefined && current !== outputs[attr])) originals[attr] = current;
+      const nextValue = translateValue(originals[attr]);
+      if (current !== nextValue) node.setAttribute(attr, nextValue);
+      outputs[attr] = nextValue;
     }
     node.childNodes.forEach(processNode);
   }
