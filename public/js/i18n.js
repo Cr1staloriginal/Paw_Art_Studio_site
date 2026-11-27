@@ -251,7 +251,25 @@
     'Операции с балансом':'Balance transactions','История операций':'Transaction history',
     'Выберите сумму':'Choose an amount','Номер карты для вывода':'Card number for withdrawal',
     'Скопировать email':'Copy email',
-    'Пока нет операций':'No transactions yet','Пока нет заявок на вывод':'No withdrawal requests yet'
+    'Пока нет операций':'No transactions yet','Пока нет заявок на вывод':'No withdrawal requests yet',
+    'Редактор сайта 👑':'Site editor 👑','⭐ 4.9 из 5':'⭐ 4.9 out of 5',
+    '⚡ Срок от 3 дней':'⚡ Turnaround from 3 days','🎨 50+ работ':'🎨 50+ works',
+    'Пак DS':'Discord bundle','Все':'All',
+    'Вопрос 1':'Question 1','Вопрос 2':'Question 2','Вопрос 3':'Question 3',
+    'Вопрос 4':'Question 4','Вопрос 5':'Question 5','Ответ':'Answer',
+    '. Оплата через ЮKassa.':'. Payments via YooKassa.',
+    'Paw Art Studio — студия цифрового дизайна: маскоты, стикеры, баннеры, аватары и иллюстрации.':'Paw Art Studio — digital design studio: mascots, stickers, banners, avatars and illustrations.',
+    'Paw Art Studio — аватар студии':'Paw Art Studio studio avatar',
+    'Paw Art Studio — на главную':'Paw Art Studio — home',
+    'Кабинет':'Dashboard','Повторите новый пароль':'Confirm new password',
+    'Например, 1500':'For example, 1500','Укажите ссылку, имя пользователя или адрес':'Enter a link, username or address',
+    'Например: Маскот для кофейни':'For example: a mascot for a coffee shop',
+    'Код ссылки, например FLUFFY':'Referral code, e.g. FLUFFY',
+    'URL логотипа':'Logo URL','Скидка, %':'Discount, %','Вознаграждение, %':'Reward, %',
+    'Описание сообщества':'Community description',
+    'Стоимость обсуждается':'Price to be discussed','Не добавлено':'Not included',
+    'Услуга':'Service','Количество:':'Quantity:','Предварительная стоимость:':'Estimated price:',
+    'Закрыть':'Close','Подробнее':'Details','Клиенты':'Clients'
   };
   const reverse = Object.fromEntries(Object.entries(translations).map(([ru,en]) => [en,ru]));
   let language = localStorage.getItem(STORAGE_KEY) === 'en' ? 'en' : 'ru';
