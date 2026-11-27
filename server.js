@@ -643,6 +643,32 @@ async function sendVerificationEmail(email, code) {
   });
 }
 
+// Reference FX rate for displaying approximate USD prices. Payments remain in RUB.
+let fxRateCache = { rate: null, date: null, fetchedAt: 0 };
+app.get('/api/exchange-rate', async (req, res) => {
+  const maxAge = 6 * 60 * 60 * 1000;
+  if (fxRateCache.rate && Date.now() - fxRateCache.fetchedAt < maxAge) {
+    res.set('Cache-Control', 'public, max-age=3600');
+    return res.json({ base: 'USD', quote: 'RUB', rubPerUsd: fxRateCache.rate, date: fxRateCache.date, approximate: true });
+  }
+  try {
+    const response = await fetch('https://api.frankfurter.dev/v2/rate/usd/rub', { signal: AbortSignal.timeout(6000) });
+    if (!response.ok) throw new Error('Exchange-rate provider returned ' + response.status);
+    const data = await response.json();
+    const rate = Number(data.rate);
+    if (!Number.isFinite(rate) || rate <= 0) throw new Error('Invalid exchange rate');
+    fxRateCache = { rate, date: data.date || null, fetchedAt: Date.now() };
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.json({ base: 'USD', quote: 'RUB', rubPerUsd: rate, date: fxRateCache.date, approximate: true });
+  } catch (error) {
+    if (fxRateCache.rate) {
+      res.set('Cache-Control', 'no-store');
+      return res.json({ base: 'USD', quote: 'RUB', rubPerUsd: fxRateCache.rate, date: fxRateCache.date, approximate: true, stale: true });
+    }
+    res.status(503).json({ error: 'Exchange rate is temporarily unavailable' });
+  }
+});
+
 app.get('/health', (req, res) =>
   res.json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() })
 );
