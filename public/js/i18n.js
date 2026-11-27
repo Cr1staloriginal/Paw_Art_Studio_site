@@ -414,6 +414,10 @@
     'Заявка на выплату отправлена администратору':'Payout request sent to the administrator',
     'Такой API-маршрут не существует.':'This API route does not exist.'
   });
+  Object.assign(translations, {
+    'Поле превышает допустимую длину: ':'Field exceeds the maximum length: ',
+    'Сумма должна совпадать с доступным остатком: ':'Amount must match the available balance: '
+  });
   const reverse = Object.fromEntries(Object.entries(translations).map(([ru,en]) => [en,ru]));
   let language = localStorage.getItem(STORAGE_KEY) === 'en' ? 'en' : 'ru';
   const original = new WeakMap();
