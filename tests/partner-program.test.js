@@ -57,7 +57,7 @@ test('partner referral, discount, verified reward and payout lifecycle', async t
   assert.equal(click.status,200);
   assert.ok(click.data.partnerToken);
   const registered=await request('/api/auth/register',{method:'POST',body:{
-    name:'Referred Customer',email:'customer@test.local',password:'CustomerPass123',ref:'TESTPAW',partnerToken:click.data.partnerToken
+    name:'Referred Customer',email:'customer@test.local',password:'CustomerPass123',ref:'TESTPAW',partnerToken:click.data.partnerToken,agreementAccepted:true
   }});
   assert.equal(registered.status,200,JSON.stringify(registered.data));
   db.prepare("UPDATE users SET email_verified=1 WHERE email='customer@test.local'").run();
