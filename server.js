@@ -18,12 +18,12 @@ const server = http.createServer(app);
 const PORT = process.env.PORT || 3000;
 const HOST = process.env.HOST || '0.0.0.0';
 const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
-if (IS_PROD && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || process.env.JWT_SECRET === 'dev_secret_change_me' || !process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'change_me')) {
-  throw new Error('Production security configuration is incomplete: set a unique JWT_SECRET (32+ chars) and ADMIN_PASSWORD in the environment.');
-}
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@example.com').toLowerCase();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'change_me';
 const IS_PROD = process.env.NODE_ENV === 'production';
+if (IS_PROD && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || process.env.JWT_SECRET === 'dev_secret_change_me' || !process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'change_me')) {
+  throw new Error('Production security configuration is incomplete: set a unique JWT_SECRET (32+ chars) and ADMIN_PASSWORD in the environment.');
+}
 const DATABASE_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'paw.db');
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
 const AVATAR_DIR = path.join(UPLOAD_DIR, 'avatars');
