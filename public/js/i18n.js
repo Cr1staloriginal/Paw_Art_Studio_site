@@ -60,9 +60,8 @@
       if (!original.has(node)) original.set(node, node.nodeValue);
       const source = original.get(node);
       const key = source.trim();
-      const translated = language === 'en' ? translations[key] : reverse[key];
-      if (translated) node.nodeValue = source.replace(key, translated);
-      else if (language === 'ru' && reverse[key]) node.nodeValue = source.replace(key, reverse[key]);
+      const translated = language === 'en' ? translations[key] : null;
+      node.nodeValue = translated ? source.replace(key, translated) : source;
       return;
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return;
