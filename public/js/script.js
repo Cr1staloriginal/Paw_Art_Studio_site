@@ -37,10 +37,11 @@ async function api(path, options = {}) {
     return data;
 }
 
-function formatMoney(k) { const r = (Number(k) || 0) / 100; return new Intl.NumberFormat('ru-RU', { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(r) + ' ₽'; }
+function pasLocale() { return window.PAS_I18N?.language === 'en' ? 'en-US' : 'ru-RU'; }
+function formatMoney(k) { const r = (Number(k) || 0) / 100; return new Intl.NumberFormat(pasLocale(), { minimumFractionDigits: 0, maximumFractionDigits: 2 }).format(r) + ' ₽'; }
 function escapeHtml(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
-function formatTime(ts) { const d = new Date(ts), now = new Date(), diff = (now - d) / 1000; if (diff < 60) return 'сейчас'; if (diff < 3600) return Math.floor(diff / 60) + ' мин'; if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit' }); }
-function formatDateTime(ts) { const d = new Date(ts); return d.toLocaleDateString('ru-RU', { day: '2-digit', month: '2-digit', year: '2-digit' }) + ' · ' + d.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' }); }
+function formatTime(ts) { const d = new Date(ts), now = new Date(), diff = (now - d) / 1000, en = pasLocale() === 'en-US'; if (diff < 60) return en ? 'now' : 'сейчас'; if (diff < 3600) return Math.floor(diff / 60) + (en ? ' min' : ' мин'); if (d.toDateString() === now.toDateString()) return d.toLocaleTimeString(pasLocale(), { hour: '2-digit', minute: '2-digit' }); return d.toLocaleDateString(pasLocale(), { day: '2-digit', month: '2-digit' }); }
+function formatDateTime(ts) { const d = new Date(ts); return d.toLocaleDateString(pasLocale(), { day: '2-digit', month: '2-digit', year: '2-digit' }) + ' · ' + d.toLocaleTimeString(pasLocale(), { hour: '2-digit', minute: '2-digit' }); }
 function userAvatarHtml(u) { if (u?.avatar) return `<img src="${escapeHtml(u.avatar)}" alt="">`; return `<span>${(u?.name || '?').charAt(0).toUpperCase()}</span>`; }
 
 function scrollToSection(id) { const el = document.getElementById(id); if (!el) { console.warn(`Раздел не найден: #${id}`); showToast('Раздел временно недоступен', 'error'); return; } const header = document.querySelector('header'); const offset = (header?.getBoundingClientRect().height || 70) + 12; const top = el.getBoundingClientRect().top + window.pageYOffset - offset; window.scrollTo({ top: Math.max(0, top), behavior: 'smooth' }); if (location.hash !== `#${id}`) history.replaceState(null, '', `#${id}`); closeMenu(); }

@@ -57,7 +57,7 @@ test('partner referral, discount, verified reward and payout lifecycle', async t
   assert.equal(click.status,200);
   assert.ok(click.data.partnerToken);
   const registered=await request('/api/auth/register',{method:'POST',body:{
-    name:'Referred Customer',email:'customer@test.local',password:'CustomerPass123',ref:'TESTPAW',partnerToken:click.data.partnerToken
+    name:'Referred Customer',email:'customer@test.local',password:'CustomerPass123',ref:'TESTPAW',partnerToken:click.data.partnerToken,agreementAccepted:true
   }});
   assert.equal(registered.status,200,JSON.stringify(registered.data));
   db.prepare("UPDATE users SET email_verified=1 WHERE email='customer@test.local'").run();
@@ -68,7 +68,7 @@ test('partner referral, discount, verified reward and payout lifecycle', async t
   const promo=await request('/api/admin/partners/'+partnerId+'/promos',{method:'POST',token:adminToken,body:{code:'TEST10',discountPercent:10,maxUses:1,expiresAt:'2099-12-31T23:59:59'}});
   assert.equal(promo.status,201);
   assert.equal((await request('/api/admin/partners/'+partnerId+'/promos/'+promo.data.id,{method:'PATCH',token:adminToken,body:{active:false}})).status,200);
-  const disabledPromoProject=await request('/api/projects',{method:'POST',token:customerToken,body:{title:'Disabled promo',description:'Must not apply disabled promo',category:'Mascot',budget:1000,promoCode:'TEST10'}});
+  const disabledPromoProject=await request('/api/projects',{method:'POST',token:customerToken,body:{title:'Disabled promo',description:'Must not apply disabled promo',category:'Mascot',budget:1000,promoCode:'TEST10',contactMethod:'Сайт'}});
   assert.equal(disabledPromoProject.status,400);
   assert.equal((await request('/api/admin/partners/'+partnerId+'/promos/'+promo.data.id,{method:'PATCH',token:adminToken,body:{active:true}})).status,200);
   const partnerPromos=(await request('/api/partner/me',{token:partnerToken})).data.promos;
@@ -84,17 +84,17 @@ test('partner referral, discount, verified reward and payout lifecycle', async t
   }});
   assert.equal(duplicatePromo.status,201);
 
-  const referralOnlyProject=await request('/api/projects',{method:'POST',token:customerToken,body:{title:'Referral attribution',description:'Referral-only attribution test',category:'Banner',budget:500}});
+  const referralOnlyProject=await request('/api/projects',{method:'POST',token:customerToken,body:{title:'Referral attribution',description:'Referral-only attribution test',category:'Banner',budget:500,contactMethod:'Сайт'}});
   assert.equal(referralOnlyProject.status,201,JSON.stringify(referralOnlyProject.data));
   assert.equal(referralOnlyProject.data.project.partner_id,partnerId);
   const project=await request('/api/projects',{method:'POST',token:customerToken,body:{
-    title:'Test order',description:'Integration test',category:'Mascot',budget:1000,promoCode:'TEST10'
+    title:'Test order',description:'Integration test',category:'Mascot',budget:1000,promoCode:'TEST10',contactMethod:'Сайт'
   }});
   assert.equal(project.status,201,JSON.stringify(project.data));
   assert.equal(project.data.project.base_budget,100000);
   assert.equal(project.data.project.budget,90000);
   assert.equal(project.data.project.discount_percent,10);
-  const duplicateProject=await request('/api/projects',{method:'POST',token:customerToken,body:{title:'Duplicate',description:'Duplicate promo test',category:'Mascot',budget:1000,promoCode:'TEST10'}});
+  const duplicateProject=await request('/api/projects',{method:'POST',token:customerToken,body:{title:'Duplicate',description:'Duplicate promo test',category:'Mascot',budget:1000,promoCode:'TEST10',contactMethod:'Сайт'}});
   assert.equal(duplicateProject.status,400);
   assert.equal((await request('/api/projects/'+project.data.project.id+'/pay',{method:'POST',token:customerToken,body:{}})).status,503);
   const projectId=project.data.project.id;

@@ -21,6 +21,9 @@ const JWT_SECRET = process.env.JWT_SECRET || 'dev_secret_change_me';
 const ADMIN_EMAIL = (process.env.ADMIN_EMAIL || 'admin@example.com').toLowerCase();
 const ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || 'change_me';
 const IS_PROD = process.env.NODE_ENV === 'production';
+if (IS_PROD && (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32 || process.env.JWT_SECRET === 'dev_secret_change_me' || !process.env.ADMIN_PASSWORD || process.env.ADMIN_PASSWORD === 'change_me')) {
+  throw new Error('Production security configuration is incomplete: set a unique JWT_SECRET (32+ chars) and ADMIN_PASSWORD in the environment.');
+}
 const DATABASE_PATH = process.env.DATABASE_PATH || path.join(__dirname, 'paw.db');
 const UPLOAD_DIR = process.env.UPLOAD_DIR || path.join(__dirname, 'uploads');
 const AVATAR_DIR = path.join(UPLOAD_DIR, 'avatars');
@@ -57,8 +60,17 @@ if (process.env.YOOKASSA_SHOP_ID && process.env.YOOKASSA_SECRET_KEY) {
   console.log('⚠️ ЮKassa не настроена');
 }
 
+const allowedOrigins = new Set([
+  SITE_URL.replace(/\/$/, ''),
+  ...(process.env.CORS_ORIGINS || '').split(',').map(value => value.trim().replace(/\/$/, '')).filter(Boolean),
+  ...(!IS_PROD ? ['http://localhost:3000', 'http://127.0.0.1:3000'] : []),
+]);
+function checkOrigin(origin, callback) {
+  if (!origin || allowedOrigins.has(origin)) return callback(null, true);
+  return callback(new Error('Origin is not allowed by CORS'));
+}
 const io = new SocketServer(server, {
-  cors: { origin: '*', methods: ['GET', 'POST'] },
+  cors: { origin: checkOrigin, methods: ['GET', 'POST'], credentials: true },
   transports: ['websocket', 'polling'],
 });
 
@@ -490,7 +502,30 @@ if (contentCount === 0) {
 }
 
 app.set('trust proxy', 1);
-app.use(cors());
+app.use(cors({ origin: checkOrigin, credentials: true }));
+const authRateBuckets = new Map();
+function authRateLimit({ windowMs = 15 * 60 * 1000, max = 8 } = {}) {
+  return (req, res, next) => {
+    const now = Date.now();
+    const key = String(req.ip || req.socket.remoteAddress || 'unknown') + ':' + req.path;
+    let bucket = authRateBuckets.get(key);
+    if (!bucket || now >= bucket.resetAt) {
+      bucket = { count: 0, resetAt: now + windowMs };
+      authRateBuckets.set(key, bucket);
+    }
+    bucket.count += 1;
+    if (authRateBuckets.size > 10000) {
+      for (const [bucketKey, value] of authRateBuckets) if (now >= value.resetAt) authRateBuckets.delete(bucketKey);
+    }
+    res.setHeader('RateLimit-Limit', String(max));
+    res.setHeader('RateLimit-Remaining', String(Math.max(0, max - bucket.count)));
+    if (bucket.count > max) {
+      res.setHeader('Retry-After', String(Math.ceil((bucket.resetAt - now) / 1000)));
+      return res.status(429).json({ error: 'Слишком много попыток. Попробуйте позже.' });
+    }
+    next();
+  };
+}
 app.use(express.json({ limit: '2mb' }));
 app.use(express.static(path.join(__dirname, 'public'), { maxAge: IS_PROD ? '7d' : 0 }));
 app.use('/uploads', express.static(UPLOAD_DIR, { maxAge: IS_PROD ? '30d' : 0 }));
@@ -608,6 +643,32 @@ async function sendVerificationEmail(email, code) {
   });
 }
 
+// Reference FX rate for displaying approximate USD prices. Payments remain in RUB.
+let fxRateCache = { rate: null, date: null, fetchedAt: 0 };
+app.get('/api/exchange-rate', async (req, res) => {
+  const maxAge = 6 * 60 * 60 * 1000;
+  if (fxRateCache.rate && Date.now() - fxRateCache.fetchedAt < maxAge) {
+    res.set('Cache-Control', 'public, max-age=3600');
+    return res.json({ base: 'USD', quote: 'RUB', rubPerUsd: fxRateCache.rate, date: fxRateCache.date, approximate: true });
+  }
+  try {
+    const response = await fetch('https://api.frankfurter.dev/v2/rate/usd/rub', { signal: AbortSignal.timeout(6000) });
+    if (!response.ok) throw new Error('Exchange-rate provider returned ' + response.status);
+    const data = await response.json();
+    const rate = Number(data.rate);
+    if (!Number.isFinite(rate) || rate <= 0) throw new Error('Invalid exchange rate');
+    fxRateCache = { rate, date: data.date || null, fetchedAt: Date.now() };
+    res.set('Cache-Control', 'public, max-age=3600');
+    res.json({ base: 'USD', quote: 'RUB', rubPerUsd: rate, date: fxRateCache.date, approximate: true });
+  } catch (error) {
+    if (fxRateCache.rate) {
+      res.set('Cache-Control', 'no-store');
+      return res.json({ base: 'USD', quote: 'RUB', rubPerUsd: fxRateCache.rate, date: fxRateCache.date, approximate: true, stale: true });
+    }
+    res.status(503).json({ error: 'Exchange rate is temporarily unavailable' });
+  }
+});
+
 app.get('/health', (req, res) =>
   res.json({ status: 'ok', uptime: process.uptime(), timestamp: Date.now() })
 );
@@ -615,7 +676,7 @@ app.get('/health', (req, res) =>
 /* ==================== AUTH ==================== */
 const TERMS_VERSION = '2026-10-27';
 
-app.post('/api/auth/register', async (req, res) => {
+app.post('/api/auth/register', authRateLimit({ windowMs: 15 * 60 * 1000, max: 5 }), async (req, res) => {
   const { name, email, password, ref, agreementAccepted } = req.body || {};
   if (agreementAccepted !== true)
     return res.status(400).json({ error: 'Для регистрации необходимо принять Пользовательское соглашение' });
@@ -734,7 +795,7 @@ app.post('/api/auth/resend-code', async (req, res) => {
   res.json({ ok: true, message: 'Код отправлен повторно' });
 });
 
-app.post('/api/auth/forgot-password', async (req, res) => {
+app.post('/api/auth/forgot-password', authRateLimit({ windowMs: 15 * 60 * 1000, max: 3 }), async (req, res) => {
   const email = String(req.body?.email || '').trim().toLowerCase();
   if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return res.status(400).json({ error: 'Укажите корректный email' });
   const user = db.prepare('SELECT id, email_verified FROM users WHERE email = ?').get(email);
@@ -761,7 +822,7 @@ app.post('/api/auth/forgot-password', async (req, res) => {
   res.json({ ok: true, message: 'Если аккаунт существует, код отправлен на почту' });
 });
 
-app.post('/api/auth/reset-password', (req, res) => {
+app.post('/api/auth/reset-password', authRateLimit({ windowMs: 15 * 60 * 1000, max: 8 }), (req, res) => {
   const email = String(req.body?.email || '').trim().toLowerCase();
   const code = String(req.body?.code || '').trim();
   const password = String(req.body?.password || '');
@@ -788,7 +849,7 @@ app.post('/api/auth/reset-password', (req, res) => {
   res.json({ ok: true, message: 'Пароль успешно изменён' });
 });
 
-app.post('/api/auth/login', (req, res) => {
+app.post('/api/auth/login', authRateLimit({ windowMs: 15 * 60 * 1000, max: 8 }), (req, res) => {
   const { email, password } = req.body || {};
   if (!email || !password) return res.status(400).json({ error: 'Заполните все поля' });
 

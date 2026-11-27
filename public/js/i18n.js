@@ -1,0 +1,259 @@
+(() => {
+  'use strict';
+  const STORAGE_KEY = 'pas_language';
+  const translations = {
+    'Paw Art Studio — Визуал для твоего проекта':'Paw Art Studio — Visuals for your project',
+    'Paw Art Studio — студия цифрового дизайна':'Paw Art Studio — digital design studio',
+    'Маскоты, стикеры, баннеры, аватары и иллюстрации для твоего проекта.':'Mascots, stickers, banners, avatars and illustrations for your project.',
+    '🐾 Студия визуала Paw Art Studio':'🐾 Paw Art Studio visual design studio',
+    'Language':'Язык',
+    'Услуги':'Services','Заказы':'Orders','Портфолио':'Portfolio','О нас':'About us','Контакты':'Contact',
+    'Войти':'Sign in','Выйти':'Sign out','Сообщения':'Messages','Найти пользователя':'Find a user',
+    'Введите имя пользователя...':'Enter a username...','Написать сообщение...':'Write a message...',
+    'Кабинет и баланс':'Account & balance','Редактировать профиль':'Edit profile','Моё портфолио':'My portfolio',
+    'Админ-панель':'Admin panel','Редактор сайта':'Site editor','Пользователь':'User',
+    'Клиент':'Client','Исполнитель':'Artist','Менеджер':'Manager','Администратор':'Administrator',
+    'Визуал, который работает на вас':'Visuals that work for you',
+    'Маскоты, стикеры, оформление для стримеров, серверов и брендов.':'Mascots, stickers and visuals for streamers, servers and brands.',
+    'Заказать проект':'Order a project','Смотреть работы':'View portfolio',
+    'Твой творческий напарник — Paw!':'Your creative companion — Paw!',
+    'Маскоты, стикеры и визуал с характером ✨':'Mascots, stickers and visuals with personality ✨',
+    'Создаём уникальный визуальный стиль для тебя, твоего проекта и сообщества.':'We create a unique visual identity for you, your project and your community.',
+    'Готовые паки':'Ready-made bundles','Выбрать услугу':'Choose a service',
+    'Есть идея для проекта?':'Have a project idea?','Подберём подходящую услугу и обсудим детали':'We’ll help you choose a service and discuss the details',
+    'FAQ':'FAQ','Создать заказ':'Create an order','Опишите задачу':'Describe your task',
+    'Название *':'Title *','Описание *':'Description *','Категория *':'Category *',
+    'Бюджет заказа, ₽':'Order budget, ₽','Как с вами связаться? *':'How can we contact you? *',
+    'Мессенджер Paw Art Studio':'Paw Art Studio messenger','Ваш контакт *':'Your contact *',
+    'Исполнитель свяжется с вами выбранным способом. Переписка на сайте будет отключена.':'The artist will contact you using your selected method. Website messaging will be disabled.',
+    'Промокод партнёра':'Partner promo code','Маскот':'Mascot','Стикеры':'Stickers','Баннеры':'Banners',
+    'Аватарки':'Avatars','Арт':'Artwork','Анимация':'Animation','3D арт':'3D art','Другое':'Other',
+    'Админ-панель':'Admin panel','Управление и статистика':'Management and statistics',
+    'Статистика':'Statistics','Выплаты':'Payouts','Заявки':'Requests','Пользователи':'Users','Партнёры':'Partners',
+    'Добавить официального партнёра':'Add an official partner','Добавить партнёра':'Add partner',
+    'Начисления и заявки на выплаты':'Credits and payout requests','Поиск...':'Search...',
+    'Сохранить':'Save','Сохранить всё':'Save all','Загрузить':'Upload','Закрыть':'Close',
+    'Пополнение баланса':'Add funds','Выберите сумму или введите свою':'Choose an amount or enter your own',
+    'Сумма (можно копейки)':'Amount (decimals allowed)','Перейти к оплате':'Continue to payment',
+    'Комиссия':'Fee','Оплата через ЮKassa.':'Payments powered by YooKassa.',
+    'Настройка пака':'Bundle configuration','Выбери состав комплекта':'Choose bundle contents',
+    'Предварительная стоимость':'Estimated total','Заказать пак':'Order bundle',
+    'Итоговая стоимость предварительная — детали и сроки согласуем перед началом работы.':'The total is an estimate. We’ll confirm the details and timeline before starting.',
+    'Моё портфолио':'My portfolio','Загружайте свои работы':'Upload your work',
+    'Нажмите, чтобы выбрать изображение':'Click to choose an image','Название':'Title','Описание':'Description',
+    'Категория':'Category','Имя автора *':'Artist name *','Загрузить':'Upload',
+    'Смена пароля':'Change password','Текущий пароль':'Current password','Новый пароль':'New password',
+    'Сохранить':'Save','Создать заказ':'Create order','Загрузка профиля…':'Loading profile…',
+    'Переписка внутри сайта будет доступна, если выбран этот способ связи.':'Website messaging is available when this contact method is selected.',
+    'Пользовательское соглашение':'Terms of Service','Телефон':'Phone','Email':'Email',
+    'Скоро здесь появятся наши партнёры.':'Our partners will appear here soon.',
+    'Не удалось загрузить партнёров.':'Could not load partners.',
+    'Восстановление доступа':'Password recovery','Установить новый пароль':'Set a new password',
+    'Если аккаунт существует, код отправлен на почту':'If the account exists, a code has been sent by email',
+    'Активировать промокод':'Redeem promo code','Введи код, чтобы получить доступную скидку или бонус на баланс.':'Enter a code to receive an available discount or balance bonus.',
+    'Активировать':'Redeem','Проверяем код…':'Checking code…','Промокод применён!':'Promo code applied!',
+    'Не удалось применить промокод.':'Could not redeem promo code.','Не удалось подключиться к API.':'Could not connect to the API.',
+    'Приглашай друзей 🐾':'Invite friends 🐾','Поделись персональной ссылкой. Здесь видно количество переходов.':'Share your personal link. The number of visits is shown here.',
+    'Загружаем ссылку…':'Loading link…','Скопировать ссылку':'Copy link','Скопировано ✓':'Copied ✓',
+    'Переходов по ссылке:':'Link visits:','Ссылка появится после входа в аккаунт.':'Your link will appear after you sign in.',
+    'Вывод средств':'Withdraw funds','Оформить вывод':'Request a withdrawal',
+    'Исполнители могут отправить заявку на вывод доступного баланса. Администратор проверит реквизиты и вручную выполнит перевод. До рассмотрения сумма резервируется; при отказе возвращается на баланс.':'Artists can request a withdrawal of their available balance. An administrator will verify the details and make the transfer manually. The amount is reserved while the request is reviewed; rejected requests are refunded to the balance.',
+    'Количество':'Quantity','Подробнее':'Details','Обсудить / оформить заказ':'Discuss / place an order',
+    'Закрыть окно':'Close window','Стоимость обсуждается':'Price to be discussed','Не добавлено':'Not included',
+    'Цена указана ориентировочно. До начала работы согласуем задачу, сроки и итоговую стоимость.':'The price is indicative. We will agree on the task, timeline and final price before work begins.',
+    'Это предварительный расчёт по выбранному количеству. Окончательную стоимость подтвердим до начала работы.':'This is an estimate based on the selected quantity. The final price will be confirmed before work begins.',
+    'Промокод скопирован:':'Promo code copied:','Не удалось скопировать промокод.':'Could not copy promo code.',
+    'Партнёрская ссылка скопирована.':'Partner link copied.','Не удалось скопировать ссылку. Скопируйте её вручную.':'Could not copy the link. Please copy it manually.',
+    'Официальный партнёр Paw Art Studio':'Official Paw Art Studio partner',
+    'Скидка по промокодам:':'Promo code discount:','Вознаграждение:':'Reward:','Минимальная выплата:':'Minimum payout:',
+    'На рассмотрении':'Under review','Одобрено':'Approved','Выплачено':'Paid','Отклонено':'Rejected','Сторнировано':'Reversed',
+    'Активных промокодов пока нет.':'No active promo codes yet.','Пока нет заявок.':'No requests yet.','Нет начислений.':'No credits yet.',
+    'Сначала войдите в аккаунт на главной странице, затем откройте кабинет партнёра.':'First sign in on the home page, then open the partner dashboard.',
+    'Ошибка запроса':'Request error','Заявка отправлена.':'Request submitted.',
+    'Скрыть плашку':'Hide banner','Быстрый переход к услугам':'Quick link to services',
+    'Открыт':'Open','В работе':'In progress','На проверке':'In review','Завершён':'Completed','Отменён':'Cancelled',
+    'сейчас':'now','мин':'min','шт.':'pcs',
+    'Срок от 3 дней':'Turnaround from 3 days',
+    'Баннер Discord':'Discord banner','Аватарка':'Avatar','ИИ-арт':'AI art',
+    'Персонаж-талисман, который олицетворяет бренд, компанию, команду или сообщество. Обсуждается лично с заказчиком, высылается модельным листом.':'A mascot character representing a brand, company, team or community. The concept is discussed with the client and delivered with a model sheet.',
+    'Небольшие изображения или надписи в цифровом виде. Наборы эмоций для Discord, Telegram, VK — от 5 до 15 штук.':'Small digital images or lettering. Emotion sticker sets for Discord, Telegram and VK — 5 to 15 items.',
+    'Графическое изображение в верхней части списка каналов вашего сервера. Делает визуальный стиль узнаваемым и помогает участникам быстрее понять тематику группы.':'A graphic displayed at the top of your server channel list. It makes the visual style recognizable and helps members understand the community theme.',
+    'Графическое изображение, фотография или картинка, которая представляет пользователя, бренд или сообщество в интернете.':'A graphic, photo or image representing a user, brand or community online.',
+    'Полноценное художественное произведение, созданное для выражения определённой идеи, эмоции, образа или авторского стиля.':'A complete artwork created to express an idea, emotion, character or artistic style.',
+    'Изображение, созданное искусственным интеллектом (нейросетью) на основе текстового описания (промпта), эскиза или фотографии. Доступно более 20 правок.':'An image generated by AI from a text prompt, sketch or photo. More than 20 revisions are available.',
+    'Собери комплект под свой проект — меняй количество каждого элемента и сразу смотри итоговую стоимость.':'Build a bundle for your project — adjust quantities and see the estimated total instantly.',
+    'Аватарки, сезонные баннеры, стикеры, маскот и оформление Discord-сервера.':'Avatars, seasonal banners, stickers, a mascot and Discord server design.',
+    'Настроить пак':'Configure bundle','Пак стримера':'Streamer bundle',
+    '2D-модель, эмодзи, арт и оверлеи для оформления стрима.':'A 2D model, emotes, artwork and stream overlays.',
+    'Пак «Бренд»':'Brand bundle','Комплект из маскота, 10 стикеров и оверлея. Настройте состав и посмотрите предварительную цену.':'A bundle with a mascot, 10 stickers and an overlay. Customize it and view the estimated price.',
+    'Ориентир: 10 000–12 000 ₽':'Estimate: RUB 10,000–12,000',
+    'Пак «Под ключ»':'All-in-one bundle','Расширенное оформление: маскот, стикеры, оверлей, баннеры и анимация.':'Extended design package: mascot, stickers, overlay, banners and animation.',
+    'Ориентир: 15 000–20 000 ₽':'Estimate: RUB 15,000–20,000',
+    'Создайте заказ или возьмите в работу':'Create an order or pick one up',
+    'Открытые':'Open','Завершённые':'Completed','Отменённые':'Cancelled',
+    'Готовые работы мастеров студии':'Selected work by our studio artists',
+    'Команда, которая делает визуал осмысленным':'A team that gives visuals meaning',
+    '— команда художников и менеджеров.':'— a team of artists and managers.',
+    '«Мы не просто рисуем»':'“We do more than draw”',
+    'проектов':'projects','клиентов':'clients','срок':'turnaround',
+    'Частые вопросы':'Frequently asked questions','Коротко о главном':'The essentials, at a glance',
+    'Свяжитесь с нами удобным способом':'Contact us in the way that works for you',
+    'Оставить заявку':'Submit a request','Мы ответим в течение 24 часов':'We will reply within 24 hours',
+    'Имя':'Name','Проект':'Project','Что нужно':'What do you need?',
+    'обязательно':'required','Выберите услугу из списка — нажмите на поле, чтобы увидеть варианты.':'Choose a service from the list — click the field to see the options.',
+    'Артики':'Illustrations','Премиум арт':'Premium artwork','Чибики':'Chibis','Ава':'Avatar','3D модель':'3D model',
+    'Ссылка на референсы':'Reference links','Промокод партнёра (необязательно)':'Partner promo code (optional)',
+    'Скидка будет указана в заявке для подтверждения администрацией.':'The discount will be shown in the request for administrator confirmation.',
+    'Способ связи':'Contact method','Это тоже список. Выберите, где вам удобнее получить ответ.':'Choose where you would prefer to receive a reply.',
+    'Контакт для связи':'Contact details','Укажите ник, номер или ссылку — в зависимости от выбранного способа.':'Enter a username, number or link depending on the selected method.',
+    'Отправить заявку':'Send request','Наши партнёры 🐾':'Our partners 🐾',
+    'Сообщества, с которыми Paw Art Studio развивает творческую фурри-среду.':'Communities helping Paw Art Studio grow a creative furry space.',
+    'Загружаем партнёров…':'Loading partners…','Уже являетесь партнёром? Открыть партнёрский кабинет ↗':'Already a partner? Open partner dashboard ↗',
+    'Визуал для стримеров, серверов и брендов.':'Visuals for streamers, servers and brands.',
+    'Навигация':'Navigation','Соцсети':'Social media',
+    'Войдите или создайте аккаунт':'Sign in or create an account','Вход':'Sign in','Регистрация':'Register',
+    'Пароль':'Password','Забыли пароль?':'Forgot password?',
+    'На указанный email придёт код подтверждения регистрации.':'A registration confirmation code will be sent to this email.',
+    'Я ознакомился(-ась) и принимаю':'I have read and accept the',
+    'Пользовательское соглашение (публичную оферту)':'Terms of Service (public offer)',
+    'Получить код на email':'Get code by email','Мы отправили код на':'We sent a code to',
+    'Не пришло? Проверьте папку Спам или запросите код повторно.':'Didn’t receive it? Check your spam folder or request another code.',
+    'Код из письма':'Email code','Подтвердить':'Confirm','Отправить код повторно':'Resend code',
+    '← Назад':'← Back','Введите email аккаунта. Мы отправим код для сброса пароля.':'Enter your account email. We will send a password reset code.',
+    'Отправить код':'Send code','← Назад ко входу':'← Back to sign in',
+    'Введите шестизначный код из письма и установите новый пароль.':'Enter the six-digit email code and set a new password.',
+    'Повторите пароль':'Repeat password','Сохранить новый пароль':'Save new password',
+    'Кошелёк':'Wallet','История':'History','Роль':'Role','Ваш баланс':'Your balance',
+    'Пополнить':'Add funds','Вывести':'Withdraw','. Пополнение через ЮKassa.':'. Top-ups via YooKassa.',
+    'пополнено':'deposited','выведено':'withdrawn','Пока нет заявок на вывод':'No withdrawal requests yet.',
+    'Пока нет операций':'No transactions yet.','Ваша роль':'Your role',
+    'Отправьте заявку — админ рассмотрит.':'Submit a request for administrator review.',
+    'Стать исполнителем':'Become an artist','Стать менеджером':'Become a manager',
+    'Заявка на рассмотрении':'Request under review','Загрузить аватар':'Upload avatar',
+    'PNG, JPG, WEBP до 5 МБ':'PNG, JPG, WEBP up to 5 MB','О себе':'About me',
+    'Бюджет заказа, ₽':'Order budget, RUB',
+    'Привязать к зарегистрированному пользователю':'Link to a registered user',
+    'Указать автора вручную':'Enter artist name manually',
+    'По умолчанию выбран ваш аккаунт. Можно выбрать другого пользователя или указать автора вручную.':'Your account is selected by default. You can choose another user or enter an artist name manually.',
+    'Управление и статистика':'Management and statistics',
+    'Промокоды, конкурсы и реклама':'Promo codes, contests and advertising',
+    'Начисления и заявки на выплаты':'Credits and payout requests',
+    'Редакторы и администраторы могут менять услуги, цены и контент':'Editors and administrators can change services, prices and content',
+    'Выберите сумму или введите свою':'Choose an amount or enter your own',
+    'Сумма (можно копейки)':'Amount (decimals allowed)','Номер карты для вывода':'Card number for withdrawal',
+    'Только для исполнителей. Администратор проверит заявку и вручную переведёт сумму на указанную карту. При отказе сумма вернётся на баланс.':'For artists only. An administrator will review the request and manually transfer the amount to the specified card. If rejected, the amount will be returned to your balance.',
+    'Выбери состав комплекта':'Choose bundle contents',
+    'Итоговая стоимость предварительная — детали и сроки согласуем перед началом работы.':'The total is an estimate — details and timing will be agreed before work begins.',
+    'Раздел временно недоступен':'This section is temporarily unavailable',
+    'Не удалось скопировать':'Could not copy',
+    'Пароль должен содержать минимум 6 символов':'Password must contain at least 6 characters',
+    'Пароли не совпадают':'Passwords do not match',
+    'Пароль изменён. Теперь войдите с новым паролем.':'Password changed. Please sign in with your new password.',
+    'Создайте новый аккаунт':'Create a new account',
+    'Email не найден. Вернитесь к регистрации и запросите код заново.':'Email not found. Return to registration and request a new code.',
+    'Введите ровно 6 цифр из письма.':'Enter exactly the 6 digits from the email.',
+    'Сервер вернул неполные данные. Попробуйте позже.':'The server returned incomplete data. Please try again later.',
+    'Не удалось подтвердить email. Попробуйте ещё раз.':'Could not verify the email. Please try again.',
+    'Ошибка подтверждения email':'Email verification error',
+    'Email не найден':'Email not found',
+    'Код отправлен повторно':'Code sent again',
+    'Вы вышли':'You have signed out',
+    'Профиль обновлён':'Profile updated',
+    'Выберите PNG, JPG, WEBP или GIF до 5 МБ':'Choose a PNG, JPG, WEBP or GIF file up to 5 MB',
+    'Максимум 5 МБ':'Maximum 5 MB',
+    'Аватар обновлён':'Avatar updated',
+    'Войдите, чтобы увидеть заказы':'Sign in to view orders',
+    'Работы появятся здесь':'Your work will appear here',
+    'Возьмите в работу':'Accept order',
+    'Исполнители не создают заказы':'Artists cannot create orders',
+    'Загрузка файлов…':'Uploading files…',
+    'Вернуть в открытые':'Reopen order',
+    'Перевести в работу':'Move to in progress',
+    'Отменить заказ':'Cancel order',
+    'Исполнитель сможет написать вам здесь. Ответить можно в мессенджере сайта.':'The artist can message you here. You can reply in the website messenger.',
+    'Слишком много попыток. Попробуйте позже.':'Too many attempts. Please try again later.',
+    'Показывать все':'Show all','Нет результатов':'No results',
+    'Ожидает подтверждения':'Awaiting confirmation','Новый заказ':'New order',
+    'Выберите пользователя':'Select a user','Написать':'Send message',
+    'Отправить':'Send','Отправка…':'Sending…','Загрузка…':'Loading…',
+    'Обновить':'Refresh','Назад':'Back','Да':'Yes','Нет':'No',
+    'Подтвердите действие':'Confirm action','Вы уверены?':'Are you sure?',
+    'Ошибка загрузки данных':'Error loading data','Не удалось загрузить данные':'Could not load data',
+    'Сохранено':'Saved','Изменения сохранены':'Changes saved',
+    'Удалить':'Delete','Редактировать':'Edit','Подробнее':'Details',
+    'Пользователь не найден':'User not found','Чат не найден':'Chat not found',
+    'Сообщение не может быть пустым':'Message cannot be empty',
+    'Заказ не найден':'Order not found','Доступ запрещён':'Access denied'
+  };
+  const reverse = Object.fromEntries(Object.entries(translations).map(([ru,en]) => [en,ru]));
+  let language = localStorage.getItem(STORAGE_KEY) === 'en' ? 'en' : 'ru';
+  const original = new WeakMap();
+  const rendered = new WeakMap();
+  const originalAttributes = new WeakMap();
+  const renderedAttributes = new WeakMap();
+  function translateValue(value) {
+    const text = String(value ?? '');
+    const trimmed = text.trim();
+    if (!trimmed) return text;
+    const translated = language === 'en' ? translations[trimmed] : reverse[trimmed];
+    if (!translated) return text;
+    return text.replace(trimmed, translated);
+  }
+  function processNode(node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const current = node.nodeValue;
+      if (!original.has(node) || (rendered.has(node) && current !== rendered.get(node))) original.set(node, current);
+      const source = original.get(node);
+      const key = source.trim();
+      const translated = language === 'en' ? translations[key] : null;
+      const nextValue = translated ? source.replace(key, translated) : source;
+      if (current !== nextValue) node.nodeValue = nextValue;
+      rendered.set(node, nextValue);
+      return;
+    }
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+    for (const attr of ['placeholder','title','aria-label','alt','content']) {
+      if (!node.hasAttribute(attr)) continue;
+      let originals = originalAttributes.get(node);
+      let outputs = renderedAttributes.get(node);
+      if (!originals) { originals = {}; originalAttributes.set(node, originals); }
+      if (!outputs) { outputs = {}; renderedAttributes.set(node, outputs); }
+      const current = node.getAttribute(attr);
+      if (originals[attr] === undefined || (outputs[attr] !== undefined && current !== outputs[attr])) originals[attr] = current;
+      const nextValue = translateValue(originals[attr]);
+      if (current !== nextValue) node.setAttribute(attr, nextValue);
+      outputs[attr] = nextValue;
+    }
+    node.childNodes.forEach(processNode);
+  }
+  function applyLanguage(next) {
+    language = next === 'en' ? 'en' : 'ru';
+    localStorage.setItem(STORAGE_KEY, language);
+    document.documentElement.lang = language;
+    document.querySelectorAll('.pas-language-option').forEach(button => {
+      button.setAttribute('aria-pressed', String(button.dataset.lang === language));
+      button.classList.toggle('active', button.dataset.lang === language);
+    });
+    processNode(document.head);
+    processNode(document.body);
+    window.dispatchEvent(new CustomEvent('pas:languagechange', { detail: { language } }));
+  }
+  document.addEventListener('click', event => {
+    const button = event.target.closest('.pas-language-option');
+    if (button) applyLanguage(button.dataset.lang);
+  });
+  const observer = new MutationObserver(records => {
+    for (const record of records) {
+      if (record.type === 'childList') record.addedNodes.forEach(processNode);
+      else if (record.type === 'characterData') processNode(record.target);
+    }
+  });
+  observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+  window.PAS_I18N = {
+    get language() { return language; },
+    t(value) { return translateValue(value); },
+    setLanguage: applyLanguage
+  };
+  if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', () => applyLanguage(language), { once: true });
+  else applyLanguage(language);
+})();
