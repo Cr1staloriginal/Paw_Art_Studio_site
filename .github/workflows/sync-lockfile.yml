@@ -27,7 +27,8 @@ jobs:
           cache: npm
 
       - name: Regenerate lockfile from package.json
-        run: npm install --package-lock-only --ignore-scripts
+        run: |
+          npm install --package-lock-only --ignore-scripts
           npm audit fix --package-lock-only --ignore-scripts
 
       - name: Commit lockfile if changed
