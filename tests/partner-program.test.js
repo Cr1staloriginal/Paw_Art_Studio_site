@@ -88,7 +88,7 @@ test('partner referral, discount, verified reward and payout lifecycle', async t
   assert.equal(referralOnlyProject.status,201,JSON.stringify(referralOnlyProject.data));
   assert.equal(referralOnlyProject.data.project.partner_id,partnerId);
   const project=await request('/api/projects',{method:'POST',token:customerToken,body:{
-    title:'Test order',description:'Integration test',category:'Mascot',budget:1000,promoCode:'TEST10'
+    title:'Test order',description:'Integration test',category:'Mascot',budget:1000,promoCode:'TEST10',contactMethod:'Сайт'
   }});
   assert.equal(project.status,201,JSON.stringify(project.data));
   assert.equal(project.data.project.base_budget,100000);
