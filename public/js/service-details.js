@@ -3,7 +3,9 @@
   'use strict';
 
   let activeCard = null;
-  const money = (value) => new Intl.NumberFormat('ru-RU').format(value) + ' ₽';
+  const locale = () => window.PAS_I18N?.language === 'en' ? 'en-US' : 'ru-RU';
+  const tr = (ru, en) => locale() === 'en-US' ? en : ru;
+  const money = (value) => new Intl.NumberFormat(locale(), {style:'currency',currency:'RUB',maximumFractionDigits:0}).format(value);
   const modal = document.createElement('div');
   modal.className = 'paw-service-modal';
   modal.id = 'pawServiceModal';
@@ -48,17 +50,17 @@
     const input = $('pawServiceQuantity');
     const qty = Math.max(min, Math.min(max, Math.round(Number(input.value) || 0)));
     input.value = String(qty);
-    $('pawServiceQuantityValue').textContent = qty + (qty === 1 ? ' шт.' : ' шт.');
+    $('pawServiceQuantityValue').textContent = qty + ' ' + tr('шт.','pcs');
     $('pawServicePrice').textContent = kind === 'quote'
-      ? (activeCard.dataset.price || 'Стоимость обсуждается')
-      : (kind === 'fixed' && qty === 0 ? 'Не добавлено' : money(qty * price));
+      ? (window.PAS_I18N?.t(activeCard.dataset.price || 'Стоимость обсуждается') || activeCard.dataset.price || tr('Стоимость обсуждается','Price to be discussed'))
+      : (kind === 'fixed' && qty === 0 ? tr('Не добавлено','Not included') : money(qty * price));
     $('pawServiceNote').textContent = kind === 'quote'
-      ? 'Цена указана ориентировочно. До начала работы согласуем задачу, сроки и итоговую стоимость.'
+      ? tr('Цена указана ориентировочно. До начала работы согласуем задачу, сроки и итоговую стоимость.','The price is indicative. We will agree on the task, timeline and final price before work begins.')
       : (kind === 'fixed' && qty === 0
-        ? 'Маскот не будет включён в заявку. Перед заказом его концепцию нужно обсудить лично.'
-        : 'Это предварительный расчёт по выбранному количеству. Окончательную стоимость подтвердим до начала работы.');
-    $('pawServiceMin').textContent = min + ' шт.';
-    $('pawServiceMax').textContent = max + ' шт.';
+        ? tr('Маскот не будет включён в заявку. Перед заказом его концепцию нужно обсудить лично.','The mascot will not be added to the request. Its concept must be discussed separately before ordering.')
+        : tr('Это предварительный расчёт по выбранному количеству. Окончательную стоимость подтвердим до начала работы.','This is an estimate based on the selected quantity. The final price will be confirmed before work begins.'));
+    $('pawServiceMin').textContent = min + ' ' + tr('шт.','pcs');
+    $('pawServiceMax').textContent = max + ' ' + tr('шт.','pcs');
     modal.querySelector('.paw-service-order').disabled = kind === 'fixed' && qty === 0;
   };
 
@@ -67,13 +69,13 @@
     const kind = card.dataset.kind || 'quote';
     const min = Number(card.dataset.min ?? 1);
     const max = Number(card.dataset.max ?? 1);
-    $('pawServiceTitle').textContent = card.dataset.service || 'Услуга';
+    $('pawServiceTitle').textContent = card.dataset.service || tr('Услуга','Service');
     $('pawServiceDescription').textContent = card.dataset.detail || card.querySelector('p')?.textContent || '';
     const sourceImage = card.querySelector('.service-image img, img');
     const detailImage = $('pawServiceImage');
     if (sourceImage?.getAttribute('src')) {
       detailImage.src = sourceImage.getAttribute('src');
-      detailImage.alt = sourceImage.alt || ('Пример услуги «' + (card.dataset.service || 'Услуга') + '»');
+      detailImage.alt = sourceImage.alt || (tr('Пример услуги «','Example service “') + (card.dataset.service || tr('Услуга','Service')) + (locale() === 'en-US' ? '”' : '»'));
       detailImage.hidden = false;
     } else {
       detailImage.removeAttribute('src');
@@ -99,8 +101,8 @@
       const button = document.createElement('button');
       button.type = 'button';
       button.className = 'paw-service-more';
-      button.textContent = 'Подробнее';
-      button.setAttribute('aria-label', 'Подробнее об услуге ' + (card.dataset.service || ''));
+      button.textContent = tr('Подробнее','Details');
+      button.setAttribute('aria-label', tr('Подробнее об услуге ','More about this service ') + (card.dataset.service || ''));
       content.appendChild(button);
     }
   });
@@ -132,10 +134,10 @@
       const description = document.getElementById('projDescription');
 
       if (category && Array.from(category.options).some((item) => item.value === title)) category.value = title;
-      if (titleInput) titleInput.value = title + (kind === 'quote' ? '' : ' — ' + qty + ' шт.');
+      if (titleInput) titleInput.value = title + (kind === 'quote' ? '' : ' — ' + qty + ' ' + tr('шт.','pcs'));
       if (description) {
         description.value = (activeCard.dataset.detail || '') +
-          (kind === 'quote' ? '' : '\nКоличество: ' + qty + '. Предварительная стоимость: ' + price + '.');
+          (kind === 'quote' ? '' : '\n' + tr('Количество:','Quantity:') + ' ' + qty + '. ' + tr('Предварительная стоимость:','Estimated price:') + ' ' + (window.PAS_I18N?.t(price) || price) + '.');
       }
       // Поле бюджета убрано из формы заказа; предварительная цена остаётся в окне услуги.
 
@@ -159,4 +161,5 @@
   });
 
   $('pawServiceQuantity').addEventListener('input', updatePrice);
+  window.addEventListener('pas:languagechange', updatePrice);
 })();
