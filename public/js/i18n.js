@@ -2,6 +2,11 @@
   'use strict';
   const STORAGE_KEY = 'pas_language';
   const translations = {
+    'Paw Art Studio — Визуал для твоего проекта':'Paw Art Studio — Visuals for your project',
+    'Paw Art Studio — студия цифрового дизайна':'Paw Art Studio — digital design studio',
+    'Маскоты, стикеры, баннеры, аватары и иллюстрации для твоего проекта.':'Mascots, stickers, banners, avatars and illustrations for your project.',
+    '🐾 Студия визуала Paw Art Studio':'🐾 Paw Art Studio visual design studio',
+    'Language':'Язык',
     'Услуги':'Services','Заказы':'Orders','Портфолио':'Portfolio','О нас':'About us','Контакты':'Contact',
     'Войти':'Sign in','Выйти':'Sign out','Сообщения':'Messages','Найти пользователя':'Find a user',
     'Введите имя пользователя...':'Enter a username...','Написать сообщение...':'Write a message...',
@@ -167,7 +172,7 @@
       return;
     }
     if (node.nodeType !== Node.ELEMENT_NODE) return;
-    for (const attr of ['placeholder','title','aria-label','alt']) {
+    for (const attr of ['placeholder','title','aria-label','alt','content']) {
       if (!node.hasAttribute(attr)) continue;
       let originals = originalAttributes.get(node);
       let outputs = renderedAttributes.get(node);
@@ -189,6 +194,7 @@
       button.setAttribute('aria-pressed', String(button.dataset.lang === language));
       button.classList.toggle('active', button.dataset.lang === language);
     });
+    processNode(document.head);
     processNode(document.body);
     window.dispatchEvent(new CustomEvent('pas:languagechange', { detail: { language } }));
   }
