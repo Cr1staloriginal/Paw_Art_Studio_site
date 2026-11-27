@@ -28,13 +28,14 @@
     if (!output) {
       output = document.createElement('small');
       output.className = 'pas-usd-equivalent';
+      output.style.cssText = 'display:block;font-size:.78em;opacity:.72;margin-top:2px;font-weight:500;';
       target.insertAdjacentElement('afterend', output);
     }
     const usd = amount / rubPerUsd;
     output.textContent = '≈ ' + new Intl.NumberFormat(locale(), {
       style: 'currency', currency: 'USD', maximumFractionDigits: 2
     }).format(usd);
-    output.title = note() + (rateDate ? ' Rate date: ' + rateDate : '');
+    output.title = note() + (rateDate ? (locale() === 'en-US' ? ' Rate date: ' : ' Дата курса: ') + rateDate : '');
   }
 
   function refresh() {
